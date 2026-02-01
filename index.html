@@ -6,24 +6,26 @@
   <title>Sueños Shipping & Variety Store | Jamaica</title>
   <meta name="description" content="Reliable shipping, courier delivery, and a trusted variety store—Jamaica-wide. Fast. Secure. Friendly." />
 
-  <!-- Optional: Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      --bg:#070a08;
-      --panel:#0e1410;
-      --text:#eaf2ec;
-      --muted:#b9c7be;
-      --green:#1db954;     /* Jamaica-inspired green */
-      --gold:#f9c74f;      /* Jamaica-inspired gold */
-      --black:#000000;
-      --line:rgba(255,255,255,.10);
-      --shadow: 0 12px 30px rgba(0,0,0,.45);
+      --bg:#ffffff;
+      --panel:#ffffff;
+      --text:#0d1b14;
+      --muted:#4c5e55;
+      --line:rgba(13,27,20,.12);
+      --shadow: 0 12px 28px rgba(0,0,0,.10);
       --radius: 18px;
       --radius2: 26px;
+
+      /* Jamaican brand accents */
+      --green:#1db954;
+      --gold:#f9c74f;
+      --black:#000000;
+
       --max: 1120px;
     }
 
@@ -34,48 +36,18 @@
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color:var(--text);
       background:
-        radial-gradient(1200px 600px at 20% -10%, rgba(29,185,84,.25), transparent 60%),
-        radial-gradient(900px 500px at 90% 10%, rgba(249,199,79,.20), transparent 60%),
-        linear-gradient(180deg, #050705 0%, #070a08 40%, #050705 100%);
+        radial-gradient(900px 520px at 15% -10%, rgba(29,185,84,.14), transparent 60%),
+        radial-gradient(760px 460px at 90% 0%, rgba(249,199,79,.16), transparent 60%),
+        linear-gradient(180deg, #ffffff 0%, #fbfdfb 60%, #ffffff 100%);
     }
 
     a{color:inherit; text-decoration:none}
     .wrap{max-width:var(--max); margin:0 auto; padding:0 18px}
-    .btn{
-      display:inline-flex; align-items:center; justify-content:center;
-      gap:10px;
-      padding:12px 16px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.06);
-      color:var(--text);
-      font-weight:700;
-      cursor:pointer;
-      transition: transform .15s ease, background .15s ease, border-color .15s ease;
-      user-select:none;
-    }
-    .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16)}
-    .btn.primary{
-      background: linear-gradient(90deg, rgba(29,185,84,.95), rgba(249,199,79,.92));
-      color:#09110c;
-      border-color: rgba(255,255,255,.18);
-    }
-    .btn.primary:hover{background: linear-gradient(90deg, rgba(29,185,84,1), rgba(249,199,79,1))}
-    .pill{
-      display:inline-flex; align-items:center; gap:10px;
-      padding:8px 12px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.05);
-      color:var(--muted);
-      font-weight:600;
-      font-size:13px;
-    }
-    .dot{width:9px;height:9px;border-radius:999px;background:var(--green); box-shadow: 0 0 0 4px rgba(29,185,84,.15)}
+
     .topbar{
       position:sticky; top:0; z-index:50;
       backdrop-filter: blur(10px);
-      background: rgba(5,7,5,.55);
+      background: rgba(255,255,255,.78);
       border-bottom:1px solid var(--line);
     }
     .nav{
@@ -91,740 +63,1092 @@
     .mark{
       width:38px;height:38px;border-radius:12px;
       background: linear-gradient(135deg, rgba(29,185,84,1), rgba(249,199,79,1));
-      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+      box-shadow: 0 10px 20px rgba(0,0,0,.10);
       position:relative;
       overflow:hidden;
     }
     .mark:after{
       content:"";
-      position:absolute; inset:-20%;
-      background: linear-gradient(135deg, rgba(0,0,0,.25), transparent 55%);
+      position:absolute; inset:-25%;
+      background: linear-gradient(135deg, rgba(0,0,0,.18), transparent 55%);
       transform: rotate(18deg);
     }
-    .navlinks{
-      display:flex; gap:14px; flex-wrap:wrap;
-      align-items:center;
-      justify-content:flex-end;
-    }
+
+    .navlinks{display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:flex-end}
     .navlinks a{
       padding:8px 10px;
       border-radius:12px;
       color:var(--muted);
       border:1px solid transparent;
-      font-weight:600;
+      font-weight:700;
       font-size:14px;
     }
-    .navlinks a:hover{
-      color:var(--text);
-      border-color: var(--line);
-      background: rgba(255,255,255,.04);
-    }
+    .navlinks a:hover{color:var(--text); border-color:var(--line); background: rgba(13,27,20,.03)}
 
-    /* Hero */
-    .hero{
-      padding:40px 0 10px;
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:10px;
+      padding:11px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(13,27,20,.03);
+      color:var(--text);
+      font-weight:800;
+      cursor:pointer;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
     }
-    .heroGrid{
-      display:grid;
-      grid-template-columns: 1.12fr .88fr;
-      gap:18px;
-      align-items:stretch;
+    .btn:hover{transform: translateY(-1px); background: rgba(13,27,20,.05); border-color: rgba(13,27,20,.16)}
+    .btn.primary{
+      background: linear-gradient(90deg, rgba(29,185,84,1), rgba(249,199,79,1));
+      color:#07130d;
+      border-color: rgba(0,0,0,.06);
     }
+    .btn.primary:hover{filter:saturate(1.05) contrast(1.02)}
+    .btn.danger{background: rgba(0,0,0,.85); color:#fff; border-color: rgba(0,0,0,.12)}
+    .btn.small{padding:9px 12px; border-radius:12px; font-size:13px}
+
+    .pill{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(13,27,20,.03);
+      color:var(--muted);
+      font-weight:800;
+      font-size:12px;
+    }
+    .dot{width:9px;height:9px;border-radius:999px;background:var(--green); box-shadow: 0 0 0 4px rgba(29,185,84,.18)}
+
+    /* Layout cards */
     .card{
-      background: rgba(255,255,255,.04);
+      background: var(--panel);
       border:1px solid var(--line);
       border-radius: var(--radius2);
       box-shadow: var(--shadow);
     }
-    .heroLeft{
-      padding:28px 26px;
-      overflow:hidden;
-      position:relative;
-    }
-    .heroLeft:before{
-      content:"";
-      position:absolute;
-      inset:-60px -80px auto auto;
-      width:260px; height:260px;
-      background: radial-gradient(circle at 30% 30%, rgba(249,199,79,.28), transparent 65%);
-      filter: blur(2px);
-      transform: rotate(12deg);
-      pointer-events:none;
-    }
-    h1{
-      margin:14px 0 10px;
-      font-size: clamp(30px, 4vw, 48px);
-      line-height: 1.02;
-      letter-spacing: -0.6px;
-    }
-    .lead{
-      margin:0 0 18px;
-      color:var(--muted);
-      max-width: 62ch;
-      font-size: 15.5px;
-      line-height: 1.55;
-    }
-    .ctaRow{display:flex; gap:12px; flex-wrap:wrap; margin-top:14px}
-    .miniRow{
-      display:flex; gap:14px; flex-wrap:wrap; margin-top:16px;
-      color:var(--muted); font-size:13px; font-weight:600;
-    }
-    .miniRow span{display:inline-flex; align-items:center; gap:8px}
-    .badge{
-      display:inline-flex; align-items:center; gap:10px;
-      padding:10px 12px;
-      border-radius: 14px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-    }
-    .badge strong{color:var(--text)}
-    .heroRight{
-      padding:14px;
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-    }
-    .imgBox{
-      border-radius: 22px;
-      border:1px solid var(--line);
-      overflow:hidden;
-      min-height: 220px;
-      background:#0b120d;
-      position:relative;
-    }
-    .imgBox img{
-      width:100%; height:100%;
-      object-fit:cover;
-      display:block;
-      filter: saturate(1.05) contrast(1.03);
-      opacity:.92;
-    }
-    .imgOverlay{
-      position:absolute; inset:0;
-      background: linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.65));
-    }
-    .imgCaption{
-      position:absolute; left:14px; right:14px; bottom:14px;
-      display:flex; justify-content:space-between; gap:10px; align-items:flex-end;
-      color:rgba(234,242,236,.92);
-      font-weight:700;
-      font-size:13px;
-    }
-    .imgCaption small{display:block; color:rgba(185,199,190,.95); font-weight:600; margin-top:4px}
-    .statRow{
-      display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;
-    }
-    .stat{
-      padding:12px;
-      border-radius: 18px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-    }
-    .stat b{display:block; font-size:18px}
-    .stat span{color:var(--muted); font-weight:600; font-size:12px}
-
-    /* Sections */
     section{padding:42px 0}
-    .sectionHead{
-      display:flex; align-items:flex-end; justify-content:space-between;
-      gap:14px; margin-bottom:14px;
-    }
-    .sectionHead h2{margin:0; font-size:26px; letter-spacing:-0.3px}
-    .sectionHead p{margin:0; color:var(--muted); max-width: 60ch; line-height:1.55}
-    .grid4{display:grid; grid-template-columns: repeat(4, 1fr); gap:14px}
+    h1{margin:12px 0 10px; font-size: clamp(30px, 4vw, 46px); line-height: 1.02; letter-spacing: -0.6px;}
+    h2{margin:0; font-size:26px; letter-spacing:-0.3px}
+    .lead{margin:0 0 18px; color:var(--muted); max-width: 68ch; font-size: 15.5px; line-height: 1.55;}
+    .muted{color:var(--muted)}
     .grid2{display:grid; grid-template-columns: 1fr 1fr; gap:14px}
-    .tile{
-      padding:16px;
-      border-radius: var(--radius);
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-    }
+    .grid3{display:grid; grid-template-columns: repeat(3, 1fr); gap:14px}
+    .grid4{display:grid; grid-template-columns: repeat(4, 1fr); gap:14px}
+    .panel{padding:18px; border-radius: var(--radius2); border:1px solid var(--line); background: var(--panel); box-shadow: var(--shadow)}
+    .tile{padding:16px; border-radius: var(--radius); border:1px solid var(--line); background: rgba(13,27,20,.02)}
     .icon{
       width:40px; height:40px; border-radius: 14px;
-      background: rgba(29,185,84,.12);
-      border:1px solid rgba(29,185,84,.25);
+      background: rgba(29,185,84,.10);
+      border:1px solid rgba(29,185,84,.22);
       display:grid; place-items:center;
       margin-bottom:12px;
+      font-weight:900;
     }
     .tile h3{margin:0 0 6px; font-size:16px}
     .tile p{margin:0; color:var(--muted); line-height:1.55; font-size:14px}
 
-    /* Rates + Calculator */
-    .panel{
-      padding:18px;
-      border-radius: var(--radius2);
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      box-shadow: var(--shadow);
+    /* Hero */
+    .hero{padding:36px 0 10px}
+    .heroGrid{display:grid; grid-template-columns: 1.15fr .85fr; gap:14px; align-items:stretch}
+    .heroLeft{padding:26px 24px; position:relative; overflow:hidden}
+    .heroLeft:before{
+      content:""; position:absolute; inset:-80px -100px auto auto;
+      width:260px; height:260px;
+      background: radial-gradient(circle at 30% 30%, rgba(249,199,79,.26), transparent 66%);
+      pointer-events:none;
     }
-    table{width:100%; border-collapse: collapse; overflow:hidden; border-radius:16px}
-    th, td{padding:10px 10px; text-align:left; border-bottom: 1px solid rgba(255,255,255,.08)}
-    th{color: rgba(234,242,236,.9); font-size:12px; text-transform:uppercase; letter-spacing:.08em}
-    td{color: var(--muted); font-weight:600}
-    tr:hover td{color:var(--text)}
-    .note{color:var(--muted); font-size:13px; margin-top:10px; line-height:1.55}
+    .ctaRow{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+    .miniRow{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+    .badge{display:inline-flex; align-items:center; gap:10px; padding:10px 12px; border-radius: 14px; border:1px solid var(--line); background: rgba(13,27,20,.02); font-weight:800; font-size:13px}
+    .badge span{color:var(--muted); font-weight:800; font-size:12px}
 
-    .formGrid{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:12px;
-      margin-top:10px;
+    .imgBox{
+      border-radius: 22px;
+      border:1px solid var(--line);
+      overflow:hidden;
+      min-height: 210px;
+      background:#f6faf7;
+      position:relative;
     }
-    label{display:block; font-size:12px; color:rgba(234,242,236,.88); font-weight:700; margin:10px 0 6px}
+    .imgBox img{width:100%; height:100%; object-fit:cover; display:block; opacity:.95}
+    .imgOverlay{
+      position:absolute; inset:0;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.42));
+    }
+    .imgCaption{
+      position:absolute; left:14px; right:14px; bottom:14px;
+      display:flex; justify-content:space-between; gap:10px; align-items:flex-end;
+      color:#fff; font-weight:900; font-size:13px;
+      text-shadow: 0 10px 18px rgba(0,0,0,.55);
+    }
+    .imgCaption small{display:block; color:rgba(255,255,255,.88); font-weight:800; margin-top:4px}
+
+    /* Forms */
+    label{display:block; font-size:12px; color:rgba(13,27,20,.92); font-weight:900; margin:10px 0 6px}
     input, select, textarea{
       width:100%;
       padding:12px 12px;
       border-radius: 14px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.25);
+      border:1px solid rgba(13,27,20,.14);
+      background: #fff;
       color: var(--text);
       outline:none;
     }
-    input::placeholder, textarea::placeholder{color:rgba(185,199,190,.7)}
+    input::placeholder, textarea::placeholder{color:rgba(76,94,85,.75)}
     textarea{min-height:120px; resize:vertical}
-    .calcResult{
+    .formGrid{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
+    .hint{font-size:12.5px; color:var(--muted); line-height:1.45; margin-top:8px}
+    .alert{
       margin-top:12px;
+      padding:12px;
+      border-radius: 16px;
+      border:1px solid rgba(249,199,79,.45);
+      background: rgba(249,199,79,.18);
+      font-weight:900;
+    }
+
+    /* Dashboard */
+    .appShell{
+      display:grid;
+      grid-template-columns: 270px 1fr;
+      gap:14px;
+      align-items:start;
+      padding:18px 0 40px;
+    }
+    .side{
+      position:sticky; top:76px;
       padding:14px;
-      border-radius: 16px;
-      border:1px solid rgba(249,199,79,.25);
-      background: rgba(249,199,79,.08);
-      color: rgba(234,242,236,.92);
-      font-weight:700;
-    }
-    .calcResult small{display:block; margin-top:6px; color:rgba(185,199,190,.92); font-weight:600; line-height:1.4}
-
-    /* FAQ */
-    details{
+      border-radius: var(--radius2);
       border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      border-radius: 16px;
-      padding: 12px 14px;
+      background: rgba(13,27,20,.02);
     }
-    details summary{
-      cursor:pointer;
-      font-weight:800;
-      color: rgba(234,242,236,.95);
-      list-style:none;
-    }
-    details summary::-webkit-details-marker{display:none}
-    details p{margin:10px 0 0; color:var(--muted); line-height:1.6}
-
-    /* Footer */
-    footer{
-      padding:28px 0 36px;
-      border-top:1px solid var(--line);
+    .side a{
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px;
+      border-radius: 14px;
+      border:1px solid transparent;
+      font-weight:900;
       color: var(--muted);
     }
-    .footGrid{
-      display:grid; grid-template-columns: 1.4fr .8fr .8fr; gap:14px;
+    .side a:hover{border-color: var(--line); background: rgba(13,27,20,.03); color:var(--text)}
+    .side a.active{border-color: rgba(29,185,84,.35); background: rgba(29,185,84,.08); color:var(--text)}
+    .kpiRow{display:grid; grid-template-columns: repeat(4, 1fr); gap:12px}
+    .kpi{padding:14px; border-radius: 18px; border:1px solid var(--line); background: #fff; box-shadow: 0 10px 18px rgba(0,0,0,.06)}
+    .kpi b{display:block; font-size:18px}
+    .kpi span{color:var(--muted); font-weight:900; font-size:12px}
+
+    table{width:100%; border-collapse: collapse; overflow:hidden; border-radius:16px}
+    th, td{padding:10px 10px; text-align:left; border-bottom: 1px solid rgba(13,27,20,.10)}
+    th{color: rgba(13,27,20,.78); font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:900}
+    td{color: var(--muted); font-weight:800}
+    tr:hover td{color:var(--text)}
+    .tag{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border-radius: 999px;
+      border:1px solid rgba(13,27,20,.14);
+      background: rgba(13,27,20,.02);
+      font-size:12px;
+      font-weight:900;
+      color: var(--text);
     }
-    .footGrid h4{margin:0 0 10px; color:rgba(234,242,236,.92)}
-    .footGrid a{display:inline-block; margin:6px 0; color:var(--muted)}
-    .footGrid a:hover{color:var(--text)}
-    .copy{margin-top:14px; font-size:13px}
+    .tag.green{border-color: rgba(29,185,84,.35); background: rgba(29,185,84,.10)}
+    .tag.gold{border-color: rgba(249,199,79,.55); background: rgba(249,199,79,.18)}
+    .tag.dark{border-color: rgba(0,0,0,.22); background: rgba(0,0,0,.06)}
+
+    footer{padding:26px 0 34px; border-top:1px solid var(--line); color: var(--muted)}
+    .copy{margin-top:14px; font-size:13px; font-weight:800}
 
     /* Responsive */
     @media (max-width: 980px){
       .heroGrid{grid-template-columns:1fr}
       .grid4{grid-template-columns: repeat(2, 1fr)}
+      .grid3{grid-template-columns: 1fr}
       .grid2{grid-template-columns: 1fr}
       .formGrid{grid-template-columns: 1fr}
-      .footGrid{grid-template-columns: 1fr}
+      .appShell{grid-template-columns: 1fr}
+      .side{position:relative; top:auto}
+      .kpiRow{grid-template-columns: 1fr 1fr}
     }
     @media (max-width: 520px){
       .grid4{grid-template-columns: 1fr}
-      .statRow{grid-template-columns: 1fr}
       .navlinks{display:none}
+      .kpiRow{grid-template-columns: 1fr}
     }
+
+    /* Hide/show pages */
+    .page{display:none}
+    .page.active{display:block}
   </style>
 </head>
 
 <body>
+  <!-- Topbar -->
   <div class="topbar">
     <div class="wrap">
       <div class="nav">
         <a class="brand" href="#home" aria-label="Sueños Shipping Home">
           <div class="mark" aria-hidden="true"></div>
           <div>
-            Sueños Shipping<br><span style="color:var(--muted); font-weight:700; font-size:12px"> & Variety Store • Jamaica</span>
+            Sueños Shipping
+            <div style="color:var(--muted); font-weight:900; font-size:12px"> & Variety Store • Jamaica</div>
           </div>
         </a>
 
         <div class="navlinks" aria-label="Primary navigation">
+          <a href="#home">Home</a>
           <a href="#services">Services</a>
-          <a href="#rates">Rates</a>
-          <a href="#calculator">Calculator</a>
-          <a href="#faq">FAQ</a>
           <a href="#contact">Contact</a>
+          <a href="#dashboard">Dashboard</a>
         </div>
 
-        <div style="display:flex; gap:10px">
-          <a class="btn" href="#contact">Get a Quote</a>
-          <a class="btn primary" href="#calculator">Calculate</a>
-        </div>
+        <div id="navAuth" style="display:flex; gap:10px"></div>
       </div>
     </div>
   </div>
 
-  <main id="home" class="hero">
-    <div class="wrap">
-      <div class="heroGrid">
-        <div class="card heroLeft">
-          <div class="pill"><span class="dot"></span> Jamaica-wide shipping • Courier • Variety store</div>
-          <h1>Reliable, fast & secure deliveries — with Jamaican heart.</h1>
-          <p class="lead">
-            Sueños Shipping & Variety Store moves packages with care, speed, and real customer service.
-            From overseas shipping support to local courier drop-offs — we keep Jamaica connected.
-          </p>
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page">
+    <main class="hero">
+      <div class="wrap">
+        <div class="heroGrid">
+          <div class="card heroLeft">
+            <div class="pill"><span class="dot"></span> Jamaica-wide shipping • Courier • Variety store</div>
+            <h1>Reliable deliveries — with Jamaican heart.</h1>
+            <p class="lead">
+              Sueños Shipping & Variety Store moves packages with care, speed, and real customer service.
+              From inbound shipping support to local courier drop-offs — we keep Jamaica connected.
+            </p>
 
-          <div class="ctaRow">
-            <a class="btn primary" href="#contact">Start Shipping</a>
-            <a class="btn" href="#services">See Services</a>
-          </div>
-
-          <div class="miniRow">
-            <span class="badge">🚚 <strong>Courier Movement</strong> <span style="opacity:.85">Kingston → All Parishes</span></span>
-            <span class="badge">✈️ <strong>Air & Ocean Support</strong> <span style="opacity:.85">Fast inbound handling</span></span>
-            <span class="badge">🏪 <strong>Variety Store</strong> <span style="opacity:.85">Everyday essentials</span></span>
-          </div>
-        </div>
-
-        <div class="card heroRight">
-          <!-- Replace these image URLs with your own photos OR free stock (Unsplash/Pexels) -->
-          <div class="imgBox">
-            <img alt="Logistics and courier movement" src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=1400&q=70">
-            <div class="imgOverlay"></div>
-            <div class="imgCaption">
-              <div>
-                On-the-move logistics
-                <small>Packages tracked • handled with care</small>
-              </div>
-              <div style="color:rgba(249,199,79,.95)">●</div>
-            </div>
-          </div>
-
-          <div class="statRow">
-            <div class="stat"><b>Fast</b><span>Same/next-day options</span></div>
-            <div class="stat"><b>Secure</b><span>Careful handling</span></div>
-            <div class="stat"><b>Friendly</b><span>Real support team</span></div>
-          </div>
-
-          <div class="imgBox" style="min-height:160px">
-            <img alt="Happy Jamaican customers" src="https://images.unsplash.com/photo-1520975693411-b2734e7f2a2b?auto=format&fit=crop&w=1400&q=70">
-            <div class="imgOverlay"></div>
-            <div class="imgCaption">
-              <div>
-                Happy customers
-                <small>Service with respect & smiles</small>
-              </div>
-              <div style="color:rgba(29,185,84,.95)">●</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <section id="services">
-    <div class="wrap">
-      <div class="sectionHead">
-        <div>
-          <h2>Our Services</h2>
-          <p>Shipping and retail support built for real life in Jamaica — businesses, families, and everyone in between.</p>
-        </div>
-        <a class="btn" href="#contact">Ask a question</a>
-      </div>
-
-      <div class="grid4">
-        <div class="tile">
-          <div class="icon">🚀</div>
-          <h3>Express Shipping</h3>
-          <p>Fast, reliable shipping support for urgent deliveries and time-sensitive packages.</p>
-        </div>
-        <div class="tile">
-          <div class="icon">📦</div>
-          <h3>Package Consolidation</h3>
-          <p>Combine multiple packages to reduce costs and simplify pickup or delivery.</p>
-        </div>
-        <div class="tile">
-          <div class="icon">🌍</div>
-          <h3>Island-wide Courier</h3>
-          <p>Kingston to all parishes—schedule drops, deliveries, and pickups with ease.</p>
-        </div>
-        <div class="tile">
-          <div class="icon">🏪</div>
-          <h3>Variety Store</h3>
-          <p>Everyday essentials, household items, snacks, and small conveniences in one stop.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="rates">
-    <div class="wrap">
-      <div class="sectionHead">
-        <div>
-          <h2>Rates</h2>
-          <p>Clear pricing, no surprises. Edit these numbers to match your real rate sheet.</p>
-        </div>
-      </div>
-
-      <div class="panel">
-        <table aria-label="Shipping rate table">
-          <thead>
-            <tr>
-              <th>Weight (lbs)</th>
-              <th>Base Rate (JMD)</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody id="rateTableBody"></tbody>
-        </table>
-        <div class="note">
-          <strong>Example policy:</strong> base rate covers standard handling. Customs/duties, special items, oversized packages, or high value items may add fees.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="calculator">
-    <div class="wrap">
-      <div class="sectionHead">
-        <div>
-          <h2>Rate Calculator</h2>
-          <p>Instant estimate based on weight + declared value. Adjust rules to match your business.</p>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="panel">
-          <h3 style="margin:0 0 6px; font-size:18px">Package Details</h3>
-          <p style="margin:0 0 12px; color:var(--muted); line-height:1.55">Enter your package info for an instant estimate.</p>
-
-          <div class="formGrid">
-            <div>
-              <label for="weight">Package Weight (lbs) *</label>
-              <input id="weight" type="number" min="0.1" step="0.1" placeholder="e.g., 4.5" />
+            <div class="ctaRow">
+              <a class="btn primary" href="#login">Customer Login</a>
+              <a class="btn" href="#dashboard">Open Dashboard</a>
             </div>
 
-            <div>
-              <label for="value">Package Value (USD) *</label>
-              <input id="value" type="number" min="1" step="1" placeholder="e.g., 120" />
+            <div class="miniRow">
+              <div class="badge">🚚 Courier Movement <span>Kingston → All Parishes</span></div>
+              <div class="badge">📦 Consolidation <span>Save cost</span></div>
+              <div class="badge">🏪 Variety Store <span>Everyday essentials</span></div>
             </div>
 
-            <div>
-              <label for="service">Service *</label>
-              <select id="service">
-                <option value="standard" selected>Standard</option>
-                <option value="express">Express</option>
-                <option value="courier">Local Courier (Delivery)</option>
-              </select>
-            </div>
-
-            <div>
-              <label for="parish">Destination Parish</label>
-              <select id="parish">
-                <option value="kingston" selected>Kingston / St. Andrew</option>
-                <option value="stcatherine">St. Catherine</option>
-                <option value="other">Other Parish</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
-            <button class="btn primary" id="calcBtn" type="button">Calculate Estimate</button>
-            <button class="btn" id="resetBtn" type="button">Reset</button>
-          </div>
-
-          <div class="calcResult" id="calcResult" style="display:none"></div>
-        </div>
-
-        <div class="panel">
-          <h3 style="margin:0 0 6px; font-size:18px">What’s included</h3>
-          <p style="margin:0 0 12px; color:var(--muted); line-height:1.55">
-            This estimator is a starting point. You can add your real policies:
-            handling, warehouse fees, special item fees, duty/tax estimates, etc.
-          </p>
-
-          <div class="tile" style="margin-top:10px">
-            <h3 style="margin:0 0 6px">Suggested add-ons (optional)</h3>
-            <p style="margin:0; color:var(--muted)">
-              • Insurance for high value items<br>
-              • Oversize / fragile handling<br>
-              • Same-day courier delivery<br>
-              • Business pickup routes
+            <p class="hint">
+              Tip: Replace the images on the right with your own Jamaican photos for maximum trust.
             </p>
           </div>
+
+          <div class="card" style="padding:14px; display:flex; flex-direction:column; gap:14px">
+            <!-- Replace these with your chosen images -->
+            <div class="imgBox">
+              <img alt="Courier van moving with packages" src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=1400&q=70">
+              <div class="imgOverlay"></div>
+              <div class="imgCaption">
+                <div>Logistics in motion<small>Fast • secure • tracked</small></div>
+                <div style="color:rgba(249,199,79,1)">●</div>
+              </div>
+            </div>
+
+            <div class="imgBox" style="min-height:160px">
+              <img alt="Happy customers" src="https://images.unsplash.com/photo-1520975693411-b2734e7f2a2b?auto=format&fit=crop&w=1400&q=70">
+              <div class="imgOverlay"></div>
+              <div class="imgCaption">
+                <div>Happy customers<small>Respect & smiles</small></div>
+                <div style="color:rgba(29,185,84,1)">●</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </main>
 
-  <section id="faq">
-    <div class="wrap">
-      <div class="sectionHead">
-        <div>
-          <h2>FAQ</h2>
-          <p>Quick answers to common questions. Replace these with your real policies.</p>
+    <section id="services">
+      <div class="wrap">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:14px">
+          <div>
+            <h2>Services</h2>
+            <p class="lead" style="margin:8px 0 0">Shipping and retail support built for real life in Jamaica.</p>
+          </div>
+          <a class="btn" href="#contact">Ask a question</a>
+        </div>
+
+        <div class="grid4">
+          <div class="tile">
+            <div class="icon">🚀</div>
+            <h3>Express Shipping</h3>
+            <p>Fast processing and handling for time-sensitive packages.</p>
+          </div>
+          <div class="tile">
+            <div class="icon">📦</div>
+            <h3>Package Consolidation</h3>
+            <p>Combine packages to reduce costs and simplify delivery/pickup.</p>
+          </div>
+          <div class="tile">
+            <div class="icon">🌍</div>
+            <h3>Island-wide Courier</h3>
+            <p>Schedule deliveries across parishes with clear communication.</p>
+          </div>
+          <div class="tile">
+            <div class="icon">🏪</div>
+            <h3>Variety Store</h3>
+            <p>Essentials, household items, snacks, and convenience goods.</p>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="grid2">
-        <details open>
-          <summary>How do I schedule a courier pickup or delivery?</summary>
-          <p>Message us with your name, location, package size, and preferred time. We’ll confirm a slot and send instructions.</p>
-        </details>
-        <details>
-          <summary>Do you handle package consolidation?</summary>
-          <p>Yes. We can group multiple incoming packages into one shipment to reduce cost and simplify delivery.</p>
-        </details>
-        <details>
-          <summary>What affects the final cost?</summary>
-          <p>Weight, declared value, item type (fragile/oversize), destination parish, and any customs/duties where applicable.</p>
-        </details>
-        <details>
-          <summary>Do you sell items in-store?</summary>
-          <p>Yes—our variety store carries everyday essentials. Ask us what’s currently in stock or request specific items.</p>
-        </details>
-      </div>
-    </div>
-  </section>
+    <section id="contact">
+      <div class="wrap">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:14px">
+          <div>
+            <h2>Contact</h2>
+            <p class="lead" style="margin:8px 0 0">Ready to ship or need a courier? Message us.</p>
+          </div>
+        </div>
 
-  <section id="contact">
-    <div class="wrap">
-      <div class="sectionHead">
-        <div>
-          <h2>Get in Touch</h2>
-          <p>Ready to ship? Need a courier? Looking for an item from the store? Send us a message.</p>
+        <div class="grid2">
+          <div class="panel">
+            <h3 style="margin:0 0 10px; font-size:18px">Send a Message</h3>
+            <form onsubmit="event.preventDefault(); alert('Connect this form to Formspree / Netlify Forms to receive messages.');">
+              <div class="formGrid">
+                <div>
+                  <label for="c_name">Name</label>
+                  <input id="c_name" placeholder="Your name" />
+                </div>
+                <div>
+                  <label for="c_phone">Phone / WhatsApp</label>
+                  <input id="c_phone" placeholder="+1 (876) ..." />
+                </div>
+              </div>
+              <label for="c_email">Email</label>
+              <input id="c_email" type="email" placeholder="you@email.com" />
+              <label for="c_msg">Message</label>
+              <textarea id="c_msg" placeholder="Tell us what you need…"></textarea>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
+                <button class="btn primary" type="submit">Submit</button>
+                <a class="btn" href="#login">Customer Login</a>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel">
+            <h3 style="margin:0 0 10px; font-size:18px">Business Info</h3>
+            <div class="tile">
+              <p style="margin:0; line-height:1.65" class="muted">
+                <b style="color:var(--text)">Address:</b><br>
+                (Add your address), Jamaica<br><br>
+                <b style="color:var(--text)">Phone / WhatsApp:</b><br>
+                (Add your number)<br><br>
+                <b style="color:var(--text)">Email:</b><br>
+                (Add your email)<br><br>
+                <b style="color:var(--text)">Hours:</b><br>
+                Mon–Sat: 9:00am–6:00pm
+              </p>
+            </div>
+            <div class="hint">
+              Want a more “real” dashboard? Use Firebase Auth + Firestore (still low-cost, easy).
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="grid2">
-        <div class="panel">
-          <h3 style="margin:0 0 10px; font-size:18px">Send a Message</h3>
+    <footer>
+      <div class="wrap">
+        <div class="copy">© <span id="yearHome"></span> Sueños Shipping & Variety Store. All rights reserved.</div>
+      </div>
+    </footer>
+  </div>
 
-          <!-- Front-end only: replace action with your form service (Formspree, Netlify forms, etc.) -->
-          <form onsubmit="event.preventDefault(); alert('Thanks! Connect this form to email or Formspree to receive messages.');">
+  <!-- LOGIN PAGE -->
+  <div id="page-login" class="page">
+    <section>
+      <div class="wrap">
+        <div class="grid2">
+          <div class="panel">
+            <div class="pill"><span class="dot"></span> Customer Portal</div>
+            <h2 style="margin-top:10px">Login</h2>
+            <p class="lead" style="margin:8px 0 0">Access your shipments, invoices, and tracking updates.</p>
+
+            <label>Email</label>
+            <input id="loginEmail" type="email" placeholder="name@email.com" />
+
+            <label>Password</label>
+            <input id="loginPassword" type="password" placeholder="••••••••" />
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+              <button class="btn primary" type="button" id="btnLogin">Login</button>
+              <a class="btn" href="#home">Back to site</a>
+            </div>
+
+            <div id="loginMsg" class="alert" style="display:none"></div>
+
+            <div class="hint">
+              Demo login: create an account on the right, then log in.
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Create Account</h2>
+            <p class="lead" style="margin:8px 0 0">This creates a demo user stored in your browser.</p>
+
             <div class="formGrid">
               <div>
-                <label for="first">First Name</label>
-                <input id="first" placeholder="First name" />
+                <label>First Name</label>
+                <input id="regFirst" placeholder="First name" />
               </div>
               <div>
-                <label for="last">Last Name</label>
-                <input id="last" placeholder="Last name" />
-              </div>
-              <div>
-                <label for="email">Email</label>
-                <input id="email" type="email" placeholder="you@email.com" />
-              </div>
-              <div>
-                <label for="phone">Phone / WhatsApp</label>
-                <input id="phone" placeholder="+1 (876) ..." />
+                <label>Last Name</label>
+                <input id="regLast" placeholder="Last name" />
               </div>
             </div>
 
-            <label for="subject">Subject</label>
-            <input id="subject" placeholder="Shipping quote / Courier / Store item" />
+            <label>Email</label>
+            <input id="regEmail" type="email" placeholder="name@email.com" />
 
-            <label for="message">Message</label>
-            <textarea id="message" placeholder="Tell us what you need…"></textarea>
+            <label>Password</label>
+            <input id="regPassword" type="password" placeholder="Create a password" />
 
-            <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
-              <button class="btn primary" type="submit">Submit</button>
-              <a class="btn" href="#calculator">Estimate a rate</a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+              <button class="btn primary" type="button" id="btnRegister">Register</button>
             </div>
 
-            <p class="note" style="margin-top:10px">We typically respond quickly during business hours.</p>
-          </form>
-        </div>
+            <div id="regMsg" class="alert" style="display:none"></div>
 
-        <div class="panel">
-          <h3 style="margin:0 0 10px; font-size:18px">Contact Info</h3>
-          <div class="tile">
-            <p style="margin:0; color:var(--muted); line-height:1.65">
-              <strong style="color:var(--text)">Address:</strong><br>
-              (Add your address here), Jamaica<br><br>
-
-              <strong style="color:var(--text)">Phone / WhatsApp:</strong><br>
-              (Add your number)<br><br>
-
-              <strong style="color:var(--text)">Email:</strong><br>
-              (Add your email)<br><br>
-
-              <strong style="color:var(--text)">Business Hours:</strong><br>
-              Mon–Sat: 9:00am–6:00pm
-            </p>
-          </div>
-
-          <div class="tile" style="margin-top:12px">
-            <h3 style="margin:0 0 6px">Brand tip</h3>
-            <p style="margin:0; color:var(--muted)">
-              Swap the two hero images for: <strong style="color:var(--text)">courier vans in motion</strong> + <strong style="color:var(--text)">smiling Jamaican customers</strong>.
-              Use your own photos if possible (most authentic).
-            </p>
+            <div class="hint">
+              For production: swap this demo auth with Firebase/Supabase authentication.
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <footer>
+    <footer>
+      <div class="wrap">
+        <div class="copy">© <span id="yearLogin"></span> Sueños Shipping & Variety Store.</div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- DASHBOARD PAGE -->
+  <div id="page-dashboard" class="page">
     <div class="wrap">
-      <div class="footGrid">
-        <div>
-          <div class="brand" style="margin-bottom:10px">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-              Sueños Shipping<br><span style="color:var(--muted); font-weight:700; font-size:12px"> & Variety Store • Jamaica</span>
+      <div class="appShell">
+        <!-- Sidebar -->
+        <aside class="side">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px">
+            <div style="display:flex; align-items:center; gap:10px">
+              <div class="mark" style="width:34px;height:34px;border-radius:12px"></div>
+              <div style="font-weight:900">
+                Dashboard
+                <div class="muted" style="font-weight:900; font-size:12px" id="whoami">Guest</div>
+              </div>
             </div>
+            <button class="btn small danger" type="button" id="btnLogout">Logout</button>
           </div>
-          <p style="margin:0; max-width:70ch; line-height:1.6">
-            Your trusted partner for shipping, courier movement, and everyday essentials—built on speed, care, and respect.
-          </p>
-        </div>
-        <div>
-          <h4>Navigation</h4>
-          <a href="#services">Services</a><br>
-          <a href="#rates">Rates</a><br>
-          <a href="#calculator">Calculator</a><br>
-          <a href="#faq">FAQ</a><br>
-          <a href="#contact">Contact</a>
-        </div>
-        <div>
-          <h4>Quick Links</h4>
-          <a href="#contact">Get a Quote</a><br>
-          <a href="#calculator">Rate Calculator</a><br>
-          <a href="#services">Courier & Store</a>
-        </div>
-      </div>
 
-      <div class="copy">© <span id="year"></span> Sueños Shipping & Variety Store. All rights reserved.</div>
+          <div style="height:10px"></div>
+
+          <a href="#dashboard?tab=overview" data-tab="overview" class="dashlink">🏠 Overview</a>
+          <a href="#dashboard?tab=create" data-tab="create" class="dashlink">➕ Create Shipment</a>
+          <a href="#dashboard?tab=shipments" data-tab="shipments" class="dashlink">📦 My Shipments</a>
+          <a href="#dashboard?tab=tracking" data-tab="tracking" class="dashlink">🔎 Tracking</a>
+          <a href="#dashboard?tab=invoices" data-tab="invoices" class="dashlink">🧾 Invoices</a>
+          <a href="#dashboard?tab=profile" data-tab="profile" class="dashlink">👤 Profile</a>
+
+          <div class="hint" style="margin-top:12px">
+            This is a demo portal. Data is stored in your browser.
+          </div>
+        </aside>
+
+        <!-- Main content -->
+        <section style="padding:0">
+          <div class="panel">
+            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-end">
+              <div>
+                <div class="pill"><span class="dot"></span> Sueños Customer Portal</div>
+                <h2 style="margin-top:10px" id="dashTitle">Overview</h2>
+                <p class="lead" style="margin:8px 0 0" id="dashSub">Quick snapshot of your activity.</p>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap">
+                <a class="btn" href="#home">Public Site</a>
+                <a class="btn primary" href="#dashboard?tab=create">New Shipment</a>
+              </div>
+            </div>
+
+            <div style="height:14px"></div>
+
+            <!-- Tabs -->
+            <div id="tab-overview" class="tab">
+              <div class="kpiRow">
+                <div class="kpi"><b id="kpiShipments">0</b><span>Shipments</span></div>
+                <div class="kpi"><b id="kpiInTransit">0</b><span>In Transit</span></div>
+                <div class="kpi"><b id="kpiDelivered">0</b><span>Delivered</span></div>
+                <div class="kpi"><b id="kpiBalance">JMD 0</b><span>Estimated Balance</span></div>
+              </div>
+
+              <div style="height:14px"></div>
+
+              <div class="grid2">
+                <div class="tile">
+                  <h3 style="margin:0 0 6px">Next step</h3>
+                  <p>Click <b>Create Shipment</b> to add a package and get an estimate.</p>
+                </div>
+                <div class="tile">
+                  <h3 style="margin:0 0 6px">Support</h3>
+                  <p>Need help? Use the public contact page or add WhatsApp button later.</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-create" class="tab" style="display:none">
+              <div class="grid2">
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Create Shipment</h3>
+
+                  <label>Description</label>
+                  <input id="s_desc" placeholder="e.g., Shoes + T-shirt" />
+
+                  <div class="formGrid">
+                    <div>
+                      <label>Weight (lbs)</label>
+                      <input id="s_weight" type="number" min="0.1" step="0.1" placeholder="e.g., 4.5" />
+                    </div>
+                    <div>
+                      <label>Declared Value (USD)</label>
+                      <input id="s_value" type="number" min="1" step="1" placeholder="e.g., 120" />
+                    </div>
+                  </div>
+
+                  <div class="formGrid">
+                    <div>
+                      <label>Service</label>
+                      <select id="s_service">
+                        <option value="standard" selected>Standard</option>
+                        <option value="express">Express</option>
+                        <option value="courier">Local Courier (Delivery)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Destination Parish</label>
+                      <select id="s_parish">
+                        <option value="kingston" selected>Kingston / St. Andrew</option>
+                        <option value="stcatherine">St. Catherine</option>
+                        <option value="other">Other Parish</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+                    <button class="btn primary" type="button" id="btnCreateShipment">Create</button>
+                    <button class="btn" type="button" id="btnClearShipment">Clear</button>
+                  </div>
+
+                  <div id="createMsg" class="alert" style="display:none"></div>
+                </div>
+
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Estimator Rules (editable)</h3>
+                  <p class="muted" style="margin:0; line-height:1.6">
+                    This demo uses: rounding up weight, base rate up to 10 lbs, plus per-lb after.
+                    Value fee is optional.
+                  </p>
+                  <div class="hint">
+                    If you give me your real rate sheet, I’ll bake it into this calculator + invoice totals.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-shipments" class="tab" style="display:none">
+              <div class="tile">
+                <h3 style="margin:0 0 10px">My Shipments</h3>
+                <div style="overflow:auto">
+                  <table aria-label="Shipments table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Description</th>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Est. Total</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody id="shipmentsBody"></tbody>
+                  </table>
+                </div>
+                <div class="hint">
+                  Status is demo-generated. In production, statuses update from your operations team/system.
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-tracking" class="tab" style="display:none">
+              <div class="grid2">
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Track a Shipment</h3>
+                  <label>Shipment ID</label>
+                  <input id="trackId" placeholder="e.g., SNS-2401-AB12" />
+                  <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+                    <button class="btn primary" type="button" id="btnTrack">Track</button>
+                    <button class="btn" type="button" id="btnTrackClear">Clear</button>
+                  </div>
+                  <div id="trackResult" class="alert" style="display:none"></div>
+                </div>
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Common statuses</h3>
+                  <p class="muted" style="margin:0; line-height:1.6">
+                    <span class="tag green">Created</span>
+                    <span class="tag gold">In Transit</span>
+                    <span class="tag dark">Delivered</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-invoices" class="tab" style="display:none">
+              <div class="tile">
+                <h3 style="margin:0 0 10px">Invoices (Demo)</h3>
+                <p class="muted" style="margin:0 0 12px; line-height:1.6">
+                  This demo shows estimated invoices based on shipments created.
+                </p>
+                <div style="overflow:auto">
+                  <table aria-label="Invoices table">
+                    <thead>
+                      <tr>
+                        <th>Invoice #</th>
+                        <th>Shipments</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="invoicesBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-profile" class="tab" style="display:none">
+              <div class="grid2">
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Profile</h3>
+                  <div class="muted" style="font-weight:900; line-height:1.9" id="profileBox"></div>
+                </div>
+                <div class="tile">
+                  <h3 style="margin:0 0 8px">Account Settings</h3>
+                  <p class="muted" style="margin:0; line-height:1.6">
+                    For production: password resets, email verification, and role-based access (admin vs customer).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <footer>
+            <div class="copy">© <span id="yearDash"></span> Sueños Shipping & Variety Store.</div>
+          </footer>
+        </section>
+      </div>
     </div>
-  </footer>
+  </div>
 
   <script>
-    // ---------- Editable rate sheet (example) ----------
-    // Base rates in JMD for 1..10 lbs; after 10 lbs add per-lb.
-    const baseRates = {
-      1: 450, 2: 800, 3: 1150, 4: 1500, 5: 1800,
-      6: 2150, 7: 2450, 8: 2750, 9: 3100, 10: 3450
-    };
-    const extraPerLbOver10 = 350;  // JMD per lb over 10
-    const usdToJmd = 155;          // rough placeholder — replace with your actual conversion policy (or remove)
-
-    // Service multipliers (edit as needed)
-    const serviceMultiplier = {
-      standard: 1.0,
-      express: 1.25,
-      courier: 0.55   // courier delivery (separate from air/ocean) — adjust
+    // ------------------------
+    // Demo "database" (localStorage)
+    // ------------------------
+    const LS = {
+      users: "suenos_users_v1",
+      session: "suenos_session_v1",
+      shipments: "suenos_shipments_v1"
     };
 
-    // Parish add-ons for courier deliveries (edit)
-    const parishAddOn = {
-      kingston: 0,
-      stcatherine: 250,
-      other: 500
-    };
+    function load(key, fallback){
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+      catch { return fallback; }
+    }
+    function save(key, value){
+      localStorage.setItem(key, JSON.stringify(value));
+    }
 
-    // Value handling fee: e.g., 1.5% of declared value converted to JMD (optional)
+    function uid(prefix="SNS"){
+      const s = Math.random().toString(16).slice(2,6).toUpperCase();
+      const t = Math.random().toString(16).slice(2,6).toUpperCase();
+      const d = new Date();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${prefix}-${mm}${dd}-${s}${t}`;
+    }
+
+    // ------------------------
+    // Demo rate estimator (edit these)
+    // ------------------------
+    const baseRates = {1:450,2:800,3:1150,4:1500,5:1800,6:2150,7:2450,8:2750,9:3100,10:3450};
+    const extraPerLbOver10 = 350;
+    const usdToJmd = 155; // placeholder
     const valueFeeRate = 0.015;
 
-    // ---------- Render rate table ----------
-    const tbody = document.getElementById("rateTableBody");
-    Object.keys(baseRates).forEach(lb => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${lb}</td>
-        <td>${baseRates[lb].toLocaleString()}</td>
-        <td>Base rate</td>
-      `;
-      tbody.appendChild(tr);
-    });
-    const trFixed = document.createElement("tr");
-    trFixed.innerHTML = `
-      <td>10+ (each extra lb)</td>
-      <td>${extraPerLbOver10.toLocaleString()}</td>
-      <td>Added per lb over 10</td>
-    `;
-    tbody.appendChild(trFixed);
+    const serviceMultiplier = {standard:1.0, express:1.25, courier:0.55};
+    const parishAddOn = {kingston:0, stcatherine:250, other:500};
 
-    // ---------- Calculator ----------
     function estimate(weightLbs, valueUsd, service, parish){
-      if (weightLbs <= 0 || valueUsd <= 0) return null;
+      if (!(weightLbs>0) || !(valueUsd>0)) return null;
 
-      // Base weight cost
       const whole = Math.floor(weightLbs);
       const frac = weightLbs - whole;
-
-      // Round up any fraction to the next lb (simple policy)
-      const billableLbs = frac > 0 ? whole + 1 : whole;
+      const billable = (frac > 0) ? whole + 1 : whole;
 
       let base = 0;
-      if (billableLbs <= 10){
-        base = baseRates[billableLbs] ?? baseRates[10];
+      if (billable <= 10){
+        base = baseRates[billable] ?? baseRates[10];
       } else {
-        base = (baseRates[10] ?? 0) + (billableLbs - 10) * extraPerLbOver10;
+        base = (baseRates[10] ?? 0) + (billable - 10) * extraPerLbOver10;
       }
 
-      // Value-based fee (optional)
       const valueFee = Math.round((valueUsd * usdToJmd) * valueFeeRate);
-
-      // Apply service type multiplier
       const mult = serviceMultiplier[service] ?? 1.0;
-      let total = Math.round((base + valueFee) * mult);
 
-      // Parish add-on for courier deliveries
+      let total = Math.round((base + valueFee) * mult);
       if (service === "courier"){
         total += (parishAddOn[parish] ?? 0);
       }
-
-      return {
-        billableLbs,
-        base,
-        valueFee,
-        total
-      };
+      return { billable, base, valueFee, total };
     }
 
-    const calcBtn = document.getElementById("calcBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    const resultBox = document.getElementById("calcResult");
+    // ------------------------
+    // Auth (demo)
+    // ------------------------
+    function getSession(){ return load(LS.session, null); }
+    function setSession(sess){ save(LS.session, sess); }
+    function clearSession(){ localStorage.removeItem(LS.session); }
 
-    calcBtn.addEventListener("click", () => {
-      const w = parseFloat(document.getElementById("weight").value);
-      const v = parseFloat(document.getElementById("value").value);
-      const s = document.getElementById("service").value;
-      const p = document.getElementById("parish").value;
+    function getUsers(){ return load(LS.users, []); }
+    function setUsers(users){ save(LS.users, users); }
 
-      const res = estimate(w, v, s, p);
-      if (!res){
-        resultBox.style.display = "block";
-        resultBox.innerHTML = `Please enter a valid weight and value.`;
+    function requireAuth(){
+      const s = getSession();
+      if (!s) { location.hash = "#login"; return null; }
+      return s;
+    }
+
+    // ------------------------
+    // Shipments (demo)
+    // ------------------------
+    function getShipments(){ return load(LS.shipments, []); }
+    function setShipments(list){ save(LS.shipments, list); }
+
+    function statusForShipment(sh){
+      // demo progression based on age
+      const ageHrs = (Date.now() - sh.createdAt) / (1000*60*60);
+      if (ageHrs < 6) return "Created";
+      if (ageHrs < 36) return "In Transit";
+      return "Delivered";
+    }
+
+    // ------------------------
+    // Router (pages + dashboard tabs)
+    // ------------------------
+    const pages = ["home","login","dashboard"];
+    function showPage(name){
+      pages.forEach(p => {
+        const el = document.getElementById(`page-${p}`);
+        if (el) el.classList.toggle("active", p === name);
+      });
+    }
+
+    function parseHash(){
+      const raw = location.hash.replace("#","");
+      if (!raw) return { page:"home", tab:"overview" };
+
+      const [path, query] = raw.split("?");
+      const page = (pages.includes(path)) ? path : "home";
+
+      let tab = "overview";
+      if (query && page === "dashboard"){
+        const params = new URLSearchParams(query);
+        tab = params.get("tab") || "overview";
+      }
+      return { page, tab };
+    }
+
+    function setActiveTab(tab){
+      // tabs
+      const tabIds = ["overview","create","shipments","tracking","invoices","profile"];
+      tabIds.forEach(id => {
+        const el = document.getElementById(`tab-${id}`);
+        if (el) el.style.display = (id === tab) ? "block" : "none";
+      });
+
+      // sidebar active
+      document.querySelectorAll(".dashlink").forEach(a => {
+        a.classList.toggle("active", a.dataset.tab === tab);
+      });
+
+      // titles
+      const title = document.getElementById("dashTitle");
+      const sub = document.getElementById("dashSub");
+      const map = {
+        overview: ["Overview", "Quick snapshot of your activity."],
+        create: ["Create Shipment", "Add a package and get an instant estimate."],
+        shipments: ["My Shipments", "All shipments linked to your account."],
+        tracking: ["Tracking", "Search a shipment ID for updates."],
+        invoices: ["Invoices", "Estimated invoices based on created shipments."],
+        profile: ["Profile", "Your account details (demo)."]
+      };
+      const [t, s] = map[tab] || map.overview;
+      title.textContent = t;
+      sub.textContent = s;
+    }
+
+    function renderNavAuth(){
+      const nav = document.getElementById("navAuth");
+      const s = getSession();
+      if (!nav) return;
+
+      if (s){
+        nav.innerHTML = `
+          <a class="btn" href="#dashboard">Dashboard</a>
+          <button class="btn" id="navLogout" type="button">Logout</button>
+        `;
+        document.getElementById("navLogout").onclick = () => { clearSession(); renderNavAuth(); location.hash="#home"; };
+      } else {
+        nav.innerHTML = `
+          <a class="btn" href="#login">Login</a>
+          <a class="btn primary" href="#login">Register</a>
+        `;
+      }
+    }
+
+    function refreshDashboard(){
+      const s = requireAuth();
+      if (!s) return;
+
+      document.getElementById("whoami").textContent = `${s.firstName} ${s.lastName}`;
+      document.getElementById("profileBox").innerHTML = `
+        <div><b style="color:var(--text)">Name:</b> ${s.firstName} ${s.lastName}</div>
+        <div><b style="color:var(--text)">Email:</b> ${s.email}</div>
+        <div><b style="color:var(--text)">Customer ID:</b> ${s.userId}</div>
+      `;
+
+      const shipments = getShipments().filter(x => x.userId === s.userId);
+      const inTransit = shipments.filter(x => statusForShipment(x) === "In Transit").length;
+      const delivered = shipments.filter(x => statusForShipment(x) === "Delivered").length;
+
+      document.getElementById("kpiShipments").textContent = shipments.length.toString();
+      document.getElementById("kpiInTransit").textContent = inTransit.toString();
+      document.getElementById("kpiDelivered").textContent = delivered.toString();
+
+      const balance = shipments.reduce((sum, x) => sum + (x.estimate?.total || 0), 0);
+      document.getElementById("kpiBalance").textContent = `JMD ${balance.toLocaleString()}`;
+
+      // shipments table
+      const body = document.getElementById("shipmentsBody");
+      body.innerHTML = shipments
+        .slice()
+        .sort((a,b)=>b.createdAt - a.createdAt)
+        .map(x => {
+          const st = statusForShipment(x);
+          const tagClass = st === "Delivered" ? "dark" : (st === "In Transit" ? "gold" : "green");
+          return `
+            <tr>
+              <td><b style="color:var(--text)">${x.id}</b></td>
+              <td>${x.desc || "-"}</td>
+              <td>${x.service}</td>
+              <td><span class="tag ${tagClass}">${st}</span></td>
+              <td>JMD ${(x.estimate?.total || 0).toLocaleString()}</td>
+              <td>${new Date(x.createdAt).toLocaleString()}</td>
+            </tr>
+          `;
+        }).join("");
+
+      // invoices (demo: 1 open invoice)
+      const invBody = document.getElementById("invoicesBody");
+      const invAmount = balance;
+      invBody.innerHTML = `
+        <tr>
+          <td><b style="color:var(--text)">INV-${s.userId.slice(-4)}-001</b></td>
+          <td>${shipments.length}</td>
+          <td>JMD ${invAmount.toLocaleString()}</td>
+          <td><span class="tag gold">Estimated</span></td>
+        </tr>
+      `;
+    }
+
+    function onRoute(){
+      const { page, tab } = parseHash();
+
+      // guard dashboard
+      if (page === "dashboard" && !getSession()){
+        showPage("login");
+      } else {
+        showPage(page);
+      }
+
+      renderNavAuth();
+
+      if (page === "dashboard"){
+        refreshDashboard();
+        setActiveTab(tab);
+      }
+    }
+
+    // ------------------------
+    // Login/Register handlers
+    // ------------------------
+    function showMsg(id, text){
+      const el = document.getElementById(id);
+      el.style.display = "block";
+      el.textContent = text;
+    }
+    function hideMsg(id){
+      const el = document.getElementById(id);
+      el.style.display = "none";
+      el.textContent = "";
+    }
+
+    document.getElementById("btnRegister").addEventListener("click", () => {
+      hideMsg("regMsg");
+
+      const first = document.getElementById("regFirst").value.trim();
+      const last = document.getElementById("regLast").value.trim();
+      const email = document.getElementById("regEmail").value.trim().toLowerCase();
+      const pass = document.getElementById("regPassword").value;
+
+      if (!first || !last || !email || !pass){
+        showMsg("regMsg","Please fill out all registration fields.");
         return;
       }
 
-      resultBox.style.display = "block";
-      resultBox.innerHTML = `
-        Estimated Total: <span style="color:var(--gold)">JMD ${res.total.toLocaleString()}</span>
-        <small>
-          Billable weight: ${res.billableLbs} lb(s)<br>
-          Base: JMD ${res.base.toLocaleString()} • Value fee: JMD ${res.valueFee.toLocaleString()}<br>
-          Note: This is an estimate. Final cost may change based on item type, customs/duties, or special handling.
-        </small>
-      `;
-      resultBox.scrollIntoView({behavior:"smooth", block:"nearest"});
+      const users = getUsers();
+      if (users.some(u => u.email === email)){
+        showMsg("regMsg","That email is already registered. Use Login.");
+        return;
+      }
+
+      const user = { userId: uid("CUST"), firstName:first, lastName:last, email, password: pass };
+      users.push(user);
+      setUsers(users);
+
+      showMsg("regMsg","Account created! Now log in on the left.");
     });
 
-    resetBtn.addEventListener("click", () => {
-      ["weight","value"].forEach(id => document.getElementById(id).value = "");
-      document.getElementById("service").value = "standard";
-      document.getElementById("parish").value = "kingston";
-      resultBox.style.display = "none";
-      resultBox.textContent = "";
+    document.getElementById("btnLogin").addEventListener("click", () => {
+      hideMsg("loginMsg");
+
+      const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+      const pass = document.getElementById("loginPassword").value;
+
+      const users = getUsers();
+      const user = users.find(u => u.email === email && u.password === pass);
+      if (!user){
+        showMsg("loginMsg","Invalid email or password (demo). Try registering first.");
+        return;
+      }
+
+      setSession({
+        userId: user.userId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      });
+
+      renderNavAuth();
+      location.hash = "#dashboard?tab=overview";
     });
 
-    document.getElementById("year").textContent = new Date().getFullYear();
+    // ------------------------
+    // Dashboard actions
+    // ------------------------
+    document.getElementById("btnLogout").addEventListener("click", () => {
+      clearSession();
+      renderNavAuth();
+      location.hash = "#home";
+    });
+
+    document.getElementById("btnCreateShipment").addEventListener("click", () => {
+      const s = requireAuth(); if (!s) return;
+      const desc = document.getElementById("s_desc").value.trim();
+      const w = parseFloat(document.getElementById("s_weight").value);
+      const v = parseFloat(document.getElementById("s_value").value);
+      const service = document.getElementById("s_service").value;
+      const parish = document.getElementById("s_parish").value;
+
+      const est = estimate(w, v, service, parish);
+      if (!desc || !est){
+        showMsg("createMsg","Please enter a description, weight, and value.");
+        return;
+      }
+
+      const shipments = getShipments();
+      const item = {
+        id: uid("SNS"),
+        userId: s.userId,
+        desc,
+        weight: w,
+        valueUsd: v,
+        service,
+        parish,
+        estimate: est,
+        createdAt: Date.now()
+      };
+      shipments.push(item);
+      setShipments(shipments);
+
+      showMsg("createMsg", `Shipment created: ${item.id} • Estimated Total: JMD ${est.total.toLocaleString()}`);
+      refreshDashboard();
+      // optionally jump to shipments tab
+      // location.hash = "#dashboard?tab=shipments";
+    });
+
+    document.getElementById("btnClearShipment").addEventListener("click", () => {
+      ["s_desc","s_weight","s_value"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("s_service").value = "standard";
+      document.getElementById("s_parish").value = "kingston";
+      const msg = document.getElementById("createMsg");
+      msg.style.display = "none";
+      msg.textContent = "";
+    });
+
+    document.getElementById("btnTrack").addEventListener("click", () => {
+      const s = requireAuth(); if (!s) return;
+      const id = document.getElementById("trackId").value.trim().toUpperCase();
+      const all = getShipments();
+      const item = all.find(x => x.id === id);
+      const box = document.getElementById("trackResult");
+
+      if (!id){
+        box.style.display="block";
+        box.textContent="Enter a Shipment ID.";
+        return;
+      }
+      if (!item){
+        box.style.display="block";
+        box.textContent="No shipment found for that ID (demo).";
+        return;
+      }
+
+      const st = statusForShipment(item);
+      box.style.display="block";
+      box.textContent = `Shipment ${item.id}: ${st}. Est. Total: JMD ${(item.estimate?.total||0).toLocaleString()}`;
+    });
+
+    document.getElementById("btnTrackClear").addEventListener("click", () => {
+      document.getElementById("trackId").value = "";
+      const box = document.getElementById("trackResult");
+      box.style.display="none";
+      box.textContent="";
+    });
+
+    // ------------------------
+    // Init
+    // ------------------------
+    document.getElementById("yearHome").textContent = new Date().getFullYear();
+    document.getElementById("yearLogin").textContent = new Date().getFullYear();
+    document.getElementById("yearDash").textContent = new Date().getFullYear();
+
+    window.addEventListener("hashchange", onRoute);
+    renderNavAuth();
+    onRoute();
   </script>
 </body>
 </html>
