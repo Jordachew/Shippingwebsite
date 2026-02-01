@@ -1,326 +1,45 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sueños Shipping & Variety Store</title>
-  <meta name="description" content="Reliable shipping services + a convenient variety store. Fast, secure, and straightforward." />
-  <link rel="stylesheet" href="styles.css" />
-</head>
+<main id="home" class="hero hero--image">
+  <div class="hero__bg" aria-hidden="true"></div>
 
-<body>
-  <!-- Top bar -->
-  <header class="header">
-    <div class="container header__inner">
-      <a class="brand" href="#home" aria-label="Sueños Shipping & Variety Store">
-        <!-- Replace with your own logo file if you have one -->
-        <div class="brand__mark" aria-hidden="true">S</div>
-        <div class="brand__text">
-          <div class="brand__name">Sueños Shipping</div>
-          <div class="brand__tag">and Variety Store</div>
-        </div>
-      </a>
+  <div class="container hero__grid">
+    <div class="hero__copy">
+      <div class="pill pill--ja">🇯🇲 Jamaican-owned • Reliable shipping • In-store essentials</div>
+      <h1>Sueños Shipping & Variety Store</h1>
+      <p>
+        Fast air freight, package consolidation, and friendly service—plus a convenient variety store
+        for everyday essentials.
+      </p>
 
-      <button class="nav__toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">☰</button>
-
-      <nav class="nav" id="nav">
-        <a href="#home">Home</a>
-        <a href="#services">Services</a>
-        <a href="#rates">Rates</a>
-        <a href="#calculator">Calculator</a>
-        <a href="#faq">FAQ</a>
-        <a href="#contact">Contact</a>
-      </nav>
-
-      <div class="header__actions">
-        <!-- Optional: point these to your real customer portal later -->
-        <a class="btn btn--ghost" href="#" aria-disabled="true" title="Add your portal link later">Register</a>
-        <a class="btn btn--primary" href="#" aria-disabled="true" title="Add your portal link later">Login</a>
-      </div>
-    </div>
-  </header>
-
-  <!-- Hero -->
-  <main id="home" class="hero">
-    <div class="container hero__grid">
-      <div class="hero__copy">
-        <div class="pill">We ship 3x a week</div>
-        <h1>Reliable, fast, and secure shipping — plus your neighborhood variety store.</h1>
-        <p>
-          Ship with confidence. Consolidate packages, get transparent rates, and contact us anytime.
-          Need essentials? Shop our variety section when you visit.
-        </p>
-
-        <div class="hero__cta">
-          <a class="btn btn--primary" href="#calculator">Get a Quote</a>
-          <a class="btn btn--ghost" href="#contact">Contact Us</a>
-        </div>
-
-        <div class="hero__meta">
-          <div class="metaCard">
-            <div class="metaCard__k">Pickup</div>
-            <div class="metaCard__v">Kingston & Surrounding Areas</div>
-          </div>
-          <div class="metaCard">
-            <div class="metaCard__k">Support</div>
-            <div class="metaCard__v">Fast response during business hours</div>
-          </div>
-        </div>
+      <div class="hero__cta">
+        <a class="btn btn--primary" href="#calculator">Get a Quote</a>
+        <a class="btn btn--ghost" href="#contact">Contact Us</a>
       </div>
 
-      <div class="hero__visual" aria-hidden="true">
-        <div class="visualCard">
-          <div class="visualCard__title">What we handle</div>
-          <ul class="checklist">
-            <li>Air freight shipments</li>
-            <li>Package consolidation</li>
-            <li>Secure handling</li>
-            <li>Local assistance & guidance</li>
-          </ul>
-          <div class="visualCard__note">Tip: Use the calculator below for an instant estimate.</div>
+      <div class="hero__meta">
+        <div class="metaCard">
+          <div class="metaCard__k">Courier movement</div>
+          <div class="metaCard__v">Fast drop-offs + updates</div>
+        </div>
+        <div class="metaCard">
+          <div class="metaCard__k">Local support</div>
+          <div class="metaCard__v">Friendly, clear guidance</div>
         </div>
       </div>
     </div>
-  </main>
 
-  <!-- Services -->
-  <section id="services" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Our Services</h2>
-        <p>Flexible shipping options and in-person support to match your needs.</p>
-      </div>
-
-      <div class="cards">
-        <article class="card">
-          <h3>Express Shipping</h3>
-          <p>Fast, dependable shipping for time-sensitive deliveries.</p>
-        </article>
-        <article class="card">
-          <h3>Package Consolidation</h3>
-          <p>Combine multiple packages into one shipment to help reduce costs.</p>
-        </article>
-        <article class="card">
-          <h3>Secure Handling</h3>
-          <p>Your items are handled carefully with safety in mind from start to finish.</p>
-        </article>
-        <article class="card">
-          <h3>Variety Store</h3>
-          <p>Snacks, household essentials, toiletries, small electronics, and more in-store.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Rates -->
-  <section id="rates" class="section section--alt">
-    <div class="container">
-      <div class="section__head">
-        <h2>Shipping Rates</h2>
-        <p>Clear pricing. No confusing surprises. (You can edit these values in <code>script.js</code>.)</p>
-      </div>
-
-      <div class="tableWrap">
-        <table class="table" aria-label="Air Freight Rates">
-          <thead>
-            <tr>
-              <th>Weight (lbs)</th>
-              <th>Rate (JMD)</th>
-            </tr>
-          </thead>
-          <tbody id="ratesTableBody"></tbody>
-        </table>
-      </div>
-
-      <div class="fineprint">
-        Rates shown are base rates. Additional charges may apply depending on item category, duties, or special handling.
-      </div>
-    </div>
-  </section>
-
-  <!-- Calculator -->
-  <section id="calculator" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Rate Calculator</h2>
-        <p>Enter your package details to get an instant estimate.</p>
-      </div>
-
-      <div class="grid2">
-        <form class="form card card--pad" id="calcForm">
-          <label>
-            Package Weight (lbs) <span class="req">*</span>
-            <input id="weight" type="number" inputmode="decimal" step="0.1" min="0.1" placeholder="e.g. 3.5" required />
-          </label>
-
-          <label>
-            Package Value (USD) <span class="req">*</span>
-            <input id="value" type="number" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 120" required />
-          </label>
-
-          <label>
-            Tariff Code (optional)
-            <input id="tariff" type="text" placeholder="e.g. 8517.12" />
-          </label>
-
-          <label>
-            Calculator Type
-            <select id="calculatorType">
-              <option value="air" selected>Air Freight</option>
-              <option value="variety">Variety Store Pickup (info)</option>
-            </select>
-          </label>
-
-          <button class="btn btn--primary" type="submit">Calculate Shipping Cost</button>
-          <p class="small muted">This is an estimate. Final totals can change based on duties/fees.</p>
-        </form>
-
-        <div class="card card--pad">
-          <h3>Estimate</h3>
-          <div class="result" id="result">
-            <div class="result__big">—</div>
-            <div class="result__sub">Enter details and calculate.</div>
-          </div>
-
-          <div class="divider"></div>
-
-          <h4>What’s included</h4>
-          <ul class="bullets">
-            <li>Base rate by weight</li>
-            <li>Optional fixed processing fee (editable)</li>
-            <li>Notes for duties/taxes (not automatically calculated)</li>
-          </ul>
+    <div class="hero__visual">
+      <div class="visualCard visualCard--image">
+        <img
+          class="visualCard__img"
+          src="https://images.unsplash.com/photo-1730997082638-3f0fa9d0f5c8?auto=format&fit=crop&w=900&q=80"
+          alt="Motorcycle courier in motion"
+          loading="lazy"
+        />
+        <div class="visualCard__overlay">
+          <div class="visualCard__title">Moving packages. Moving smiles.</div>
+          <div class="visualCard__note">Use the calculator for an instant estimate.</div>
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- FAQ -->
-  <section id="faq" class="section section--alt">
-    <div class="container">
-      <div class="section__head">
-        <h2>Frequently Asked Questions</h2>
-        <p>Quick answers to common questions.</p>
-      </div>
-
-      <div class="accordion">
-        <details class="acc">
-          <summary>How often do you ship?</summary>
-          <div class="acc__body">We ship three times per week. Contact us for the current schedule and cutoff times.</div>
-        </details>
-        <details class="acc">
-          <summary>Do you offer package consolidation?</summary>
-          <div class="acc__body">Yes. We can combine multiple packages into one shipment depending on size and contents.</div>
-        </details>
-        <details class="acc">
-          <summary>Where are you located?</summary>
-          <div class="acc__body">Update this section with your actual address and landmarks so customers can find you easily.</div>
-        </details>
-        <details class="acc">
-          <summary>What does the variety store sell?</summary>
-          <div class="acc__body">Everyday essentials: snacks, beverages, toiletries, household items, and quick-grab accessories.</div>
-        </details>
-      </div>
-    </div>
-  </section>
-
-  <!-- Contact -->
-  <section id="contact" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Get in Touch</h2>
-        <p>Questions about shipping or the store? Send a message and we’ll reply as soon as we can.</p>
-      </div>
-
-      <div class="grid2">
-        <form class="form card card--pad" action="mailto:youremail@example.com" method="post" enctype="text/plain">
-          <div class="grid2__tight">
-            <label>
-              First Name
-              <input name="First Name" type="text" required />
-            </label>
-            <label>
-              Last Name
-              <input name="Last Name" type="text" required />
-            </label>
-          </div>
-
-          <label>
-            Email
-            <input name="Email" type="email" required />
-          </label>
-
-          <label>
-            Phone (optional)
-            <input name="Phone" type="tel" />
-          </label>
-
-          <label>
-            Subject
-            <input name="Subject" type="text" required />
-          </label>
-
-          <label>
-            Message
-            <textarea name="Message" rows="5" required></textarea>
-          </label>
-
-          <button class="btn btn--primary" type="submit">Submit</button>
-          <p class="small muted">This form uses your email app (mailto). For a real web form, use Formspree or similar.</p>
-        </form>
-
-        <div class="card card--pad">
-          <h3>Contact Details</h3>
-          <div class="contactList">
-            <div>
-              <div class="muted small">Address</div>
-              <div><strong>Your Business Address Here</strong></div>
-              <div class="muted small">Kingston, Jamaica</div>
-            </div>
-            <div>
-              <div class="muted small">Phone</div>
-              <div><strong>+1 (876) 000-0000</strong></div>
-            </div>
-            <div>
-              <div class="muted small">Email</div>
-              <div><strong>youremail@example.com</strong></div>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <h4>Business Hours</h4>
-          <p class="muted small">Add your hours here (e.g., Mon–Sat 9:00 AM – 6:00 PM).</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <footer class="footer">
-    <div class="container footer__grid">
-      <div>
-        <div class="footer__brand">Sueños Shipping & Variety Store</div>
-        <p class="muted small">Your trusted partner for shipping and everyday essentials.</p>
-      </div>
-      <div>
-        <div class="footer__head">Quick Links</div>
-        <div class="footer__links">
-          <a href="#services">Services</a>
-          <a href="#rates">Rates</a>
-          <a href="#calculator">Calculator</a>
-          <a href="#contact">Contact</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer__head">Location</div>
-        <p class="muted small">Kingston, Jamaica</p>
-      </div>
-    </div>
-    <div class="container footer__bottom muted small">
-      © <span id="year"></span> Sueños Shipping & Variety Store. All rights reserved.
-    </div>
-  </footer>
-
-  <script src="script.js"></script>
-</body>
-</html>
+  </div>
+</main>
