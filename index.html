@@ -429,6 +429,56 @@
               </div>
             </form>
           </div>
+          <section id="calculator">
+  <div class="wrap">
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-end">
+        <div>
+          <div class="pill"><span class="dot"></span> Instant Estimate</div>
+          <h2 style="margin-top:10px">Rate Calculator</h2>
+          <p class="lead" style="margin:8px 0 0">
+            Get a quick estimate based on weight, declared value, service type, and destination parish.
+          </p>
+        </div>
+        <a class="btn" href="#contact">Request a Quote</a>
+      </div>
+
+      <div class="grid2" style="margin-top:14px">
+        <div class="tile">
+          <h3 style="margin:0 0 10px">Package Details</h3>
+
+          <div class="formGrid">
+            <div>
+              <label for="calc_weight">Package Weight (lbs)</label>
+              <input id="calc_weight" type="number" min="0.1" step="0.1" placeholder="e.g., 4.5" />
+            </div>
+            <div>
+              <label for="calc_value">Package Value (USD)</label>
+              <input id="calc_value" type="number" min="1" step="1" placeholder="e.g., 120" />
+            </div>
+
+            <div>
+              <label for="calc_service">Service</label>
+              <select id="calc_service">
+                <option value="standard" selected>Standard</option>
+                <option value="express">Express</option>
+                <option value="courier">Local Courier (Delivery)</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="calc_parish">Destination Parish</label>
+              <select id="calc_parish">
+                <option value="kingston" selected>Kingston / St. Andrew</option>
+                <option value="stcatherine">St. Catherine</option>
+                <option value="other">Other Parish</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+            <button class="btn primary" type="button" id="calc_btn">Calculate</button>
+
 
           <div class="panel">
             <h3 style="margin:0 0 10px; font-size:18px">Business Info</h3>
