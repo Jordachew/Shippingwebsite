@@ -1,1 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin • Sueños Shipping</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="container header__inner">
+      <a class="brand" href="/">
+        <div class="brand__mark">S</div>
+        <div class="brand__text">
+          <div class="brand__name">Sueños Shipping</div>
+          <div class="brand__tag">Admin</div>
+        </div>
+      </a>
+      <div class="header__actions">
+        <a class="btn btn--ghost" href="/">Main site</a>
+        <button class="btn btn--primary" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container">
+      <div class="section__head">
+        <h2>Staff Dashboard</h2>
+        <p>Search customers, manage packages, and reply to chat.</p>
+        <div class="muted small" id="authMsg"></div>
+      </div>
+
+      <div class="grid2">
+        <div class="card card--pad">
+          <h3>Find Customer</h3>
+          <form class="form" id="findForm">
+            <label>Email
+              <input id="custEmail" type="email" placeholder="customer@email.com" required />
+            </label>
+            <button class="btn btn--primary" type="submit">Search</button>
+            <div class="muted small" id="findMsg"></div>
+          </form>
+
+          <div class="divider"></div>
+          <div><strong>Customer ID:</strong> <span id="custId">—</span></div>
+          <div class="muted small">Used to assign packages and view messages.</div>
+        </div>
+
+        <div class="card card--pad">
+          <h3>Create Package</h3>
+          <form class="form" id="createPkgForm">
+            <label>Tracking ID
+              <input id="tracking" type="text" placeholder="SSX-1234" required />
+            </label>
+            <label>Status
+              <input id="status" type="text" placeholder="Received at warehouse" required />
+            </label>
+            <label>Notes (optional)
+              <input id="notes" type="text" placeholder="Any notes..." />
+            </label>
+            <button class="btn btn--primary" type="submit">Create</button>
+            <div class="muted small" id="createMsg"></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="section__head" style="margin-top:18px;">
+        <h2>Packages for Customer</h2>
+        <p class="muted">Click a row to update status quickly.</p>
+      </div>
+
+      <div class="card card--pad">
+        <div class="tableWrap tableWrap--soft">
+          <table class="table table--mini">
+            <thead>
+              <tr>
+                <th>Tracking</th>
+                <th>Status</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="pkgBody"></tbody>
+          </table>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3>Chat (Customer)</h3>
+        <div class="muted small">Replies insert as <strong>support</strong> and show in customer portal instantly.</div>
+
+        <div class="chat" style="position:static; width:100%; margin-top:12px;">
+          <div class="chat__body" id="chatBody" style="height:260px;"></div>
+          <form class="chat__form" id="chatForm">
+            <input id="chatInput" type="text" placeholder="Type a support reply..." autocomplete="off" />
+            <button class="btn btn--primary" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal hidden" id="updateModal" aria-hidden="true">
+        <div class="modal__backdrop" data-close="1"></div>
+        <div class="modal__card" role="dialog" aria-modal="true">
+          <div class="modal__head">
+            <div>
+              <div class="modal__title" id="mTitle">Update</div>
+              <div class="muted small">Set status + notes</div>
+            </div>
+            <button class="btn btn--ghost" data-close="1">Close</button>
+          </div>
+          <div class="modal__body">
+            <form class="form" id="updateForm">
+              <label>Status
+                <input id="mStatus" type="text" required />
+              </label>
+              <label>Notes (optional)
+                <input id="mNotes" type="text" />
+              </label>
+              <button class="btn btn--primary" type="submit">Save</button>
+              <div class="muted small" id="updateMsg"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
 
