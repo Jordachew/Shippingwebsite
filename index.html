@@ -303,27 +303,40 @@
     <div class="container">
       <div class="section__head">
         <h2>Customer Portal</h2>
-        <p>Log in to track packages, upload invoices, and message support.</p>
+        <p>Register or log in to track packages, upload invoices, and message support.</p>
       </div>
 
       <div class="portal">
-        <!-- Login -->
+        <!-- Login / Register -->
         <div class="card card--pad" id="loginCard">
-          <h3>Login</h3>
-          <p class="muted small">Demo login (for now): <code>demo@suenos.com</code> / <code>Demo1234</code></p>
+          <h3>Account</h3>
 
-          <form class="form" id="loginForm">
-            <label>
-              Email
-              <input id="loginEmail" type="email" placeholder="you@example.com" required />
-            </label>
-            <label>
-              Password
-              <input id="loginPassword" type="password" placeholder="••••••••" required />
-            </label>
-            <button class="btn btn--primary" type="submit">Sign In</button>
-            <div class="alert muted small" id="loginMsg" role="status"></div>
-          </form>
+          <div class="tabs">
+            <button class="tab active" id="tabLogin" type="button">Login</button>
+            <button class="tab" id="tabRegister" type="button">Register</button>
+          </div>
+
+          <div id="loginPane">
+            <form class="form" id="loginForm">
+              <label>Email <input id="loginEmail" type="email" required /></label>
+              <label>Password <input id="loginPassword" type="password" required /></label>
+              <button class="btn btn--primary" type="submit">Sign In</button>
+              <div class="alert muted small" id="loginMsg" role="status"></div>
+            </form>
+          </div>
+
+          <div id="registerPane" class="hidden">
+            <form class="form" id="registerForm">
+              <label>Full name <input id="regName" type="text" required /></label>
+              <label>Email <input id="regEmail" type="email" required /></label>
+              <label>Password <input id="regPassword" type="password" minlength="8" required /></label>
+              <button class="btn btn--primary" type="submit">Create Account</button>
+              <div class="alert muted small" id="regMsg" role="status"></div>
+            </form>
+          </div>
+
+          <div class="divider"></div>
+          <p class="muted small">Staff? Open <code>/admin.html</code> after your role is set to <strong>staff</strong>.</p>
         </div>
 
         <!-- Dashboard -->
@@ -335,6 +348,7 @@
             </div>
             <div class="dashHead__actions">
               <button class="btn btn--ghost" id="openChatDash">Chat</button>
+              <a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
               <button class="btn btn--ghost" id="logoutBtn">Logout</button>
             </div>
           </div>
@@ -396,7 +410,6 @@
 
               <div class="divider"></div>
               <div class="panel__title">Recent uploads</div>
-              <div class="muted small">Demo only: stores filename in your browser.</div>
               <ul class="list" id="uploadsList"></ul>
             </div>
           </div>
@@ -435,16 +448,16 @@
           <div class="contactList">
             <div>
               <div class="muted small">Address</div>
-              <div><strong>Rhoden Hall district </strong></div>
-              <div class="muted small">Clarendon, Jamaica</div>
+              <div><strong>Your Business Address Here</strong></div>
+              <div class="muted small">Kingston, Jamaica</div>
             </div>
             <div>
               <div class="muted small">Phone</div>
-              <div><strong>+1 (876) 364-1205</strong></div>
+              <div><strong>+1 (876) 000-0000</strong></div>
             </div>
             <div>
               <div class="muted small">Email</div>
-              <div><strong> suenoshipping@gmail.com</strong></div>
+              <div><strong>youremail@example.com</strong></div>
             </div>
           </div>
 
@@ -454,10 +467,10 @@
 
         <div class="card card--pad">
           <h3>Hours</h3>
-          <p class="muted small">Monday to Friday 10am-5pm.</p>
+          <p class="muted small">Add your real business hours here.</p>
           <div class="divider"></div>
           <h4>Shipping schedule</h4>
-          <p class="muted small">Shipping twice per week</p>
+          <p class="muted small">Add cutoff times and shipping days here.</p>
         </div>
       </div>
     </div>
@@ -506,6 +519,7 @@
 
   <button class="chatFab" id="chatFab" aria-label="Open chat">💬</button>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>
