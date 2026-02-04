@@ -471,4 +471,7 @@ function init(){
   renderAuth();
 }
 
-init();
+window.addEventListener("DOMContentLoaded", () => {
+  init();
+});
+
