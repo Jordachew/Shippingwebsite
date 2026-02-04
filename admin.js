@@ -1,5 +1,8 @@
+// ========================
+// SUPABASE CONFIG
+// ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
+const SUPABASE_ANON_KEY = "sb_publishable_i99PVgfeQkRvtjnemX6V9w_wd97XPng";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function $(id){ return document.getElementById(id); }
@@ -24,8 +27,15 @@ async function requireStaff(){
     return false;
   }
 
-  const { data: profile, error } = await supabase.from("profiles").select("role,email").single();
-  if(error){ if(authMsg) authMsg.textContent = `Profile error: ${error.message}`; return false; }
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("role,email")
+    .single();
+
+  if(error){
+    if(authMsg) authMsg.textContent = `Profile error: ${error.message}`;
+    return false;
+  }
 
   if(profile?.role !== "staff"){
     if(authMsg) authMsg.textContent = "Access denied: staff only.";
@@ -65,7 +75,7 @@ async function renderCustomerPackages(){
     .from("packages")
     .select("tracking,status,updated_at,notes")
     .eq("user_id", currentCustomer.id)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending:false });
 
   if(error){
     body.innerHTML = `<tr><td colspan="3" class="muted">Error: ${escapeHTML(error.message)}</td></tr>`;
@@ -100,8 +110,14 @@ function openUpdateModal(ds){
   const modal = $("updateModal");
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden","false");
-  modal.querySelectorAll("[data-close='1']").forEach(el => el.addEventListener("click", closeUpdateModal, { once:true }));
-  document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeUpdateModal(); }, { once:true });
+
+  modal.querySelectorAll("[data-close='1']").forEach(el => {
+    el.addEventListener("click", closeUpdateModal, { once:true });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") closeUpdateModal();
+  }, { once:true });
 }
 
 function closeUpdateModal(){
@@ -126,7 +142,10 @@ async function updatePackage(status, notes){
     .eq("user_id", currentCustomer.id)
     .eq("tracking", selectedPackage.tracking);
 
-  if(error){ if(msg) msg.textContent = error.message; return; }
+  if(error){
+    if(msg) msg.textContent = error.message;
+    return;
+  }
 
   if(msg) msg.textContent = "Saved.";
   await renderCustomerPackages();
@@ -145,14 +164,19 @@ async function createPackage(tracking, status, notes){
     .from("packages")
     .insert({ user_id: currentCustomer.id, tracking, status, notes: notes || null });
 
-  if(error){ if(msg) msg.textContent = error.message; return; }
+  if(error){
+    if(msg) msg.textContent = error.message;
+    return;
+  }
 
   if(msg) msg.textContent = "Created.";
   $("createPkgForm").reset();
   await renderCustomerPackages();
 }
 
-// Staff chat
+// -------------------
+// STAFF CHAT
+// -------------------
 async function renderChat(){
   const body = $("chatBody");
   if(!body) return;
@@ -166,7 +190,7 @@ async function renderChat(){
     .from("messages")
     .select("sender,body,created_at")
     .eq("user_id", currentCustomer.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending:true })
     .limit(200);
 
   if(error){
@@ -273,5 +297,6 @@ async function init(){
   await renderChat();
 }
 
-init();
-
+window.addEventListener("DOMContentLoaded", () => {
+  init();
+});
