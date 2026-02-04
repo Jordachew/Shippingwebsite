@@ -2,13 +2,14 @@
 // SUPABASE CONFIG
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
+const SUPABASE_ANON_KEY = "sb_publishable_i99PVgfeQkRvtjnemX6V9w_wd97XPng";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const INVOICE_BUCKET = "invoices";
-const BUSINESS_NAME = "Sueños Shipping & Variety Store";
 
-// Rates (edit as needed)
+// ========================
+// RATES (EDIT)
+// ========================
 const rates = [
   { lbs: 1, jmd: 400 },
   { lbs: 2, jmd: 750 },
@@ -23,7 +24,9 @@ const rates = [
 ];
 const fixedFeeJMD = 500;
 
-// Helpers
+// ========================
+// HELPERS
+// ========================
 function $(id){ return document.getElementById(id); }
 function escapeHTML(s){
   return String(s ?? "")
@@ -38,7 +41,9 @@ function formatJMD(n){
 }
 function setYear(){ const y = $("year"); if(y) y.textContent = new Date().getFullYear(); }
 
-// Rates table + calculator
+// ========================
+// RATES + CALCULATOR
+// ========================
 function buildRatesTable(){
   const body = $("ratesTableBody");
   if(!body) return;
@@ -83,7 +88,9 @@ function setupCalculator(){
   });
 }
 
-// Mobile nav
+// ========================
+// NAV (mobile)
+// ========================
 function setupMobileNav(){
   const toggle = $("navToggle");
   const nav = $("nav");
@@ -103,7 +110,9 @@ function setupMobileNav(){
   }));
 }
 
-// Auth tabs
+// ========================
+// AUTH TABS (REGISTER FIX)
+// ========================
 function setupAuthTabs(){
   const tabLogin = $("tabLogin");
   const tabRegister = $("tabRegister");
@@ -111,19 +120,21 @@ function setupAuthTabs(){
   const registerPane = $("registerPane");
   if(!tabLogin || !tabRegister || !loginPane || !registerPane) return;
 
-  function setTab(which){
+  const setTab = (which) => {
     const isLogin = which === "login";
     tabLogin.classList.toggle("active", isLogin);
     tabRegister.classList.toggle("active", !isLogin);
     loginPane.classList.toggle("hidden", !isLogin);
     registerPane.classList.toggle("hidden", isLogin);
-  }
+  };
 
   tabLogin.addEventListener("click", () => setTab("login"));
   tabRegister.addEventListener("click", () => setTab("register"));
 }
 
-// Login
+// ========================
+// LOGIN / REGISTER
+// ========================
 function setupLogin(){
   const form = $("loginForm");
   const msg = $("loginMsg");
@@ -151,7 +162,6 @@ function setupLogin(){
   }
 }
 
-// Register (self-register)
 function setupRegister(){
   const form = $("registerForm");
   const msg = $("regMsg");
@@ -172,12 +182,14 @@ function setupRegister(){
     });
 
     if(error){ if(msg) msg.textContent = error.message; return; }
-    if(msg) msg.textContent = "Account created. Check your email to confirm (if required), then log in.";
+    if(msg) msg.textContent = "Account created. Check email for confirmation (if enabled), then log in.";
     form.reset();
   });
 }
 
-// Packages (customer)
+// ========================
+// PACKAGES
+// ========================
 async function renderPackages(filter=""){
   const body = $("pkgBody");
   if(!body) return;
@@ -244,10 +256,11 @@ function openPackageModal(ds){
   modal.setAttribute("aria-hidden", "false");
 
   modal.querySelectorAll("[data-close='1']").forEach(el => {
-    el.addEventListener("click", closePackageModal, { once: true });
+    el.addEventListener("click", closePackageModal, { once:true });
   });
-  document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePackageModal(); }, { once: true });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePackageModal(); }, { once:true });
 }
+
 function closePackageModal(){
   const modal = $("pkgModal");
   if(!modal) return;
@@ -259,10 +272,12 @@ function setupPackageSearch(){
   const search = $("pkgSearch");
   const reset = $("resetSearch");
   if(search) search.addEventListener("input", () => renderPackages(search.value));
-  if(reset) reset.addEventListener("click", () => { if(search) search.value=""; renderPackages(""); });
+  if(reset) reset.addEventListener("click", () => { search.value=""; renderPackages(""); });
 }
 
-// Invoices (upload + list)
+// ========================
+// INVOICES
+// ========================
 async function renderUploads(){
   const ul = $("uploadsList");
   if(!ul) return;
@@ -273,7 +288,7 @@ async function renderUploads(){
   const { data, error } = await supabase
     .from("invoices")
     .select("tracking,file_name,created_at,note")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending:false })
     .limit(10);
 
   if(error){ ul.innerHTML = `<li class="muted">Error: ${escapeHTML(error.message)}</li>`; return; }
@@ -310,12 +325,17 @@ function setupInvoiceUpload(){
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { cacheControl:"3600", upsert:false });
     if(up.error){ if(msg) msg.textContent = up.error.message; return; }
 
     const ins = await supabase.from("invoices").insert({
-      user_id: user.id, tracking, file_path: path, file_name: safeName, note: note || null
+      user_id: user.id,
+      tracking,
+      file_path: path,
+      file_name: safeName,
+      note: note || null
     });
+
     if(ins.error){ if(msg) msg.textContent = ins.error.message; return; }
 
     form.reset();
@@ -324,7 +344,9 @@ function setupInvoiceUpload(){
   });
 }
 
-// Chat (realtime)
+// ========================
+// CHAT (REALTIME)
+// ========================
 let chatChannel = null;
 
 async function renderChat(){
@@ -337,7 +359,7 @@ async function renderChat(){
   const { data, error } = await supabase
     .from("messages")
     .select("sender,body,created_at")
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending:true })
     .limit(200);
 
   if(error){ body.innerHTML = `<div class="muted small">Error: ${escapeHTML(error.message)}</div>`; return; }
@@ -368,7 +390,7 @@ async function setupChatRealtime(){
   chatChannel = supabase
     .channel(`messages:${user.id}`)
     .on("postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
+      { event:"INSERT", schema:"public", table:"messages", filter:`user_id=eq.${user.id}` },
       async () => { await renderChat(); }
     )
     .subscribe();
@@ -378,15 +400,15 @@ function openChat(){
   const w = $("chatWidget");
   if(!w) return;
   w.classList.remove("hidden");
-  w.setAttribute("aria-hidden", "false");
-  renderChat().then(() => setupChatRealtime());
+  w.setAttribute("aria-hidden","false");
+  renderChat().then(setupChatRealtime);
   $("chatInput")?.focus();
 }
 function closeChat(){
   const w = $("chatWidget");
   if(!w) return;
   w.classList.add("hidden");
-  w.setAttribute("aria-hidden", "true");
+  w.setAttribute("aria-hidden","true");
 }
 
 function setupChatUI(){
@@ -399,30 +421,26 @@ function setupChatUI(){
     .map(id => $(id)).filter(Boolean);
 
   openButtons.forEach(btn => btn.addEventListener("click", openChat));
-  if(fab) fab.addEventListener("click", openChat);
-  if(close) close.addEventListener("click", closeChat);
+  fab?.addEventListener("click", openChat);
+  close?.addEventListener("click", closeChat);
 
-  if(form){
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const text = (input?.value || "").trim();
-      if(!text) return;
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = (input?.value || "").trim();
+    if(!text) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if(!user){ alert("Please log in to send messages."); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if(!user){ alert("Please log in to send messages."); return; }
 
-      input.value = "";
-
-      const { error } = await supabase.from("messages").insert({
-        user_id: user.id, sender: "customer", body: text
-      });
-
-      if(error) alert(error.message);
-    });
-  }
+    input.value = "";
+    const { error } = await supabase.from("messages").insert({ user_id:user.id, sender:"customer", body:text });
+    if(error) alert(error.message);
+  });
 }
 
-// Show/hide portal + show admin link if staff
+// ========================
+// AUTH RENDER + ADMIN LINK
+// ========================
 async function renderAuth(){
   const loginCard = $("loginCard");
   const dashCard = $("dashCard");
@@ -432,8 +450,8 @@ async function renderAuth(){
   const { data: { user } } = await supabase.auth.getUser();
   const isAuthed = !!user;
 
-  if(loginCard) loginCard.classList.toggle("hidden", isAuthed);
-  if(dashCard) dashCard.classList.toggle("hidden", !isAuthed);
+  loginCard?.classList.toggle("hidden", isAuthed);
+  dashCard?.classList.toggle("hidden", !isAuthed);
 
   if(!isAuthed){
     if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel = null; }
@@ -456,7 +474,9 @@ async function renderAuth(){
 
 supabase.auth.onAuthStateChange(async () => { await renderAuth(); });
 
-// Init
+// ========================
+// INIT (DOMContentLoaded FIX)
+// ========================
 function init(){
   setYear();
   buildRatesTable();
@@ -474,4 +494,3 @@ function init(){
 window.addEventListener("DOMContentLoaded", () => {
   init();
 });
-
