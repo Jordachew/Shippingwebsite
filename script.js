@@ -473,7 +473,13 @@ async function renderAuth(){
   await setupChatRealtime();
 }
 
-supabase.auth.onAuthStateChange(async () => { await renderAuth(); });
+supabase.auth.onAuthStateChange((event, session) => {
+  setTimeout(async () => {
+    // Await on the renderAuth function here
+    await renderAuth(); 
+  }, 0);
+});
+
 
 // ========================
 // INIT (DOMContentLoaded FIX)
