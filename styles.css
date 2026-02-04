@@ -274,6 +274,7 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
   border-radius: var(--radius2);
   padding:14px;
 }
+.panel__head{display:flex; align-items:flex-end; justify-content:space-between; gap:12px}
 .panel__title{font-weight:950}
 .panel__sub{margin-top:4px}
 
@@ -410,6 +411,11 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
 }
 .chat__form input{flex:1}
 
+.contactList{
+  display:grid;
+  gap:12px;
+}
+
 @media (max-width: 1040px){
   .cards{grid-template-columns: repeat(2, 1fr)}
   .cards--3{grid-template-columns: repeat(2, 1fr)}
@@ -432,3 +438,8 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
   .grid2{grid-template-columns: 1fr}
   .footer__grid{grid-template-columns: 1fr}
 }
+
+/* Ensure tabs stay clickable (prevents overlay issues) */
+#loginCard { position: relative; z-index: 5; }
+.tabs { position: relative; z-index: 6; }
+.tab { position: relative; z-index: 7; pointer-events: auto; }
