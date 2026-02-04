@@ -11,9 +11,9 @@ const INVOICE_BUCKET = "invoices";
 // RATES (EDIT)
 // ========================
 const rates = [
-  { lbs: 1, jmd: 400 },
-  { lbs: 2, jmd: 750 },
-  { lbs: 3, jmd: 1050 },
+  { lbs: 1, jmd: 500 },
+  { lbs: 2, jmd: 850 },
+  { lbs: 3, jmd: 1250 },
   { lbs: 4, jmd: 1350 },
   { lbs: 5, jmd: 1600 },
   { lbs: 6, jmd: 1950 },
