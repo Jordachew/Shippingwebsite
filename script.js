@@ -1,4 +1,4 @@
-// ========================
+
 // SUPABASE CONFIG
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
