@@ -4,18 +4,22 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin • Sueños Shipping</title>
+  <meta name="description" content="Sueños Shipping staff dashboard: manage customers, packages, and support chat." />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
+  <!-- Top Nav -->
   <header class="header">
     <div class="container header__inner">
-      <a class="brand" href="/">
-        <div class="brand__mark">S</div>
+      <a class="brand" href="/" aria-label="Back to main site">
+        <div class="brand__mark" aria-hidden="true">S</div>
         <div class="brand__text">
           <div class="brand__name">Sueños Shipping</div>
-          <div class="brand__tag">Admin</div>
+          <div class="brand__tag">Staff / Admin</div>
         </div>
       </a>
+
       <div class="header__actions">
         <a class="btn btn--ghost" href="/">Main site</a>
         <button class="btn btn--primary" id="logoutBtn" type="button">Logout</button>
@@ -27,47 +31,63 @@
     <div class="container">
       <div class="section__head">
         <h2>Staff Dashboard</h2>
-        <p>Search customers, manage packages, and reply to chat.</p>
-        <div class="muted small" id="authMsg"></div>
+        <p>Search a customer, create/update packages, and reply to messages.</p>
+        <div class="muted small" id="authMsg" role="status"></div>
       </div>
 
       <div class="grid2">
+        <!-- Find customer -->
         <div class="card card--pad">
           <h3>Find Customer</h3>
           <form class="form" id="findForm">
-            <label>Email
+            <label>
+              Customer Email
               <input id="custEmail" type="email" placeholder="customer@email.com" required />
             </label>
             <button class="btn btn--primary" type="submit">Search</button>
-            <div class="muted small" id="findMsg"></div>
+            <div class="muted small" id="findMsg" role="status"></div>
           </form>
 
           <div class="divider"></div>
-          <div><strong>Customer ID:</strong> <span id="custId">—</span></div>
-          <div class="muted small">Used to assign packages and view messages.</div>
+
+          <div>
+            <div class="muted small">Customer ID</div>
+            <div><strong id="custId">—</strong></div>
+            <div class="muted small">Used to assign packages and load chat.</div>
+          </div>
         </div>
 
+        <!-- Create package -->
         <div class="card card--pad">
           <h3>Create Package</h3>
           <form class="form" id="createPkgForm">
-            <label>Tracking ID
+            <label>
+              Tracking ID
               <input id="tracking" type="text" placeholder="SSX-1234" required />
             </label>
-            <label>Status
+            <label>
+              Status
               <input id="status" type="text" placeholder="Received at warehouse" required />
             </label>
-            <label>Notes (optional)
+            <label>
+              Notes (optional)
               <input id="notes" type="text" placeholder="Any notes..." />
             </label>
+
             <button class="btn btn--primary" type="submit">Create</button>
-            <div class="muted small" id="createMsg"></div>
+            <div class="muted small" id="createMsg" role="status"></div>
           </form>
+
+          <div class="divider"></div>
+          <p class="muted small">
+            Tip: Search a customer first, then create packages under their account.
+          </p>
         </div>
       </div>
 
       <div class="section__head" style="margin-top:18px;">
-        <h2>Packages for Customer</h2>
-        <p class="muted">Click a row to update status quickly.</p>
+        <h2>Packages</h2>
+        <p class="muted">Click a package row to update status/notes.</p>
       </div>
 
       <div class="card card--pad">
@@ -86,11 +106,14 @@
 
         <div class="divider"></div>
 
-        <h3>Chat (Customer)</h3>
-        <div class="muted small">Replies insert as <strong>support</strong> and show in customer portal instantly.</div>
+        <h3>Support Chat</h3>
+        <p class="muted small" style="margin-top:6px;">
+          Replies send as <strong>Support</strong> and appear in the customer portal instantly.
+        </p>
 
+        <!-- Inline chat layout (reuses .chat styles) -->
         <div class="chat" style="position:static; width:100%; margin-top:12px;">
-          <div class="chat__body" id="chatBody" style="height:260px;"></div>
+          <div class="chat__body" id="chatBody" style="height:280px;"></div>
           <form class="chat__form" id="chatForm">
             <input id="chatInput" type="text" placeholder="Type a support reply..." autocomplete="off" />
             <button class="btn btn--primary" type="submit">Send</button>
@@ -98,27 +121,31 @@
         </div>
       </div>
 
-      <!-- quick update modal -->
+      <!-- Update modal -->
       <div class="modal hidden" id="updateModal" aria-hidden="true">
         <div class="modal__backdrop" data-close="1"></div>
-        <div class="modal__card" role="dialog" aria-modal="true">
+        <div class="modal__card" role="dialog" aria-modal="true" aria-label="Update package">
           <div class="modal__head">
             <div>
               <div class="modal__title" id="mTitle">Update</div>
-              <div class="muted small">Set status + notes</div>
+              <div class="muted small">Set status and notes</div>
             </div>
             <button class="btn btn--ghost" data-close="1" type="button">Close</button>
           </div>
+
           <div class="modal__body">
             <form class="form" id="updateForm">
-              <label>Status
+              <label>
+                Status
                 <input id="mStatus" type="text" required />
               </label>
-              <label>Notes (optional)
+              <label>
+                Notes (optional)
                 <input id="mNotes" type="text" />
               </label>
+
               <button class="btn btn--primary" type="submit">Save</button>
-              <div class="muted small" id="updateMsg"></div>
+              <div class="muted small" id="updateMsg" role="status"></div>
             </form>
           </div>
         </div>
@@ -127,6 +154,7 @@
     </div>
   </main>
 
+  <!-- IMPORTANT: Supabase first, then admin.js (NOT script.js) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin.js"></script>
 </body>
