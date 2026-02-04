@@ -1,3 +1,5 @@
+console.log("script.js loaded");
+console.log("Supabase object:", window.supabase);
 
 
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
