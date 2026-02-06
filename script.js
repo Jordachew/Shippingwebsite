@@ -2,17 +2,20 @@
 // CONFIG (PASTE YOUR VALUES)
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// ✅ Safe global singleton: won’t crash if script loads twice
-window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Safe singleton (prevents double-load issues)
+window.__SB__ =
+  window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabase = window.__SB__;
 
 const INVOICE_BUCKET = "invoices";
 const CHAT_BUCKET = "chat_files";
 
 // Business hours note (Mon–Fri 10–5)
-const HOURS_TEXT = "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+const HOURS_TEXT =
+  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
 
 // Calculator base pricing (edit anytime)
 const fixedFeeJMD = 500;
@@ -29,38 +32,60 @@ const rates = [
   { lbs: 10, jmd: 3650 },
 ];
 
-function $(id){ return document.getElementById(id); }
-function escapeHTML(s){
+function $(id) {
+  return document.getElementById(id);
+}
+function escapeHTML(s) {
   return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
-function formatJMD(n){
-  return new Intl.NumberFormat("en-JM",{style:"currency",currency:"JMD",maximumFractionDigits:0}).format(Number(n||0));
+function formatJMD(n) {
+  return new Intl.NumberFormat("en-JM", {
+    style: "currency",
+    currency: "JMD",
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0));
 }
-function pickupLabel(v){
-  return v === "RHODEN_HALL_CLARENDON" ? "Rhoden Hall District, Clarendon" : "UWI, Kingston";
+function pickupLabel(v) {
+  return v === "RHODEN_HALL_CLARENDON"
+    ? "Rhoden Hall District, Clarendon"
+    : "UWI, Kingston";
 }
 
-function setupMobileNav(){
+// --------------------
+// Small helpers
+// --------------------
+function findRateForWeight(weightLbs) {
+  const rounded = Math.ceil(weightLbs);
+  const match = rates.find((r) => r.lbs === rounded);
+  if (match) return { rounded, rate: match.jmd };
+
+  const last = rates[rates.length - 1];
+  const prev = rates[rates.length - 2] || last;
+  const step = Math.max(0, last.jmd - prev.jmd);
+  return { rounded, rate: last.jmd + (rounded - last.lbs) * step };
+}
+
+function setupMobileNav() {
   const toggle = $("navToggle");
   const nav = $("nav");
-  if(!toggle || !nav) return;
+  if (!toggle || !nav) return;
   toggle.addEventListener("click", () => {
     const open = nav.style.display === "flex";
     nav.style.display = open ? "none" : "flex";
   });
 }
 
-function setupAuthTabs(){
+function setupAuthTabs() {
   const tabLogin = $("tabLogin");
   const tabRegister = $("tabRegister");
   const loginPane = $("loginPane");
   const registerPane = $("registerPane");
-  if(!tabLogin || !tabRegister || !loginPane || !registerPane) return;
+  if (!tabLogin || !tabRegister || !loginPane || !registerPane) return;
 
   const setTab = (which) => {
     const isLogin = which === "login";
@@ -74,91 +99,174 @@ function setupAuthTabs(){
   tabRegister.addEventListener("click", () => setTab("register"));
 }
 
-function findRateForWeight(weightLbs){
-  const rounded = Math.ceil(weightLbs);
-  const match = rates.find(r => r.lbs === rounded);
-  if(match) return { rounded, rate: match.jmd };
-  const last = rates[rates.length-1];
-  const prev = rates[rates.length-2] || last;
-  const step = Math.max(0, last.jmd - prev.jmd);
-  return { rounded, rate: last.jmd + (rounded - last.lbs) * step };
-}
-
-function setupCalculator(){
+function setupCalculator() {
   const form = $("calcForm");
   const result = $("result");
-  if(!form || !result) return;
+  if (!form || !result) return;
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const w = parseFloat($("weight").value);
     const v = parseFloat($("value").value);
-    if(!Number.isFinite(w) || w<=0 || !Number.isFinite(v) || v<0){
+
+    if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
       result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>`;
       return;
     }
+
     const { rounded, rate } = findRateForWeight(w);
     const total = rate + fixedFeeJMD;
     result.innerHTML = `
       <div class="result__big">${formatJMD(total)}</div>
-      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(rate)} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
+      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(
+      rate
+    )} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
     `;
   });
 }
 
-function setupLoginRegister(){
+// --------------------
+// PROFILE creation (NO TRIGGER REQUIRED)
+// --------------------
+function stashPendingProfile(full_name, phone, email) {
+  try {
+    localStorage.setItem(
+      "pending_profile",
+      JSON.stringify({ full_name, phone, email, at: Date.now() })
+    );
+  } catch (_) {}
+}
+
+function readPendingProfile() {
+  try {
+    const raw = localStorage.getItem("pending_profile");
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearPendingProfile() {
+  try {
+    localStorage.removeItem("pending_profile");
+  } catch (_) {}
+}
+
+async function ensureProfile({ full_name, phone } = {}) {
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) return { ok: false, error: userErr };
+  const user = userData?.user;
+  if (!user) return { ok: false, error: new Error("Not logged in") };
+
+  // Try to read profile
+  const { data: profile, error: pReadErr } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // If it exists, optionally update missing values
+  if (profile && !pReadErr) {
+    const patch = {};
+    if (full_name && !profile.full_name) patch.full_name = full_name;
+    if (phone && !profile.phone) patch.phone = phone;
+    if (Object.keys(patch).length) {
+      await supabase.from("profiles").update(patch).eq("id", user.id);
+    }
+    return { ok: true, profile };
+  }
+
+  // If not found or blocked, attempt upsert
+  const { error: upErr } = await supabase.from("profiles").upsert({
+    id: user.id,
+    email: user.email,
+    full_name: full_name || "",
+    phone: phone || "",
+  });
+
+  if (upErr) return { ok: false, error: upErr };
+
+  const { data: profile2 } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return { ok: true, profile: profile2 || null };
+}
+
+// --------------------
+// Login / Register
+// --------------------
+function setupLoginRegister() {
   const loginForm = $("loginForm");
   const regForm = $("registerForm");
 
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("loginMsg").textContent = "Signing in...";
+    if ($("loginMsg")) $("loginMsg").textContent = "Signing in...";
+
     const email = $("loginEmail").value.trim().toLowerCase();
     const password = $("loginPassword").value;
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if(error){ $("loginMsg").textContent = error.message; return; }
-    $("loginMsg").textContent = "";
+    if (error) {
+      if ($("loginMsg")) $("loginMsg").textContent = error.message;
+      return;
+    }
+
+    // If they registered earlier with email confirmation ON,
+    // we may have pending profile data from that signup.
+    const pending = readPendingProfile();
+    if (pending) {
+      await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
+      clearPendingProfile();
+    } else {
+      await ensureProfile(); // ensures row exists even if trigger missing
+    }
+
+    if ($("loginMsg")) $("loginMsg").textContent = "";
     await renderAuth();
   });
 
   regForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("regMsg").textContent = "Creating account...";
+    if ($("regMsg")) $("regMsg").textContent = "Creating account...";
+
     const full_name = $("regName").value.trim();
     const phone = $("regPhone").value.trim();
     const email = $("regEmail").value.trim().toLowerCase();
     const password = $("regPassword").value;
 
+    // Store pending profile in case email confirmation is ON (no session)
+    stashPendingProfile(full_name, phone, email);
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name, phone } }
+      options: { data: { full_name, phone } },
     });
-const { data: u, error: uErr } = await supabase.auth.getUser();
-if (uErr) throw uErr;
-}
-const { data: userData, error: userErr } = await supabase.auth.getUser();
-if (userErr) { throw userErr; }
 
-const user = userData?.user;
-if (user) {
-  const { error: profErr } = await supabase.from("profiles").upsert({
-    id: user.id,
-    email: user.email,
-    full_name: full_name,
-    phone: phone
-  });
+    if (error) {
+      if ($("regMsg")) $("regMsg").textContent = error.message;
+      return;
+    }
 
-  if (profErr) { throw profErr; }
-}
+    // Try to ensure profile immediately (works when email confirmation is OFF)
+    // If confirmation is ON, this will fail until user logs in.
+    const ensured = await ensureProfile({ full_name, phone });
 
-    
-  if (pErr) throw pErr;
-}
+    if ($("regMsg")) {
+      if (ensured.ok) {
+        $("regMsg").textContent = "Account created. You can now log in.";
+        clearPendingProfile();
+      } else {
+        // likely email confirmation ON; not an actual failure
+        $("regMsg").textContent =
+          "Account created. Please check your email to confirm, then log in.";
+      }
+    }
 
-    if(error){ $("regMsg").textContent = error.message; return; }
-    $("regMsg").textContent = "Account created. Please log in.";
     regForm.reset();
   });
 
@@ -166,125 +274,159 @@ if (user) {
     await supabase.auth.signOut();
     await renderAuth();
   });
-if (u?.user) {
-  const full_name = document.getElementById("regName").value.trim();
-  const phone = document.getElementById("regPhone").value.trim();
-
-  const { error: pErr } = await supabase.from("profiles").upsert({
-    id: u.user.id,
-    email: u.user.email,
-    full_name,
-    phone
-  });
-
+}
 
 // --------------------
 // Packages + invoices
 // --------------------
-async function renderPackages(filter=""){
+async function renderPackages(filter = "") {
   const body = $("pkgBody");
-  if(!body) return;
+  if (!body) return;
 
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user){
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
     body.innerHTML = `<tr><td colspan="4" class="muted">Please log in.</td></tr>`;
     return;
   }
 
-  let q = supabase.from("packages")
+  let q = supabase
+    .from("packages")
     .select("tracking,status,pickup,pickup_confirmed,updated_at")
-    .order("updated_at",{ascending:false});
+    .order("updated_at", { ascending: false });
 
-  if(filter.trim()){
+  if (filter.trim()) {
     q = q.ilike("tracking", `%${filter.trim()}%`);
   }
 
   const { data, error } = await q;
-  if(error){
-    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
+  if (error) {
+    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(
+      error.message
+    )}</td></tr>`;
     return;
   }
-  if(!data?.length){
+
+  if (!data?.length) {
     body.innerHTML = `<tr><td colspan="4" class="muted">No packages yet. Upload invoices and message us if needed.</td></tr>`;
     return;
   }
 
-  body.innerHTML = data.map(p => `
+  body.innerHTML = data
+    .map(
+      (p) => `
     <tr>
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td>${escapeHTML(pickupLabel(p.pickup))}${p.pickup_confirmed ? ` <span class="tag">Confirmed</span>` : ` <span class="tag">Pending</span>`}</td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}${
+        p.pickup_confirmed
+          ? ` <span class="tag">Confirmed</span>`
+          : ` <span class="tag">Pending</span>`
+      }</td>
       <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-async function renderUploads(){
+async function renderUploads() {
   const list = $("uploadsList");
-  if(!list) return;
+  if (!list) return;
 
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user){
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
     list.innerHTML = `<li class="muted">Log in to see uploads.</li>`;
     return;
   }
 
   const { data, error } = await supabase
     .from("invoices")
-    .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
-    .order("created_at",{ascending:false})
+    .select(
+      "tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note"
+    )
+    .order("created_at", { ascending: false })
     .limit(10);
 
-  if(error){
+  if (error) {
     list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
     return;
   }
-  if(!data?.length){
+  if (!data?.length) {
     list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
     return;
   }
 
-  list.innerHTML = data.map(i => `
+  list.innerHTML = data
+    .map(
+      (i) => `
     <li>
-      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name)} (${escapeHTML(i.file_type)})</div>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
+        i.file_name
+      )} (${escapeHTML(i.file_type)})</div>
       <div class="muted small">
-        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${i.pickup_confirmed ? "Confirmed" : "Pending confirmation"} • ${new Date(i.created_at).toLocaleString()}
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
+        i.pickup_confirmed ? "Confirmed" : "Pending confirmation"
+      } • ${new Date(i.created_at).toLocaleString()}
         ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
       </div>
     </li>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-function setupPackageSearch(){
-  $("pkgSearch")?.addEventListener("input", (e)=> renderPackages(e.target.value));
-  $("resetSearch")?.addEventListener("click", ()=> { $("pkgSearch").value=""; renderPackages(""); });
+function setupPackageSearch() {
+  $("pkgSearch")?.addEventListener("input", (e) =>
+    renderPackages(e.target.value)
+  );
+  $("resetSearch")?.addEventListener("click", () => {
+    if ($("pkgSearch")) $("pkgSearch").value = "";
+    renderPackages("");
+  });
 }
 
-function setupInvoiceUpload(){
+function setupInvoiceUpload() {
   const form = $("invoiceForm");
-  if(!form) return;
+  if (!form) return;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("invMsg").textContent = "Uploading...";
+    if ($("invMsg")) $("invMsg").textContent = "Uploading...";
 
-    const { data:{ user } } = await supabase.auth.getUser();
-    if(!user){ $("invMsg").textContent = "Please log in."; return; }
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) {
+      if ($("invMsg")) $("invMsg").textContent = "Please log in.";
+      return;
+    }
 
     const tracking = $("invTracking").value.trim();
     const pickup = $("invPickup").value;
     const note = $("invNote").value.trim();
     const fileInput = $("invFile");
 
-    if(!tracking){ $("invMsg").textContent = "Tracking ID required."; return; }
-    if(!fileInput.files?.length){ $("invMsg").textContent = "Choose a file."; return; }
+    if (!tracking) {
+      if ($("invMsg")) $("invMsg").textContent = "Tracking ID required.";
+      return;
+    }
+    if (!fileInput?.files?.length) {
+      if ($("invMsg")) $("invMsg").textContent = "Choose a file.";
+      return;
+    }
 
     const file = fileInput.files[0];
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { upsert:false });
-    if(up.error){ $("invMsg").textContent = up.error.message; return; }
+    const up = await supabase.storage
+      .from(INVOICE_BUCKET)
+      .upload(path, file, { upsert: false });
+    if (up.error) {
+      if ($("invMsg")) $("invMsg").textContent = up.error.message;
+      return;
+    }
 
     const ins = await supabase.from("invoices").insert({
       user_id: user.id,
@@ -293,14 +435,19 @@ function setupInvoiceUpload(){
       pickup_confirmed: false,
       file_path: path,
       file_name: safeName,
-      file_type: (file.type || "unknown"),
-      note: note || null
+      file_type: file.type || "unknown",
+      note: note || null,
     });
 
-    if(ins.error){ $("invMsg").textContent = ins.error.message; return; }
+    if (ins.error) {
+      if ($("invMsg")) $("invMsg").textContent = ins.error.message;
+      return;
+    }
 
     form.reset();
-    $("invMsg").textContent = "Uploaded. Pickup location will be confirmed by staff.";
+    if ($("invMsg"))
+      $("invMsg").textContent =
+        "Uploaded. Pickup location will be confirmed by staff.";
     await renderUploads();
   });
 }
@@ -310,12 +457,13 @@ function setupInvoiceUpload(){
 // --------------------
 let chatChannel = null;
 
-async function renderChat(){
+async function renderChat() {
   const body = $("chatBody");
-  if(!body) return;
+  if (!body) return;
 
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user){
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
     body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`;
     return;
   }
@@ -323,86 +471,108 @@ async function renderChat(){
   const { data, error } = await supabase
     .from("messages")
     .select("id,sender,body,created_at")
-    .order("created_at",{ascending:true})
+    .order("created_at", { ascending: true })
     .limit(200);
 
-  if(error){
-    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(
+      error.message
+    )}</div>`;
     return;
   }
 
-  body.innerHTML = (data?.length ? data : []).map(m => `
+  body.innerHTML =
+    (data?.length ? data : [])
+      .map(
+        (m) => `
     <div class="bubble ${m.sender === "customer" ? "me" : ""}">
       <div>${escapeHTML(m.body)}</div>
       <div class="meta">
         <span>${m.sender === "customer" ? "You" : "Support"}</span>
-        <span>${new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}</span>
       </div>
     </div>
-  `).join("") || `<div class="muted small">Start the conversation. ${escapeHTML(HOURS_TEXT)}</div>`;
+  `
+      )
+      .join("") ||
+    `<div class="muted small">Start the conversation. ${escapeHTML(
+      HOURS_TEXT
+    )}</div>`;
 
   body.scrollTop = body.scrollHeight;
 }
 
-async function setupChatRealtime(){
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user) return;
+async function setupChatRealtime() {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) return;
 
-  if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel=null; }
+  if (chatChannel) {
+    supabase.removeChannel(chatChannel);
+    chatChannel = null;
+  }
+
   chatChannel = supabase
     .channel(`messages:${user.id}`)
-    .on("postgres_changes",
-      { event:"INSERT", schema:"public", table:"messages", filter:`user_id=eq.${user.id}` },
-      async () => { await renderChat(); }
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
+      async () => {
+        await renderChat();
+      }
     )
     .subscribe();
 }
 
-async function sendChatMessage(text, file){
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user) return alert("Please log in to chat.");
+async function sendChatMessage(text, file) {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) return alert("Please log in to chat.");
 
-  // 1) insert message
   const { data: msg, error: mErr } = await supabase
     .from("messages")
-    .insert({ user_id:user.id, sender:"customer", body:text })
+    .insert({ user_id: user.id, sender: "customer", body: text })
     .select("id")
     .single();
 
-  if(mErr) return alert(mErr.message);
+  if (mErr) return alert(mErr.message);
 
-  // 2) optional attachment
-  if(file){
+  if (file) {
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/messages/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert:false });
-    if(up.error) return alert(up.error.message);
+    const up = await supabase.storage
+      .from(CHAT_BUCKET)
+      .upload(path, file, { upsert: false });
+    if (up.error) return alert(up.error.message);
 
     const ins = await supabase.from("message_attachments").insert({
       message_id: msg.id,
       user_id: user.id,
       file_path: path,
       file_name: safeName,
-      file_type: file.type || "unknown"
+      file_type: file.type || "unknown",
     });
 
-    if(ins.error) return alert(ins.error.message);
+    if (ins.error) return alert(ins.error.message);
   }
 }
 
-function openChat(){
-  $("chatWidget").classList.remove("hidden");
-  $("chatWidget").setAttribute("aria-hidden","false");
-  $("chatHoursText").textContent = HOURS_TEXT;
+function openChat() {
+  $("chatWidget")?.classList.remove("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "false");
+  if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
   renderChat().then(setupChatRealtime);
 }
-function closeChat(){
-  $("chatWidget").classList.add("hidden");
-  $("chatWidget").setAttribute("aria-hidden","true");
+function closeChat() {
+  $("chatWidget")?.classList.add("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "true");
 }
 
-function setupChatUI(){
+function setupChatUI() {
   $("chatFab")?.addEventListener("click", openChat);
   $("openChatTop")?.addEventListener("click", openChat);
   $("openChatCalc")?.addEventListener("click", openChat);
@@ -416,42 +586,58 @@ function setupChatUI(){
     const file = $("chatFile")?.files?.[0] || null;
     const msgEl = $("chatMsg");
 
-    const text = (input.value || "").trim();
-    if(!text && !file){
-      msgEl.textContent = "Type a message or attach a file.";
+    const text = (input?.value || "").trim();
+    if (!text && !file) {
+      if (msgEl) msgEl.textContent = "Type a message or attach a file.";
       return;
     }
-    msgEl.textContent = "Sending...";
-    input.value = "";
-    if($("chatFile")) $("chatFile").value = "";
+
+    if (msgEl) msgEl.textContent = "Sending...";
+    if (input) input.value = "";
+    if ($("chatFile")) $("chatFile").value = "";
 
     await sendChatMessage(text || "(Attachment)", file);
-    msgEl.textContent = "";
+    if (msgEl) msgEl.textContent = "";
   });
 }
 
 // --------------------
 // Auth render
 // --------------------
-async function renderAuth(){
+async function renderAuth() {
   const loginCard = $("loginCard");
   const dashCard = $("dashCard");
 
-  const { data:{ user } } = await supabase.auth.getUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   const authed = !!user;
 
-  loginCard.classList.toggle("hidden", authed);
-  dashCard.classList.toggle("hidden", !authed);
+  if (loginCard) loginCard.classList.toggle("hidden", authed);
+  if (dashCard) dashCard.classList.toggle("hidden", !authed);
 
-  if(!authed){
-    $("adminLink").style.display = "none";
-    if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel=null; }
+  if (!authed) {
+    if ($("adminLink")) $("adminLink").style.display = "none";
+    if (chatChannel) {
+      supabase.removeChannel(chatChannel);
+      chatChannel = null;
+    }
     return;
   }
 
-  const { data: profile } = await supabase.from("profiles").select("full_name,role").single();
-  $("userName").textContent = profile?.full_name || user.email || "Customer";
-  $("adminLink").style.display = (profile?.role === "staff") ? "inline-flex" : "none";
+  // Ensure profile exists; if signup used email-confirm flow, this happens after login
+  await ensureProfile();
+
+  const { data: profile, error: profErr } = await supabase
+    .from("profiles")
+    .select("full_name,role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const displayName = (!profErr && profile?.full_name) ? profile.full_name : (user.email || "Customer");
+  if ($("userName")) $("userName").textContent = displayName;
+
+  const isStaff = (!profErr && profile?.role === "staff");
+  if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
   await renderPackages("");
   await renderUploads();
@@ -461,7 +647,7 @@ supabase.auth.onAuthStateChange(async () => {
   await renderAuth();
 });
 
-function init(){
+function init() {
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
