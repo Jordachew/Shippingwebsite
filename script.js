@@ -162,7 +162,20 @@ if (u?.user) {
     await renderAuth();
   });
 }
+const { data: userData, error: userErr } = await supabase.auth.getUser();
+if (userErr) { throw userErr; }
 
+const user = userData?.user;
+if (user) {
+  const { error: profErr } = await supabase.from("profiles").upsert({
+    id: user.id,
+    email: user.email,
+    full_name: full_name,
+    phone: phone
+  });
+
+  if (profErr) { throw profErr; }
+}
 // --------------------
 // Packages + invoices
 // --------------------
