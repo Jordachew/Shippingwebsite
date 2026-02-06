@@ -137,18 +137,6 @@ function setupLoginRegister(){
     });
 const { data: u, error: uErr } = await supabase.auth.getUser();
 if (uErr) throw uErr;
-
-if (u?.user) {
-  const full_name = document.getElementById("regName").value.trim();
-  const phone = document.getElementById("regPhone").value.trim();
-
-  const { error: pErr } = await supabase.from("profiles").upsert({
-    id: u.user.id,
-    email: u.user.email,
-    full_name,
-    phone
-  });
-
 }
 const { data: userData, error: userErr } = await supabase.auth.getUser();
 if (userErr) { throw userErr; }
@@ -178,6 +166,18 @@ if (user) {
     await supabase.auth.signOut();
     await renderAuth();
   });
+if (u?.user) {
+  const full_name = document.getElementById("regName").value.trim();
+  const phone = document.getElementById("regPhone").value.trim();
+
+  const { error: pErr } = await supabase.from("profiles").upsert({
+    id: u.user.id,
+    email: u.user.email,
+    full_name,
+    phone
+  });
+
+
 // --------------------
 // Packages + invoices
 // --------------------
