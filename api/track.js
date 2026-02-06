@@ -1,22 +1,32 @@
-import { createClient } from "@supabase/supabase-js";
+const { createClient } = require("@supabase/supabase-js");
 
-export default async function handler(req, res) {
-  const tracking = String(req.query.tracking || "").trim();
-  if (!tracking) return res.status(400).json({ error: "tracking required" });
+module.exports = async function handler(req, res) {
+  try {
+    const tracking = String(req.query.tracking || "").trim();
+    if (!tracking) return res.status(400).json({ error: "tracking required" });
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
+    const url = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const { data, error } = await supabase
-    .from("packages")
-    .select("tracking,status,updated_at")
-    .eq("tracking", tracking)
-    .maybeSingle();
+    if (!url || !serviceKey) {
+      return res.status(500).json({
+        error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel env vars."
+      });
+    }
 
-  if (error) return res.status(500).json({ error: error.message });
-  if (!data) return res.status(404).json({ error: "not found" });
+    const supabase = createClient(url, serviceKey);
 
-  res.json(data);
-}
+    const { data, error } = await supabase
+      .from("packages")
+      .select("tracking,status,updated_at")
+      .eq("tracking", tracking)
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: "not found" });
+
+    return res.json(data);
+  } catch (e) {
+    return res.status(500).json({ error: String(e?.message || e) });
+  }
+};
