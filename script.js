@@ -209,11 +209,11 @@ function setupLoginRegister() {
     const email = $("loginEmail").value.trim().toLowerCase();
     const password = $("loginPassword").value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if ($("loginMsg")) $("loginMsg").textContent = error.message;
-      return;
-    }
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if(error){ $("loginMsg").textContent = error.message; return; }
+  $("loginMsg").textContent = "";
+  await renderAuth();
+});
 
     // If they registered earlier with email confirmation ON,
     // we may have pending profile data from that signup.
