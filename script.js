@@ -135,6 +135,22 @@ function setupLoginRegister(){
       password,
       options: { data: { full_name, phone } }
     });
+const { data: u, error: uErr } = await supabase.auth.getUser();
+if (uErr) throw uErr;
+
+if (u?.user) {
+  const full_name = document.getElementById("regName").value.trim();
+  const phone = document.getElementById("regPhone").value.trim();
+
+  const { error: pErr } = await supabase.from("profiles").upsert({
+    id: u.user.id,
+    email: u.user.email,
+    full_name,
+    phone
+  });
+
+  if (pErr) throw pErr;
+}
 
     if(error){ $("regMsg").textContent = error.message; return; }
     $("regMsg").textContent = "Account created. Please log in.";
