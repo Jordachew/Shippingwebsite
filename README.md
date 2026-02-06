@@ -1,19 +1,20 @@
 # Sueños Shipping & Variety Store
 
-Live site: https://suenosshipping.com
-
-## Features
-- Customer self-registration & login (Supabase Auth)
-- Customer dashboard: package statuses
-- Invoice uploads (Supabase Storage + RLS)
-- Realtime chat (customer/support)
-- Staff/admin page: search customers, create/update packages, reply to chat
-- Role-based access using profiles.role = 'staff'
-
 ## Pages
-- `/` = Marketing + Customer portal
-- `/admin.html` = Staff/admin dashboard (staff only)
+- / (index.html): marketing + customer portal
+- /admin.html: staff dashboard (staff only)
+- /track.html: public tracking page
 
-## Notes
-- Frontend uses Supabase JS CDN (no build tools required).
-- Do NOT expose any `sb_secret_...` key in frontend code.
+## Setup
+1) Create Supabase project
+2) Run SQL in Supabase SQL editor
+3) Create Storage buckets: invoices, chat_files
+4) Add env vars in Vercel:
+   - SUPABASE_URL
+   - SUPABASE_SERVICE_ROLE_KEY
+   - (optional) RESEND_API_KEY
+5) Paste SUPABASE_URL + anon key into script.js and admin.js
+6) Deploy to Vercel
+
+## Staff access
+After you register, set profiles.role = 'staff' for your account in Supabase table editor.
