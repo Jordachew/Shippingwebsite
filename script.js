@@ -17,16 +17,16 @@ const HOURS_TEXT = "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next bus
 // Calculator base pricing (edit anytime)
 const fixedFeeJMD = 500;
 const rates = [
-  { lbs: 1, jmd: 400 },
-  { lbs: 2, jmd: 750 },
-  { lbs: 3, jmd: 1050 },
-  { lbs: 4, jmd: 1350 },
-  { lbs: 5, jmd: 1600 },
-  { lbs: 6, jmd: 1950 },
-  { lbs: 7, jmd: 2150 },
-  { lbs: 8, jmd: 2350 },
-  { lbs: 9, jmd: 2600 },
-  { lbs: 10, jmd: 2950 },
+  { lbs: 1, jmd: 500 },
+  { lbs: 2, jmd: 850 },
+  { lbs: 3, jmd: 1250 },
+  { lbs: 4, jmd: 1550 },
+  { lbs: 5, jmd: 1900 },
+  { lbs: 6, jmd: 2250 },
+  { lbs: 7, jmd: 2600 },
+  { lbs: 8, jmd: 2950 },
+  { lbs: 9, jmd: 3300 },
+  { lbs: 10, jmd: 3650 },
 ];
 
 function $(id){ return document.getElementById(id); }
