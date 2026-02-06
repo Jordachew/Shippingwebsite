@@ -4,159 +4,188 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin • Sueños Shipping</title>
-  <meta name="description" content="Sueños Shipping staff dashboard: manage customers, packages, and support chat." />
   <link rel="stylesheet" href="styles.css" />
 </head>
-
-  
 <body>
-  <!-- Top Nav -->
-  <header class="header">
-    <div class="container header__inner">
-      <a class="brand" href="/" aria-label="Back to main site">
-        <div class="brand__mark" aria-hidden="true">S</div>
-        <div class="brand__text">
-          <div class="brand__name">Sueños Shipping</div>
-          <div class="brand__tag">Staff / Admin</div>
-        </div>
-      </a>
-
-      <div class="header__actions">
-        <a class="btn btn--ghost" href="/">Main site</a>
-        <button class="btn btn--primary" id="logoutBtn" type="button">Logout</button>
+<header class="header">
+  <div class="container header__inner">
+    <a class="brand" href="/">
+      <div class="brand__mark">S</div>
+      <div class="brand__text">
+        <div class="brand__name">Sueños Shipping</div>
+        <div class="brand__tag">Staff / Admin</div>
       </div>
+    </a>
+    <div class="header__actions">
+      <a class="btn btn--ghost" href="/">Main site</a>
+      <button class="btn btn--primary" id="logoutBtn" type="button">Logout</button>
     </div>
-  </header>
+  </div>
+</header>
 
-  <main class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Staff Dashboard</h2>
-        <p>Search a customer, create/update packages, and reply to messages.</p>
-        <div class="muted small" id="authMsg" role="status"></div>
-      </div>
+<main class="section">
+  <div class="container">
+    <div class="section__head">
+      <h2>Staff Dashboard</h2>
+      <p>Find customer, create packages, bulk upload, update statuses, confirm pickup, view invoices, reply to chat.</p>
+      <div class="muted small" id="authMsg"></div>
+    </div>
 
-      <div class="grid2">
-        <!-- Find customer -->
-        <div class="card card--pad">
-          <h3>Find Customer</h3>
-          <form class="form" id="findForm">
-            <label>
-              Customer Email
-              <input id="custEmail" type="email" placeholder="customer@email.com" required />
-            </label>
-            <button class="btn btn--primary" type="submit">Search</button>
-            <div class="muted small" id="findMsg" role="status"></div>
-          </form>
-
-          <div class="divider"></div>
-
-          <div>
-            <div class="muted small">Customer ID</div>
-            <div><strong id="custId">—</strong></div>
-            <div class="muted small">Used to assign packages and load chat.</div>
-          </div>
-        </div>
-
-        <!-- Create package -->
-        <div class="card card--pad">
-          <h3>Create Package</h3>
-          <form class="form" id="createPkgForm">
-            <label>
-              Tracking ID
-              <input id="tracking" type="text" placeholder="SSX-1234" required />
-            </label>
-            <label>
-              Status
-              <input id="status" type="text" placeholder="Received at warehouse" required />
-            </label>
-            <label>
-              Notes (optional)
-              <input id="notes" type="text" placeholder="Any notes..." />
-            </label>
-
-            <button class="btn btn--primary" type="submit">Create</button>
-            <div class="muted small" id="createMsg" role="status"></div>
-          </form>
-
-          <div class="divider"></div>
-          <p class="muted small">
-            Tip: Search a customer first, then create packages under their account.
-          </p>
-        </div>
-      </div>
-
-      <div class="section__head" style="margin-top:18px;">
-        <h2>Packages</h2>
-        <p class="muted">Click a package row to update status/notes.</p>
+    <div class="grid2">
+      <div class="card card--pad">
+        <h3>Find Customer</h3>
+        <form class="form" id="findForm">
+          <label>Email <input id="custEmail" type="email" required /></label>
+          <button class="btn btn--primary" type="submit">Search</button>
+          <div class="muted small" id="findMsg"></div>
+        </form>
+        <div class="divider"></div>
+        <div><strong>Customer ID:</strong> <span id="custId">—</span></div>
       </div>
 
       <div class="card card--pad">
-        <div class="tableWrap tableWrap--soft">
-          <table class="table table--mini">
-            <thead>
-              <tr>
-                <th>Tracking</th>
-                <th>Status</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody id="pkgBody"></tbody>
-          </table>
+        <h3>Create Package</h3>
+        <form class="form" id="createPkgForm">
+          <label>Tracking <input id="tracking" type="text" placeholder="SSX-1234" required /></label>
+          <label>Status
+            <select id="status">
+              <option value="RECEIVED">Received</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="IN_TRANSIT">In Transit</option>
+              <option value="ARRIVED_JAMAICA">Arrived Jamaica</option>
+              <option value="READY_FOR_PICKUP">Ready for Pickup</option>
+              <option value="PICKED_UP">Picked Up</option>
+              <option value="ON_HOLD">On Hold</option>
+            </select>
+          </label>
+          <label>Pickup Location
+            <select id="pickup">
+              <option value="UWI_KINGSTON">UWI, Kingston</option>
+              <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
+            </select>
+          </label>
+          <label>Weight (lbs) <input id="weight" type="number" step="0.1" /></label>
+          <label>Declared Value USD <input id="value" type="number" step="0.01" /></label>
+          <label>Shipping Cost JMD <input id="cost" type="number" step="1" /></label>
+          <label>Notes <input id="notes" type="text" /></label>
+          <button class="btn btn--primary" type="submit">Create</button>
+          <div class="muted small" id="createMsg"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="section__head" style="margin-top:18px;">
+      <h2>Bulk Upload Packages</h2>
+      <p class="muted small">Paste CSV lines: tracking,status,pickup,weight_lbs,declared_value_usd,shipping_cost_jmd,notes</p>
+    </div>
+
+    <div class="card card--pad">
+      <form class="form" id="bulkForm">
+        <label>CSV Lines
+          <textarea id="bulkText" rows="6" placeholder="SSX-1001,RECEIVED,UWI_KINGSTON,2.5,120,1800,No notes"></textarea>
+        </label>
+        <button class="btn btn--primary" type="submit">Upload List</button>
+        <div class="muted small" id="bulkMsg"></div>
+      </form>
+    </div>
+
+    <div class="section__head" style="margin-top:18px;">
+      <h2>Customer Packages</h2>
+      <p class="muted">Click a row to update status + confirm pickup + trigger Ready email.</p>
+    </div>
+
+    <div class="card card--pad">
+      <div class="tableWrap tableWrap--soft">
+        <table class="table table--mini">
+          <thead>
+          <tr>
+            <th>Tracking</th>
+            <th>Status</th>
+            <th>Pickup</th>
+            <th>Pickup Confirmed</th>
+            <th>Updated</th>
+          </tr>
+          </thead>
+          <tbody id="pkgBody"></tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+      <h3>Invoices</h3>
+      <ul class="list" id="invoiceList"></ul>
+
+      <div class="divider"></div>
+      <h3>Chat</h3>
+      <div class="chat" style="position:static; width:100%; margin-top:12px;">
+        <div class="chat__body" id="chatBody" style="height:260px;"></div>
+        <form class="chat__form" id="chatForm">
+          <input id="chatInput" type="text" placeholder="Reply as support..." autocomplete="off" />
+          <button class="btn btn--primary" type="submit">Send</button>
+        </form>
+      </div>
+
+      <div class="divider"></div>
+      <label class="muted small">Attachment (optional)</label>
+      <input id="chatFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"/>
+      <div class="muted small" id="chatMsg"></div>
+    </div>
+
+    <!-- Update modal -->
+    <div class="modal hidden" id="updateModal" aria-hidden="true">
+      <div class="modal__backdrop" data-close="1"></div>
+      <div class="modal__card" role="dialog" aria-modal="true">
+        <div class="modal__head">
+          <div>
+            <div class="modal__title" id="mTitle">Update</div>
+            <div class="muted small">Update status, confirm pickup, optionally send ready email.</div>
+          </div>
+          <button class="btn btn--ghost" data-close="1" type="button">Close</button>
         </div>
-
-        <div class="divider"></div>
-
-        <h3>Support Chat</h3>
-        <p class="muted small" style="margin-top:6px;">
-          Replies send as <strong>Support</strong> and appear in the customer portal instantly.
-        </p>
-
-        <!-- Inline chat layout (reuses .chat styles) -->
-        <div class="chat" style="position:static; width:100%; margin-top:12px;">
-          <div class="chat__body" id="chatBody" style="height:280px;"></div>
-          <form class="chat__form" id="chatForm">
-            <input id="chatInput" type="text" placeholder="Type a support reply..." autocomplete="off" />
-            <button class="btn btn--primary" type="submit">Send</button>
+        <div class="modal__body">
+          <form class="form" id="updateForm">
+            <label>Status
+              <select id="mStatus">
+                <option value="RECEIVED">Received</option>
+                <option value="PROCESSING">Processing</option>
+                <option value="IN_TRANSIT">In Transit</option>
+                <option value="ARRIVED_JAMAICA">Arrived Jamaica</option>
+                <option value="READY_FOR_PICKUP">Ready for Pickup</option>
+                <option value="PICKED_UP">Picked Up</option>
+                <option value="ON_HOLD">On Hold</option>
+              </select>
+            </label>
+            <label>Pickup Location
+              <select id="mPickup">
+                <option value="UWI_KINGSTON">UWI, Kingston</option>
+                <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
+              </select>
+            </label>
+            <label>
+              Pickup Confirmed
+              <select id="mPickupConfirmed">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+            <label>Notes <input id="mNotes" type="text"/></label>
+            <label>
+              Send “Ready for Pickup” Email Now?
+              <select id="mSendEmail">
+                <option value="no">No</option>
+                <option value="yes">Yes (requires RESEND_API_KEY)</option>
+              </select>
+            </label>
+            <button class="btn btn--primary" type="submit">Save</button>
+            <div class="muted small" id="updateMsg"></div>
           </form>
         </div>
       </div>
-
-      <!-- Update modal -->
-      <div class="modal hidden" id="updateModal" aria-hidden="true">
-        <div class="modal__backdrop" data-close="1"></div>
-        <div class="modal__card" role="dialog" aria-modal="true" aria-label="Update package">
-          <div class="modal__head">
-            <div>
-              <div class="modal__title" id="mTitle">Update</div>
-              <div class="muted small">Set status and notes</div>
-            </div>
-            <button class="btn btn--ghost" data-close="1" type="button">Close</button>
-          </div>
-
-          <div class="modal__body">
-            <form class="form" id="updateForm">
-              <label>
-                Status
-                <input id="mStatus" type="text" required />
-              </label>
-              <label>
-                Notes (optional)
-                <input id="mNotes" type="text" />
-              </label>
-
-              <button class="btn btn--primary" type="submit">Save</button>
-              <div class="muted small" id="updateMsg" role="status"></div>
-            </form>
-          </div>
-        </div>
-      </div>
-
     </div>
-  </main>
 
-  <!-- IMPORTANT: Supabase first, then admin.js (NOT script.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="admin.js"></script>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="admin.js"></script>
 </body>
 </html>
