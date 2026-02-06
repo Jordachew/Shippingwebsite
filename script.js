@@ -149,18 +149,6 @@ if (u?.user) {
     phone
   });
 
-  if (pErr) throw pErr;
-}
-
-    if(error){ $("regMsg").textContent = error.message; return; }
-    $("regMsg").textContent = "Account created. Please log in.";
-    regForm.reset();
-  });
-
-  $("logoutBtn")?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
-    await renderAuth();
-  });
 }
 const { data: userData, error: userErr } = await supabase.auth.getUser();
 if (userErr) { throw userErr; }
@@ -176,6 +164,20 @@ if (user) {
 
   if (profErr) { throw profErr; }
 }
+
+    
+  if (pErr) throw pErr;
+}
+
+    if(error){ $("regMsg").textContent = error.message; return; }
+    $("regMsg").textContent = "Account created. Please log in.";
+    regForm.reset();
+  });
+
+  $("logoutBtn")?.addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    await renderAuth();
+  });
 // --------------------
 // Packages + invoices
 // --------------------
