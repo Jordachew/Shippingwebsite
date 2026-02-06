@@ -202,18 +202,49 @@ function setupLoginRegister() {
   const loginForm = $("loginForm");
   const regForm = $("registerForm");
 
-  loginForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if ($("loginMsg")) $("loginMsg").textContent = "Signing in...";
+loginForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
+  const msg = $("loginMsg");
+  if (msg) msg.textContent = "Signing in...";
+
+  try {
     const email = $("loginEmail").value.trim().toLowerCase();
     const password = $("loginPassword").value;
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if(error){ $("loginMsg").textContent = error.message; return; }
-  $("loginMsg").textContent = "";
-  await renderAuth();
-});
+    // 1) Sign in
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (msg) msg.textContent = error.message;
+      return;
+    }
+
+    // 2) Check session
+    const { data: sess, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) {
+      if (msg) msg.textContent = "Session error: " + sessErr.message;
+      return;
+    }
+    if (!sess?.session) {
+      if (msg) msg.textContent = "No session returned. Is email confirmation required?";
+      return;
+    }
+
+    // 3) Ensure profile exists
+    const ensured = await ensureProfile();
+    if (!ensured.ok) {
+      if (msg) msg.textContent = "Profile error: " + ensured.error.message;
+      return;
+    }
+
+    if (msg) msg.textContent = "";
+    await renderAuth();
+  } catch (err) {
+    console.error(err);
+    if (msg) msg.textContent = "Unexpected error: " + (err?.message || err);
+  }
+
+
 
     // If they registered earlier with email confirmation ON,
     // we may have pending profile data from that signup.
