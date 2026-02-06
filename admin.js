@@ -5,6 +5,9 @@ const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const INVOICE_BUCKET = "invoices";
+const CHAT_BUCKET = "chat_files";
+
 function $(id){ return document.getElementById(id); }
 function escapeHTML(s){
   return String(s ?? "")
@@ -14,35 +17,23 @@ function escapeHTML(s){
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
 }
+function pickupLabel(v){
+  return v === "RHODEN_HALL_CLARENDON" ? "Rhoden Hall District, Clarendon" : "UWI, Kingston";
+}
 
 let currentCustomer = null; // { id, email }
-let selectedPackage = null; // { tracking }
+let selectedPkg = null;
 let chatChannel = null;
 
 async function requireStaff(){
-  const authMsg = $("authMsg");
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){
-    if(authMsg) authMsg.textContent = "Not logged in. Please log in via the main portal first.";
-    return false;
-  }
+  const { data:{ user } } = await supabase.auth.getUser();
+  if(!user){ $("authMsg").textContent = "Not logged in. Log in on the main portal first."; return false; }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("role,email")
-    .single();
+  const { data: profile, error } = await supabase.from("profiles").select("role,email").single();
+  if(error){ $("authMsg").textContent = error.message; return false; }
+  if(profile.role !== "staff"){ $("authMsg").textContent = "Access denied: staff only."; return false; }
 
-  if(error){
-    if(authMsg) authMsg.textContent = `Profile error: ${error.message}`;
-    return false;
-  }
-
-  if(profile?.role !== "staff"){
-    if(authMsg) authMsg.textContent = "Access denied: staff only.";
-    return false;
-  }
-
-  if(authMsg) authMsg.textContent = `Logged in as staff (${profile.email}).`;
+  $("authMsg").textContent = `Staff access granted (${profile.email}).`;
   return true;
 }
 
@@ -51,136 +42,199 @@ async function logout(){
   location.href = "/#portal";
 }
 
-async function findCustomerByEmail(email){
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email")
-    .eq("email", email)
-    .maybeSingle();
-
-  if(error) return { error };
-  return { data };
+async function findCustomer(email){
+  return supabase.from("profiles").select("id,email").eq("email", email).maybeSingle();
 }
 
-async function renderCustomerPackages(){
+async function renderPackages(){
   const body = $("pkgBody");
-  if(!body) return;
-
   if(!currentCustomer){
-    body.innerHTML = `<tr><td colspan="3" class="muted">Search a customer first.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="muted">Search a customer first.</td></tr>`;
     return;
   }
 
   const { data, error } = await supabase
     .from("packages")
-    .select("tracking,status,updated_at,notes")
+    .select("tracking,status,pickup,pickup_confirmed,updated_at,notes")
     .eq("user_id", currentCustomer.id)
-    .order("updated_at", { ascending:false });
+    .order("updated_at",{ascending:false});
 
   if(error){
-    body.innerHTML = `<tr><td colspan="3" class="muted">Error: ${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
-
-  if(!data || data.length === 0){
-    body.innerHTML = `<tr><td colspan="3" class="muted">No packages for this customer yet.</td></tr>`;
+  if(!data?.length){
+    body.innerHTML = `<tr><td colspan="5" class="muted">No packages yet.</td></tr>`;
     return;
   }
 
   body.innerHTML = data.map(p => `
-    <tr data-tracking="${escapeHTML(p.tracking)}" data-status="${escapeHTML(p.status)}" data-notes="${escapeHTML(p.notes || "")}">
+    <tr data-tracking="${escapeHTML(p.tracking)}"
+        data-status="${escapeHTML(p.status)}"
+        data-pickup="${escapeHTML(p.pickup)}"
+        data-pickup_confirmed="${p.pickup_confirmed ? "true" : "false"}"
+        data-notes="${escapeHTML(p.notes||"")}">
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td class="muted">${escapeHTML(new Date(p.updated_at).toLocaleString())}</td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}</td>
+      <td>${p.pickup_confirmed ? `<span class="tag">Yes</span>` : `<span class="tag">No</span>`}</td>
+      <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
   `).join("");
 
-  body.querySelectorAll("tr[data-tracking]").forEach(row => {
-    row.addEventListener("click", () => openUpdateModal(row.dataset));
+  body.querySelectorAll("tr[data-tracking]").forEach(row=>{
+    row.addEventListener("click", ()=> openUpdateModal(row.dataset));
   });
+}
+
+async function renderInvoices(){
+  const list = $("invoiceList");
+  if(!currentCustomer){
+    list.innerHTML = `<li class="muted">Search a customer first.</li>`;
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
+    .eq("user_id", currentCustomer.id)
+    .order("created_at",{ascending:false})
+    .limit(30);
+
+  if(error){
+    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
+    return;
+  }
+  if(!data?.length){
+    list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
+    return;
+  }
+
+  list.innerHTML = data.map(i=>`
+    <li>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name)} (${escapeHTML(i.file_type)})</div>
+      <div class="muted small">
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${i.pickup_confirmed ? "Confirmed" : "Pending"} • ${new Date(i.created_at).toLocaleString()}
+        ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
+      </div>
+    </li>
+  `).join("");
 }
 
 function openUpdateModal(ds){
-  selectedPackage = { tracking: ds.tracking };
+  selectedPkg = ds.tracking;
   $("mTitle").textContent = `Update ${ds.tracking}`;
-  $("mStatus").value = ds.status || "";
+  $("mStatus").value = ds.status || "RECEIVED";
+  $("mPickup").value = ds.pickup || "UWI_KINGSTON";
+  $("mPickupConfirmed").value = ds.pickup_confirmed || "false";
   $("mNotes").value = ds.notes || "";
+  $("mSendEmail").value = "no";
   $("updateMsg").textContent = "";
 
-  const modal = $("updateModal");
-  modal.classList.remove("hidden");
-  modal.setAttribute("aria-hidden","false");
+  $("updateModal").classList.remove("hidden");
+  $("updateModal").setAttribute("aria-hidden","false");
 
-  modal.querySelectorAll("[data-close='1']").forEach(el => {
+  $("updateModal").querySelectorAll("[data-close='1']").forEach(el=>{
     el.addEventListener("click", closeUpdateModal, { once:true });
   });
-
-  document.addEventListener("keydown", (e) => {
-    if(e.key === "Escape") closeUpdateModal();
-  }, { once:true });
 }
-
 function closeUpdateModal(){
-  const modal = $("updateModal");
-  modal.classList.add("hidden");
-  modal.setAttribute("aria-hidden","true");
-  selectedPackage = null;
+  $("updateModal").classList.add("hidden");
+  $("updateModal").setAttribute("aria-hidden","true");
+  selectedPkg = null;
 }
 
-async function updatePackage(status, notes){
-  const msg = $("updateMsg");
-  if(!currentCustomer || !selectedPackage){
-    if(msg) msg.textContent = "No package selected.";
-    return;
-  }
+async function createPackage(payload){
+  if(!currentCustomer){ $("createMsg").textContent = "Search a customer first."; return; }
+  $("createMsg").textContent = "Creating...";
 
-  if(msg) msg.textContent = "Saving...";
+  const { error } = await supabase.from("packages").insert({
+    user_id: currentCustomer.id,
+    tracking: payload.tracking,
+    status: payload.status,
+    pickup: payload.pickup,
+    weight_lbs: payload.weight_lbs || null,
+    declared_value_usd: payload.declared_value_usd || null,
+    shipping_cost_jmd: payload.shipping_cost_jmd || null,
+    notes: payload.notes || null
+  });
+
+  if(error){ $("createMsg").textContent = error.message; return; }
+  $("createMsg").textContent = "Created.";
+  await renderPackages();
+}
+
+async function updatePackage(tracking, updates, sendEmail){
+  $("updateMsg").textContent = "Saving...";
 
   const { error } = await supabase
     .from("packages")
-    .update({ status, notes: notes || null, updated_at: new Date().toISOString() })
-    .eq("user_id", currentCustomer.id)
-    .eq("tracking", selectedPackage.tracking);
+    .update(updates)
+    .eq("tracking", tracking);
 
-  if(error){
-    if(msg) msg.textContent = error.message;
-    return;
+  if(error){ $("updateMsg").textContent = error.message; return; }
+
+  // if READY_FOR_PICKUP and user requested email:
+  if(sendEmail && updates.status === "READY_FOR_PICKUP"){
+    try{
+      const r = await fetch("/api/notify-ready", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ tracking })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.error || "Email failed");
+      $("updateMsg").textContent = "Saved + email sent.";
+    }catch(e){
+      $("updateMsg").textContent = `Saved, but email failed: ${e.message}`;
+    }
+  } else {
+    $("updateMsg").textContent = "Saved.";
   }
 
-  if(msg) msg.textContent = "Saved.";
-  await renderCustomerPackages();
+  // Also confirm invoices pickup_confirmed if pickup is confirmed (nice workflow)
+  if(updates.pickup_confirmed === true){
+    await supabase
+      .from("invoices")
+      .update({ pickup_confirmed:true })
+      .eq("user_id", currentCustomer.id)
+      .eq("tracking", tracking);
+  }
+
+  await renderPackages();
+  await renderInvoices();
 }
 
-async function createPackage(tracking, status, notes){
-  const msg = $("createMsg");
-  if(!currentCustomer){
-    if(msg) msg.textContent = "Search a customer first.";
-    return;
-  }
+async function bulkUpload(csvText){
+  if(!currentCustomer){ $("bulkMsg").textContent = "Search a customer first."; return; }
 
-  if(msg) msg.textContent = "Creating...";
+  const lines = csvText.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ $("bulkMsg").textContent = "Paste at least one line."; return; }
 
-  const { error } = await supabase
-    .from("packages")
-    .insert({ user_id: currentCustomer.id, tracking, status, notes: notes || null });
+  $("bulkMsg").textContent = "Uploading...";
+  const rows = lines.map(line => {
+    const [tracking,status,pickup,weight,value,cost,notes] = line.split(",").map(x=>x?.trim());
+    return {
+      user_id: currentCustomer.id,
+      tracking,
+      status: status || "RECEIVED",
+      pickup: pickup || "UWI_KINGSTON",
+      weight_lbs: weight ? Number(weight) : null,
+      declared_value_usd: value ? Number(value) : null,
+      shipping_cost_jmd: cost ? Number(cost) : null,
+      notes: notes || null
+    };
+  });
 
-  if(error){
-    if(msg) msg.textContent = error.message;
-    return;
-  }
+  const { error } = await supabase.from("packages").insert(rows);
+  if(error){ $("bulkMsg").textContent = error.message; return; }
 
-  if(msg) msg.textContent = "Created.";
-  $("createPkgForm").reset();
-  await renderCustomerPackages();
+  $("bulkMsg").textContent = `Uploaded ${rows.length} packages.`;
+  await renderPackages();
 }
 
-// -------------------
-// STAFF CHAT
-// -------------------
 async function renderChat(){
   const body = $("chatBody");
-  if(!body) return;
-
   if(!currentCustomer){
     body.innerHTML = `<div class="muted small">Search a customer to view chat.</div>`;
     return;
@@ -188,55 +242,69 @@ async function renderChat(){
 
   const { data, error } = await supabase
     .from("messages")
-    .select("sender,body,created_at")
+    .select("id,sender,body,created_at")
     .eq("user_id", currentCustomer.id)
-    .order("created_at", { ascending:true })
+    .order("created_at",{ascending:true})
     .limit(200);
 
   if(error){
-    body.innerHTML = `<div class="muted small">Error: ${escapeHTML(error.message)}</div>`;
+    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
     return;
   }
 
-  if(!data || data.length === 0){
-    body.innerHTML = `<div class="muted small">No messages yet.</div>`;
-    return;
-  }
-
-  body.innerHTML = data.map(m => `
+  body.innerHTML = (data?.length ? data : []).map(m => `
     <div class="bubble ${m.sender === "support" ? "me" : ""}">
       <div>${escapeHTML(m.body)}</div>
       <div class="meta">
         <span>${m.sender === "support" ? "Support" : "Customer"}</span>
-        <span>${new Date(m.created_at).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>
       </div>
     </div>
-  `).join("");
+  `).join("") || `<div class="muted small">No messages yet.</div>`;
 
   body.scrollTop = body.scrollHeight;
 }
 
 async function setupChatRealtime(){
-  if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel = null; }
+  if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel=null; }
   if(!currentCustomer) return;
 
   chatChannel = supabase
     .channel(`staff_messages:${currentCustomer.id}`)
     .on("postgres_changes",
       { event:"INSERT", schema:"public", table:"messages", filter:`user_id=eq.${currentCustomer.id}` },
-      async () => { await renderChat(); }
+      async ()=>{ await renderChat(); }
     )
     .subscribe();
 }
 
-async function sendSupportMessage(text){
-  if(!currentCustomer) return alert("Search a customer first.");
+async function sendSupport(text, file){
+  if(!currentCustomer) return alert("Search customer first.");
 
-  const { error } = await supabase
+  const { data: msg, error: mErr } = await supabase
     .from("messages")
-    .insert({ user_id: currentCustomer.id, sender: "support", body: text });
+    .insert({ user_id: currentCustomer.id, sender:"support", body: text })
+    .select("id")
+    .single();
 
-  if(error) alert(error.message);
+  if(mErr) return alert(mErr.message);
+
+  if(file){
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${currentCustomer.id}/messages/${Date.now()}_${safeName}`;
+    const up = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert:false });
+    if(up.error) return alert(up.error.message);
+
+    const ins = await supabase.from("message_attachments").insert({
+      message_id: msg.id,
+      user_id: currentCustomer.id,
+      file_path: path,
+      file_name: safeName,
+      file_type: file.type || "unknown"
+    });
+
+    if(ins.error) return alert(ins.error.message);
+  }
 }
 
 async function init(){
@@ -245,17 +313,18 @@ async function init(){
 
   $("logoutBtn")?.addEventListener("click", logout);
 
-  $("findForm")?.addEventListener("submit", async (e) => {
+  $("findForm")?.addEventListener("submit", async (e)=>{
     e.preventDefault();
     $("findMsg").textContent = "Searching...";
-    const email = ($("custEmail").value || "").trim().toLowerCase();
+    const email = $("custEmail").value.trim().toLowerCase();
 
-    const { data, error } = await findCustomerByEmail(email);
+    const { data, error } = await findCustomer(email);
     if(error || !data){
       $("findMsg").textContent = error?.message || "Customer not found.";
       currentCustomer = null;
       $("custId").textContent = "—";
-      await renderCustomerPackages();
+      await renderPackages();
+      await renderInvoices();
       await renderChat();
       return;
     }
@@ -263,40 +332,63 @@ async function init(){
     currentCustomer = { id: data.id, email: data.email };
     $("custId").textContent = data.id;
     $("findMsg").textContent = `Found: ${data.email}`;
-    await renderCustomerPackages();
+    await renderPackages();
+    await renderInvoices();
     await renderChat();
     await setupChatRealtime();
   });
 
-  $("createPkgForm")?.addEventListener("submit", async (e) => {
+  $("createPkgForm")?.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const tracking = ($("tracking").value || "").trim();
-    const status = ($("status").value || "").trim();
-    const notes = ($("notes").value || "").trim();
-    await createPackage(tracking, status, notes);
+    await createPackage({
+      tracking: $("tracking").value.trim(),
+      status: $("status").value,
+      pickup: $("pickup").value,
+      weight_lbs: $("weight").value ? Number($("weight").value) : null,
+      declared_value_usd: $("value").value ? Number($("value").value) : null,
+      shipping_cost_jmd: $("cost").value ? Number($("cost").value) : null,
+      notes: $("notes").value.trim()
+    });
   });
 
-  $("updateForm")?.addEventListener("submit", async (e) => {
+  $("bulkForm")?.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const status = ($("mStatus").value || "").trim();
-    const notes = ($("mNotes").value || "").trim();
-    $("updateMsg").textContent = "";
-    await updatePackage(status, notes);
+    await bulkUpload($("bulkText").value);
   });
 
-  $("chatForm")?.addEventListener("submit", async (e) => {
+  $("updateForm")?.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    if(!selectedPkg) return;
+
+    const status = $("mStatus").value;
+    const pickup = $("mPickup").value;
+    const pickup_confirmed = $("mPickupConfirmed").value === "true";
+    const notes = $("mNotes").value.trim();
+    const sendEmail = $("mSendEmail").value === "yes";
+
+    await updatePackage(selectedPkg, { status, pickup, pickup_confirmed, notes }, sendEmail);
+  });
+
+  $("chatForm")?.addEventListener("submit", async (e)=>{
     e.preventDefault();
     const input = $("chatInput");
+    const file = $("chatFile")?.files?.[0] || null;
+    const msgEl = $("chatMsg");
+
     const text = (input.value || "").trim();
-    if(!text) return;
+    if(!text && !file){ msgEl.textContent = "Type a message or attach a file."; return; }
+
+    msgEl.textContent = "Sending...";
     input.value = "";
-    await sendSupportMessage(text);
+    if($("chatFile")) $("chatFile").value = "";
+
+    await sendSupport(text || "(Attachment)", file);
+    msgEl.textContent = "";
   });
 
-  await renderCustomerPackages();
+  await renderPackages();
+  await renderInvoices();
   await renderChat();
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  init();
-});
+window.addEventListener("DOMContentLoaded", init);
