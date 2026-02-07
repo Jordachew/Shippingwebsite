@@ -18,7 +18,7 @@
     </a>
     <div class="header__actions">
       <a class="btn btn--ghost" href="/">Main site</a>
-      <button class="btn btn--primary" id="logoutBtn" type="button">Logout</button>
+      <button class="btn btn--primary" id="logoutBtn" type="button" class="hidden">Logout</button>
     </div>
   </div>
 </header>
@@ -29,6 +29,18 @@
       <h2>Staff Dashboard</h2>
       <p>Find customer, create packages, bulk upload, update statuses, confirm pickup, view invoices, reply to chat.</p>
       <div class="muted small" id="authMsg"></div>
+
+<div class="card card--pad" id="staffLoginCard">
+  <h3>Staff Login</h3>
+  <form class="form" id="staffLoginForm">
+    <label>Email <input id="staffEmail" type="email" autocomplete="email" required /></label>
+    <label>Password <input id="staffPassword" type="password" autocomplete="current-password" required /></label>
+    <button class="btn btn--primary" type="submit">Sign in</button>
+    <div class="muted small" id="staffLoginMsg"></div>
+  </form>
+</div>
+
+<div id="adminWrap" class="hidden">
     </div>
 
     <div class="grid2">
@@ -49,14 +61,13 @@
           <label>Tracking <input id="tracking" type="text" placeholder="SSX-1234" required /></label>
           <label>Status
             <select id="status">
-              <option value="RECEIVED">Received</option>
-              <option value="PROCESSING">Processing</option>
-              <option value="IN_TRANSIT">In Transit</option>
-              <option value="ARRIVED_JAMAICA">Arrived Jamaica</option>
-              <option value="READY_FOR_PICKUP">Ready for Pickup</option>
-              <option value="PICKED_UP">Picked Up</option>
-              <option value="ON_HOLD">On Hold</option>
-            </select>
+<option value="RECEIVED">Received</option>
+<option value="IN_TRANSIT">In Transit</option>
+<option value="ARRIVED_JA">Arrived Jamaica</option>
+<option value="READY_FOR_PICKUP">Ready for Pickup</option>
+<option value="PICKED_UP">Picked Up</option>
+<option value="ON_HOLD">On Hold</option>
+</select>
           </label>
           <label>Pickup Location
             <select id="pickup">
@@ -145,14 +156,13 @@
           <form class="form" id="updateForm">
             <label>Status
               <select id="mStatus">
-                <option value="RECEIVED">Received</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="IN_TRANSIT">In Transit</option>
-                <option value="ARRIVED_JAMAICA">Arrived Jamaica</option>
-                <option value="READY_FOR_PICKUP">Ready for Pickup</option>
-                <option value="PICKED_UP">Picked Up</option>
-                <option value="ON_HOLD">On Hold</option>
-              </select>
+<option value="RECEIVED">Received</option>
+<option value="IN_TRANSIT">In Transit</option>
+<option value="ARRIVED_JA">Arrived Jamaica</option>
+<option value="READY_FOR_PICKUP">Ready for Pickup</option>
+<option value="PICKED_UP">Picked Up</option>
+<option value="ON_HOLD">On Hold</option>
+</select>
             </label>
             <label>Pickup Location
               <select id="mPickup">
@@ -182,10 +192,12 @@
       </div>
     </div>
 
+      </div>
+
   </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="admin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script></script>
+<script src="admin.js" defer></script>
 </body>
 </html>
