@@ -13,6 +13,10 @@ const supabase = window.__SB__;
 const INVOICE_BUCKET = "invoices";
 const CHAT_BUCKET = "chat_files";
 
+
+function logSB(label, obj) {
+  console.log("🟣", label, JSON.parse(JSON.stringify(obj || {})));
+}
 // Business hours note (Mon–Fri 10–5)
 const HOURS_TEXT =
   "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
