@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin • Sueños Shipping</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -18,7 +21,7 @@
     </a>
     <div class="header__actions">
       <a class="btn btn--ghost" href="/">Main site</a>
-      <button class="btn btn--primary" id="logoutBtn" type="button" class="hidden">Logout</button>
+      <button class="btn btn--primary hidden" id="logoutBtn" type="button">Logout</button>
     </div>
   </div>
 </header>
@@ -30,20 +33,43 @@
       <p>Find customer, create packages, bulk upload, update statuses, confirm pickup, view invoices, reply to chat.</p>
       <div class="muted small" id="authMsg"></div>
 
-<div class="card card--pad" id="staffLoginCard">
-  <h3>Staff Login</h3>
-  <form class="form" id="staffLoginForm">
-    <label>Email <input id="staffEmail" type="email" autocomplete="email" required /></label>
-    <label>Password <input id="staffPassword" type="password" autocomplete="current-password" required /></label>
-    <button class="btn btn--primary" type="submit">Sign in</button>
-    <div class="muted small" id="staffLoginMsg"></div>
-  </form>
-</div>
+      <div class="card card--pad" id="staffLoginCard">
+        <h3>Staff Login</h3>
+        <form class="form" id="staffLoginForm">
+          <label>Email <input id="staffEmail" type="email" autocomplete="email" required /></label>
+          <label>Password <input id="staffPassword" type="password" autocomplete="current-password" required /></label>
+          <button class="btn btn--primary" type="submit">Sign in</button>
+          <div class="muted small" id="staffLoginMsg"></div>
+        </form>
+      </div>
 
-<div id="adminWrap" class="hidden">
-    </div>
+      <!-- Everything below is hidden unless the signed-in user is staff -->
+      <div id="adminWrap" class="hidden">
 
-    <div class="grid2">
+      <div class="cards cards--4" style="margin: 14px 0 18px;">
+        <article class="card feature">
+          <div class="icon">📦</div>
+          <h3 class="m0">Packages</h3>
+          <p class="muted small"><span id="statPkgs">—</span> total</p>
+        </article>
+        <article class="card feature">
+          <div class="icon">🚚</div>
+          <h3 class="m0">In Transit</h3>
+          <p class="muted small"><span id="statInTransit">—</span></p>
+        </article>
+        <article class="card feature">
+          <div class="icon">📍</div>
+          <h3 class="m0">Ready</h3>
+          <p class="muted small"><span id="statReady">—</span> for pickup</p>
+        </article>
+        <article class="card feature">
+          <div class="icon">💬</div>
+          <h3 class="m0">Open Messages</h3>
+          <p class="muted small"><span id="statOpenMsg">—</span> unresolved</p>
+        </article>
+      </div>
+
+      <div class="grid2">
       <div class="card card--pad">
         <h3>Find Customer</h3>
         <form class="form" id="findForm">
@@ -83,7 +109,7 @@
           <div class="muted small" id="createMsg"></div>
         </form>
       </div>
-    </div>
+      </div>
 
     <div class="section__head" style="margin-top:18px;">
       <h2>Bulk Upload Packages</h2>
@@ -141,8 +167,8 @@
       <div class="muted small" id="chatMsg"></div>
     </div>
 
-    <!-- Update modal -->
-    <div class="modal hidden" id="updateModal" aria-hidden="true">
+      <!-- Update modal -->
+      <div class="modal hidden" id="updateModal" aria-hidden="true">
       <div class="modal__backdrop" data-close="1"></div>
       <div class="modal__card" role="dialog" aria-modal="true">
         <div class="modal__head">
@@ -192,7 +218,7 @@
       </div>
     </div>
 
-      </div>
+      </div> <!-- /#adminWrap -->
 
   </div>
 </main>

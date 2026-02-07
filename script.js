@@ -6,7 +6,6 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
 // Safe singleton (prevents double-load issues)
-// Include auth options to reduce "login works once" issues (session persistence + refresh)
 window.__SB__ =
   window.__SB__ ||
   window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -228,9 +227,22 @@ function setupLoginRegister() {
       const email = $("loginEmail").value.trim().toLowerCase();
       const password = $("loginPassword").value;
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        if (msg) msg.textContent = error.message;
+      const res = await supabase.auth.signInWithPassword({ email, password });
+      console.log("LOGIN RES:", res);
+      if (res.error) {
+        if (msg) msg.textContent = `Login error: ${res.error.message}`;
+        return;
+      }
+
+      // Confirm we actually have a session (prevents "logged in once" confusion)
+      const sess = await supabase.auth.getSession();
+      console.log("SESSION:", sess);
+      if (sess.error) {
+        if (msg) msg.textContent = `Session error: ${sess.error.message}`;
+        return;
+      }
+      if (!sess.data?.session) {
+        if (msg) msg.textContent = "No session returned. Check Supabase Auth URL settings + email confirmation.";
         return;
       }
 
@@ -270,24 +282,27 @@ function setupLoginRegister() {
       // Save name/phone in case confirm-email is ON (no session yet)
       stashPendingProfile(full_name, phone, email);
 
-      const { error } = await supabase.auth.signUp({
+      const res = await supabase.auth.signUp({
         email,
         password,
         options: { data: { full_name, phone } },
       });
 
-      if (error) {
-        if (msg) msg.textContent = error.message;
+      console.log("SIGNUP RES:", res);
+
+      if (res.error) {
+        if (msg) msg.textContent = `Signup error: ${res.error.message}`;
         return;
       }
 
       // If confirm-email is OFF, user may already be signed in; create profile now.
       const ensured = await ensureProfile({ full_name, phone });
+      console.log("ENSURE PROFILE:", ensured);
 
       if (msg) {
         msg.textContent = ensured.ok
           ? "Account created. You can now log in."
-          : "Account created. Please check your email to confirm, then log in.";
+          : "Account created. If email confirmation is ON, confirm email then log in.";
       }
 
       regForm.reset();
@@ -304,10 +319,8 @@ function setupLoginRegister() {
     try {
       await supabase.auth.signOut();
     } finally {
-      // Hard reset auth state to avoid sticky sessions across reloads/domains
-      try {
-        localStorage.removeItem(`sb-${new URL(SUPABASE_URL).host}-auth-token`);
-      } catch {}
+      // Hard reset local session so you don't get "login once then stuck"
+      try { localStorage.removeItem(`sb-${new URL(SUPABASE_URL).host}-auth-token`); } catch (_) {}
       window.location.reload();
     }
   });

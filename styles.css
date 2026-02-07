@@ -1,14 +1,27 @@
+/*
+  Sethwan-inspired light aesthetic:
+  - clean white base
+  - modern typography
+  - warm/cool gradient accents
+*/
 :root{
   --bg:#ffffff;
-  --text:#0f172a;
-  --muted:#475569;
-  --line:rgba(15,23,42,.12);
-  --line2:rgba(15,23,42,.08);
-  --shadow: 0 18px 60px rgba(2,6,23,.12);
+  --surface:#ffffff;
+  --surface2:#f7f8fb;
+  --text:#0b1020;
+  --muted:#556070;
+  --line:rgba(10,16,32,.12);
+  --line2:rgba(10,16,32,.08);
+  --shadow: 0 18px 60px rgba(10,16,32,.12);
   --radius: 18px;
   --radius2: 22px;
-  --accentA: rgba(59,130,246,.18);
-  --accentB: rgba(14,165,233,.16);
+
+  /* Accent palette (Sethwan-like energy) */
+  --c1:#f15d5c; /* coral */
+  --c2:#33beba; /* teal */
+  --c3:#b654a0; /* purple */
+  --accent: linear-gradient(135deg, rgba(241,93,92,.20), rgba(51,190,186,.18) 55%, rgba(182,84,160,.18));
+  --accentStrong: linear-gradient(135deg, rgba(241,93,92,.95), rgba(51,190,186,.90) 55%, rgba(182,84,160,.90));
   --ok: rgba(34,197,94,.95);
 }
 
@@ -16,31 +29,33 @@
 html{scroll-behavior:smooth}
 body{
   margin:0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   color:var(--text);
   background:
-    radial-gradient(1200px 900px at 12% 0%, rgba(110,231,255,.14), transparent 60%),
-    radial-gradient(900px 700px at 85% 12%, rgba(167,139,250,.18), transparent 58%),
-    radial-gradient(800px 650px at 50% 100%, rgba(34,197,94,.08), transparent 55%),
+    radial-gradient(1100px 780px at 14% 2%, rgba(241,93,92,.18), transparent 60%),
+    radial-gradient(950px 720px at 82% 10%, rgba(182,84,160,.18), transparent 60%),
+    radial-gradient(850px 680px at 55% 102%, rgba(51,190,186,.14), transparent 55%),
     var(--bg);
 }
 
+h1,h2,h3{font-family: Sora, Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial}
+
 a{color:inherit;text-decoration:none}
-code{background:rgba(255,255,255,.07); padding:.12rem .35rem; border-radius:8px}
+code{background: rgba(10,16,32,.06); padding:.12rem .35rem; border-radius:8px}
 .container{width:min(1120px, 92%); margin:0 auto}
 
 .m0{margin:0}
 .mt8{margin-top:8px}
 .small{font-size:.9rem}
 .muted{color:var(--muted)}
-.req{color: rgba(110,231,255,.95)}
+.req{color: rgba(241,93,92,.95)}
 .hidden{display:none !important}
 .divider{height:1px; background: var(--line); margin:14px 0}
 
 .header{
   position:sticky; top:0; z-index:80;
   backdrop-filter: blur(12px);
-  background: rgba(7,11,20,.62);
+  background: rgba(255,255,255,.78);
   border-bottom:1px solid var(--line);
 }
 .header__inner{
@@ -51,7 +66,7 @@ code{background:rgba(255,255,255,.07); padding:.12rem .35rem; border-radius:8px}
 .brand__mark{
   width:42px; height:42px; border-radius:14px;
   display:grid; place-items:center;
-  background: linear-gradient(135deg, var(--accentA), var(--accentB));
+  background: var(--accent);
   border:1px solid var(--line);
   box-shadow: var(--shadow);
   font-weight:900;
@@ -82,13 +97,15 @@ code{background:rgba(255,255,255,.07); padding:.12rem .35rem; border-radius:8px}
   font-weight:750;
   cursor:pointer;
   user-select:none;
-  background: rgba(255,255,255,.04);
+  background: rgba(255,255,255,.70);
 }
 .btn--primary{
-  background: linear-gradient(135deg, var(--accentA), var(--accentB));
+  color: #ffffff;
+  border-color: rgba(10,16,32,.06);
+  background: var(--accentStrong);
   box-shadow: var(--shadow);
 }
-.btn--ghost{background: rgba(255,255,255,.04)}
+.btn--ghost{background: rgba(255,255,255,.60)}
 .btn:active{transform: translateY(1px)}
 
 .hero{padding:58px 0 22px}

@@ -1,5 +1,3 @@
-console.log("admin.js loaded, window.supabase:", window.supabase);
-
 // ========================
 // SUPABASE CONFIG
 // ========================
@@ -39,6 +37,40 @@ function pickupLabel(v) {
 let currentCustomer = null; // { id, email }
 let selectedPkg = null;
 let chatChannel = null;
+
+function setText(id, v){ const el = $(id); if(el) el.textContent = (v ?? "—"); }
+
+async function safeCount(table, filtersFn){
+  try{
+    let q = supabase.from(table).select('id', { count:'exact', head:true });
+    if(filtersFn) q = filtersFn(q);
+    const { count, error } = await q;
+    if(error) throw error;
+    return count ?? 0;
+  }catch(e){
+    console.warn('Count failed', table, e);
+    return null;
+  }
+}
+
+async function loadOverviewStats(){
+  // These are lightweight count queries (no row payload)
+  const totalPkgs = await safeCount('packages');
+  const inTransit = await safeCount('packages', q => q.eq('status','IN_TRANSIT'));
+  const ready = await safeCount('packages', q => q.eq('status','READY_FOR_PICKUP'));
+
+  // Messages: if you have a boolean column 'resolved', we count unresolved.
+  // If not, we'll just show total messages.
+  let openMsg = await safeCount('messages', q => q.eq('resolved', false));
+  if(openMsg === null){
+    openMsg = await safeCount('messages');
+  }
+
+  if(totalPkgs !== null) setText('statPkgs', totalPkgs);
+  if(inTransit !== null) setText('statInTransit', inTransit);
+  if(ready !== null) setText('statReady', ready);
+  if(openMsg !== null) setText('statOpenMsg', openMsg);
+}
 
 function setAuthUI({ authed, staff, email }) {
   const loginCard = $("staffLoginCard");
@@ -424,6 +456,8 @@ async function init() {
   const gate = await requireStaff();
   if (!gate.ok) return;
 
+  await loadOverviewStats();
+
   $("findForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     $("findMsg").textContent = "Searching...";
@@ -447,6 +481,7 @@ async function init() {
     await renderInvoices();
     await renderChat();
     await setupChatRealtime();
+    await loadOverviewStats();
   });
 
   $("createPkgForm")?.addEventListener("submit", async (e) => {
@@ -459,11 +494,13 @@ async function init() {
       cost_jmd: $("cost").value.trim(),
     });
     e.target.reset();
+    await loadOverviewStats();
   });
 
   $("bulkForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     await bulkUpload($("bulkText").value);
+    await loadOverviewStats();
   });
 
   $("updateForm")?.addEventListener("submit", async (e) => {
@@ -477,6 +514,7 @@ async function init() {
       weight_lbs: $("mWeight").value.trim(),
       cost_jmd: $("mCost").value.trim(),
     }, sendEmail);
+    await loadOverviewStats();
   });
 
   $("chatForm")?.addEventListener("submit", async (e) => {
