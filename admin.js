@@ -1,3 +1,5 @@
+console.log("admin.js loaded, window.supabase:", window.supabase);
+
 // ========================
 // SUPABASE CONFIG
 // ========================
