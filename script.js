@@ -6,8 +6,17 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
 // Safe singleton (prevents double-load issues)
+// Include auth options to reduce "login works once" issues (session persistence + refresh)
 window.__SB__ =
-  window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window.__SB__ ||
+  window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+    },
+  });
 const supabase = window.__SB__;
 
 const INVOICE_BUCKET = "invoices";
@@ -292,8 +301,15 @@ function setupLoginRegister() {
   // LOGOUT
   // --------
   $("logoutBtn")?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
-    await renderAuth();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      // Hard reset auth state to avoid sticky sessions across reloads/domains
+      try {
+        localStorage.removeItem(`sb-${new URL(SUPABASE_URL).host}-auth-token`);
+      } catch {}
+      window.location.reload();
+    }
   });
 }
 
