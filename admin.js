@@ -3,10 +3,19 @@
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-window.__ADMIN_SB__ = window.__ADMIN_SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Safe singleton (prevents double-load issues)
+window.__ADMIN_SB__ =
+  window.__ADMIN_SB__ ||
+  window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+    },
+  });
 const supabase = window.__ADMIN_SB__;
+
 
 const INVOICE_BUCKET = "invoices";
 const CHAT_BUCKET = "chat_files";
@@ -41,8 +50,15 @@ async function requireStaff(){
 }
 
 async function logout(){
-  await supabase.auth.signOut();
-  location.href = "/#portal";
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    try {
+      localStorage.removeItem(`sb-${new URL(SUPABASE_URL).host}-auth-token`);
+    } catch {}
+    location.href = "/#portal";
+    location.reload();
+  }
 }
 
 async function findCustomer(email){
