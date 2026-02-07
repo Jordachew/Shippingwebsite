@@ -202,105 +202,91 @@ function setupLoginRegister() {
   const loginForm = $("loginForm");
   const regForm = $("registerForm");
 
-loginForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
+  // --------
+  // LOGIN
+  // --------
+  loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  const msg = $("loginMsg");
-  if (msg) msg.textContent = "Signing in...";
+    const msg = $("loginMsg");
+    if (msg) msg.textContent = "Signing in...";
 
-  try {
-    const email = $("loginEmail").value.trim().toLowerCase();
-    const password = $("loginPassword").value;
+    try {
+      const email = $("loginEmail").value.trim().toLowerCase();
+      const password = $("loginPassword").value;
 
-    // 1) Sign in
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (msg) msg.textContent = error.message;
-      return;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (msg) msg.textContent = error.message;
+        return;
+      }
+
+      // If they registered earlier while confirm-email was ON,
+      // apply saved name/phone after login.
+      const pending = readPendingProfile();
+      if (pending) {
+        const ensured = await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
+        if (ensured.ok) clearPendingProfile();
+      } else {
+        await ensureProfile();
+      }
+
+      if (msg) msg.textContent = "";
+      await renderAuth();
+    } catch (err) {
+      console.error(err);
+      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
     }
-
-    // 2) Check session
-    const { data: sess, error: sessErr } = await supabase.auth.getSession();
-    if (sessErr) {
-      if (msg) msg.textContent = "Session error: " + sessErr.message;
-      return;
-    }
-    if (!sess?.session) {
-      if (msg) msg.textContent = "No session returned. Is email confirmation required?";
-      return;
-    }
-
-    // 3) Ensure profile exists
-    const ensured = await ensureProfile();
-    if (!ensured.ok) {
-      if (msg) msg.textContent = "Profile error: " + ensured.error.message;
-      return;
-    }
-
-    if (msg) msg.textContent = "";
-    await renderAuth();
-  } catch (err) {
-    console.error(err);
-    if (msg) msg.textContent = "Unexpected error: " + (err?.message || err);
-  }
-
-
-
-    // If they registered earlier with email confirmation ON,
-    // we may have pending profile data from that signup.
-    const pending = readPendingProfile();
-    if (pending) {
-      await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
-      clearPendingProfile();
-    } else {
-      await ensureProfile(); // ensures row exists even if trigger missing
-    }
-
-    if ($("loginMsg")) $("loginMsg").textContent = "";
-    await renderAuth();
   });
 
+  // --------
+  // REGISTER
+  // --------
   regForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if ($("regMsg")) $("regMsg").textContent = "Creating account...";
 
-    const full_name = $("regName").value.trim();
-    const phone = $("regPhone").value.trim();
-    const email = $("regEmail").value.trim().toLowerCase();
-    const password = $("regPassword").value;
+    const msg = $("regMsg");
+    if (msg) msg.textContent = "Creating account...";
 
-    // Store pending profile in case email confirmation is ON (no session)
-    stashPendingProfile(full_name, phone, email);
+    try {
+      const full_name = $("regName").value.trim();
+      const phone = $("regPhone").value.trim();
+      const email = $("regEmail").value.trim().toLowerCase();
+      const password = $("regPassword").value;
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name, phone } },
-    });
+      // Save name/phone in case confirm-email is ON (no session yet)
+      stashPendingProfile(full_name, phone, email);
 
-    if (error) {
-      if ($("regMsg")) $("regMsg").textContent = error.message;
-      return;
-    }
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name, phone } },
+      });
 
-    // Try to ensure profile immediately (works when email confirmation is OFF)
-    // If confirmation is ON, this will fail until user logs in.
-    const ensured = await ensureProfile({ full_name, phone });
-
-    if ($("regMsg")) {
-      if (ensured.ok) {
-        $("regMsg").textContent = "Account created. You can now log in.";
-        clearPendingProfile();
-      } else {
-        // likely email confirmation ON; not an actual failure
-        $("regMsg").textContent =
-          "Account created. Please check your email to confirm, then log in.";
+      if (error) {
+        if (msg) msg.textContent = error.message;
+        return;
       }
-    }
 
-    regForm.reset();
+      // If confirm-email is OFF, user may already be signed in; create profile now.
+      const ensured = await ensureProfile({ full_name, phone });
+
+      if (msg) {
+        msg.textContent = ensured.ok
+          ? "Account created. You can now log in."
+          : "Account created. Please check your email to confirm, then log in.";
+      }
+
+      regForm.reset();
+    } catch (err) {
+      console.error(err);
+      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    }
   });
 
+  // --------
+  // LOGOUT
+  // --------
   $("logoutBtn")?.addEventListener("click", async () => {
     await supabase.auth.signOut();
     await renderAuth();
@@ -448,6 +434,21 @@ function setupInvoiceUpload() {
     }
 
     const file = fileInput.files[0];
+
+    // client-side file type rule (pdf, jpeg/jpg, docx, excel)
+    const allowed =
+      /(\.pdf|\.jpe?g|\.docx|\.xlsx|\.xls)$/i.test(file.name) ||
+      ["application/pdf",
+       "image/jpeg",
+       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+       "application/vnd.ms-excel"].includes(file.type);
+
+    if (!allowed) {
+      if ($("invMsg")) $("invMsg").textContent = "Allowed: PDF, JPEG, DOCX, XLS/XLSX.";
+      return;
+    }
+
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
@@ -550,7 +551,12 @@ async function setupChatRealtime() {
     .channel(`messages:${user.id}`)
     .on(
       "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `user_id=eq.${user.id}`,
+      },
       async () => {
         await renderChat();
       }
@@ -664,10 +670,11 @@ async function renderAuth() {
     .eq("id", user.id)
     .maybeSingle();
 
-  const displayName = (!profErr && profile?.full_name) ? profile.full_name : (user.email || "Customer");
+  const displayName =
+    !profErr && profile?.full_name ? profile.full_name : user.email || "Customer";
   if ($("userName")) $("userName").textContent = displayName;
 
-  const isStaff = (!profErr && profile?.role === "staff");
+  const isStaff = !profErr && profile?.role === "staff";
   if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
   await renderPackages("");
