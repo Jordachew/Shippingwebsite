@@ -168,7 +168,23 @@ function setupLogin(){
     }
   });
 
-  $("logoutBtn")?.addEventListener("click", hardSignOut);
+function clearSupabaseAuthStorage() {
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
+    localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch {}
+}
+
+$("logoutBtn")?.addEventListener("click", async () => {
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    clearSupabaseAuthStorage();
+    location.reload();
+  }
+});
+
 }
 
 // --------------------
