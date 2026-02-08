@@ -618,3 +618,30 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
 
 .tag--ok{ border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.08); }
 .tag--warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.10); }
+
+/* Admin chat readability */
+#adminChatWindow,
+#chatBody,
+#adminChatBody,
+.chat__body {
+  color: #fff !important;
+}
+
+#adminChatWindow .bubble,
+#chatBody .bubble,
+#adminChatBody .bubble,
+.chat__body .bubble {
+  color: #fff !important;
+}
+
+#adminChatWindow .meta,
+#chatBody .meta,
+#adminChatBody .meta,
+.chat__body .meta,
+#adminChatWindow .muted,
+#chatBody .muted,
+#adminChatBody .muted,
+.chat__body .muted {
+  color: rgba(255,255,255,.75) !important;
+}
+
