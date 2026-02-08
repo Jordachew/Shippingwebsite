@@ -1,4 +1,14 @@
-console.log("✅ ADMIN.JS LOADED v2026-02-08-1");
+/* =========================================================
+   ADMIN.JS — CLEAN ALL-IN-ONE VERSION
+   - Fixes "can't login again" (proper token clearing)
+   - Chat text/input white
+   - Chat updates automatically (poll every 3s)
+   - After sending message: re-fetch chat after 5s
+   - Works with multiple possible element IDs
+   ========================================================= */
+
+console.log("✅ ADMIN.JS LOADED v2026-02-08-REWRITE");
+
 // ========================
 // SUPABASE CONFIG
 // ========================
@@ -6,7 +16,7 @@ const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// One safe singleton (prevents double-load issues)
+// Safe singleton
 window.__ADMIN_SB__ =
   window.__ADMIN_SB__ ||
   window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -20,12 +30,22 @@ window.__ADMIN_SB__ =
 
 const supabase = window.__ADMIN_SB__;
 
+// Buckets
 const INVOICE_BUCKET = "invoices";
 const CHAT_BUCKET = "chat_files";
 
-// --------------------
-// Helpers
-// --------------------
+// ========================
+// STATE
+// ========================
+let currentCustomer = null; // {id,email}
+let chatPollTimer = null;
+let lastChatSeenAt = null;
+let __authSubSet = false;
+let __authRenderLock = false;
+
+// ========================
+// HELPERS
+// ========================
 function $(id) {
   return document.getElementById(id);
 }
@@ -42,36 +62,85 @@ function pickupLabel(v) {
     ? "Rhoden Hall District, Clarendon"
     : "UWI, Kingston";
 }
-
-// ✅ FIX: correct Supabase localStorage key uses PROJECT REF, not host
+function show(el, on) {
+  if (!el) return;
+  el.classList.toggle("hidden", !on);
+}
 function getProjectRef() {
   try {
-    return new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
+    return new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgc...
   } catch {
     return "ykpcgcjudotzakaxgnxh";
   }
 }
 function clearAuthStorage() {
   try {
-    const ref = getProjectRef();
-    localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem(`sb-${getProjectRef()}-auth-token`);
   } catch (_) {}
 }
+function injectAdminChatStyles() {
+  if (document.getElementById("adminChatStyles")) return;
+  const style = document.createElement("style");
+  style.id = "adminChatStyles";
+  style.textContent = `
+    /* Chat text readability */
+    #chatBody, #adminChatBody, #adminChatWindow { color:#fff !important; }
+    #chatBody *, #adminChatBody *, #adminChatWindow * { color:#fff !important; }
+    .meta { color: rgba(255,255,255,.75) !important; }
 
-// Admin state
-let currentCustomer = null; // { id, email }
-let selectedPkg = null;
+    /* Input visibility */
+    #chatInput, #adminChatInput {
+      color:#fff !important;
+      background: rgba(255,255,255,0.07) !important;
+      border: 1px solid rgba(255,255,255,0.16) !important;
+    }
+    #chatInput::placeholder, #adminChatInput::placeholder {
+      color: rgba(255,255,255,.6) !important;
+    }
 
-let chatChannel = null;
-let chatPollTimer = null;
-let lastChatSeenAt = null;
+    /* Optional: buttons/labels in chat area */
+    #chatMsg, #adminChatMsg { color: rgba(255,255,255,.75) !important; }
+  `;
+  document.head.appendChild(style);
+}
 
-let __renderBusy = false;
-let __refreshBusy = false;
+// Works even if your admin.html uses different ids
+function els() {
+  return {
+    // auth cards/buttons
+    loginCard: $("staffLoginCard") || $("adminLoginCard"),
+    appWrap: $("adminWrap") || $("adminApp"),
+    logoutBtn: $("logoutBtn"),
+    authMsg: $("authMsg") || $("adminLoginMsg") || $("staffLoginMsg"),
 
-// --------------------
-// Auth + role gating
-// --------------------
+    // login form inputs
+    loginForm: $("staffLoginForm") || $("adminLoginForm"),
+    email: $("staffEmail") || $("adminEmail"),
+    password: $("staffPassword") || $("adminPassword"),
+    loginMsg: $("staffLoginMsg") || $("adminLoginMsg"),
+
+    // customer search
+    findForm: $("findForm"),
+    custEmail: $("custEmail"),
+    custId: $("custId"),
+    findMsg: $("findMsg"),
+
+    // packages/invoices
+    pkgBody: $("pkgBody"),
+    invoiceList: $("invoiceList"),
+
+    // chat
+    chatForm: $("chatForm") || $("adminChatForm"),
+    chatBody: $("chatBody") || $("adminChatBody") || $("adminChatWindow"),
+    chatInput: $("chatInput") || $("adminChatInput"),
+    chatFile: $("chatFile") || $("adminChatFile"),
+    chatMsg: $("chatMsg") || $("adminChatMsg"),
+  };
+}
+
+// ========================
+// AUTH + ROLE GATING
+// ========================
 async function getMyProfile() {
   const { data: u, error: uErr } = await supabase.auth.getUser();
   if (uErr) return { ok: false, error: uErr };
@@ -88,83 +157,82 @@ async function getMyProfile() {
   return { ok: true, user, profile };
 }
 
-function setAuthUI({ authed, staff, email }) {
-  const loginCard = $("staffLoginCard");
-  const wrap = $("adminWrap");
-  const logoutBtn = $("logoutBtn");
-  const authMsg = $("authMsg");
-
-  if (loginCard) loginCard.classList.toggle("hidden", authed && staff);
-  if (wrap) wrap.classList.toggle("hidden", !(authed && staff));
-  if (logoutBtn) logoutBtn.classList.toggle("hidden", !(authed && staff));
-
-  if (authMsg) {
-    if (!authed) authMsg.textContent = "Please sign in as staff.";
-    else if (!staff)
-      authMsg.textContent =
-        `Signed in as ${email || "user"}, but not staff/admin. Set role='staff' or 'admin' in profiles.`;
-    else authMsg.textContent = `Staff access granted (${email || "staff"}).`;
-  }
+function setAuthUIState(authed, staff, email, msgText) {
+  const ui = els();
+  show(ui.loginCard, !(authed && staff));
+  show(ui.appWrap, authed && staff);
+  show(ui.logoutBtn, authed && staff);
+  if (ui.authMsg) ui.authMsg.textContent = msgText || "";
+  if (!authed && ui.findMsg) ui.findMsg.textContent = "";
 }
 
 async function requireStaff() {
   const res = await getMyProfile();
   if (!res.ok) {
-    setAuthUI({ authed: false, staff: false });
-    return { ok: false, error: res.error };
+    setAuthUIState(false, false, "", "Please sign in as staff.");
+    return { ok: false };
   }
 
   const role = (res.profile?.role || "customer").toLowerCase();
   const active = (res.profile?.is_active ?? true) === true;
+  const staff = active && (role === "staff" || role === "admin");
 
-  const staff = active && (role === "staff" || role === "admin"); // allow admin
-  setAuthUI({ authed: true, staff, email: res.user.email });
+  if (!staff) {
+    setAuthUIState(
+      true,
+      false,
+      res.user.email,
+      `Signed in as ${res.user.email}, but not staff/admin. Set role='staff' or 'admin' in profiles.`
+    );
+    return { ok: false };
+  }
 
-  if (!staff) return { ok: false, error: new Error("Not staff/admin") };
-  return { ok: true, user: res.user, profile: res.profile };
+  setAuthUIState(true, true, res.user.email, `Staff access granted (${res.user.email}).`);
+  return { ok: true };
+}
+
+async function login(email, password) {
+  const ui = els();
+  if (ui.loginMsg) ui.loginMsg.textContent = "Signing in...";
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (ui.loginMsg) ui.loginMsg.textContent = error.message;
+    return false;
+  }
+
+  if (ui.loginMsg) ui.loginMsg.textContent = "";
+  return true;
 }
 
 async function logout() {
   try {
     await supabase.auth.signOut();
   } finally {
-    // ✅ important: ensure token is cleared so next login works
+    // ✅ important fix for "can't login again"
     clearAuthStorage();
-    teardownChat();
+    stopChatPolling();
+    currentCustomer = null;
     window.location.href = "/admin.html";
   }
 }
 
-async function staffLogin(email, password) {
-  const msg = $("staffLoginMsg");
-  if (msg) msg.textContent = "Signing in...";
-
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    if (msg) msg.textContent = error.message;
-    return false;
-  }
-  if (msg) msg.textContent = "";
-  return true;
+// ========================
+// CUSTOMER LOOKUP
+// ========================
+async function findCustomerByEmail(email) {
+  return supabase.from("profiles").select("id,email").eq("email", email).maybeSingle();
 }
 
-async function findCustomer(email) {
-  return supabase
-    .from("profiles")
-    .select("id,email")
-    .eq("email", email)
-    .maybeSingle();
-}
-
-// --------------------
-// Packages + invoices
-// --------------------
+// ========================
+// PACKAGES / INVOICES
+// ========================
 async function renderPackages() {
-  const body = $("pkgBody");
-  if (!body) return;
+  const ui = els();
+  if (!ui.pkgBody) return;
 
   if (!currentCustomer) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">Search a customer first.</td></tr>`;
+    ui.pkgBody.innerHTML = `<tr><td colspan="5" class="muted">Search a customer first.</td></tr>`;
     return;
   }
 
@@ -175,46 +243,35 @@ async function renderPackages() {
     .order("updated_at", { ascending: false });
 
   if (error) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHTML(
-      error.message
-    )}</td></tr>`;
+    ui.pkgBody.innerHTML = `<tr><td colspan="5" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">No packages yet.</td></tr>`;
+    ui.pkgBody.innerHTML = `<tr><td colspan="5" class="muted">No packages yet.</td></tr>`;
     return;
   }
 
-  body.innerHTML = data
+  ui.pkgBody.innerHTML = data
     .map(
       (p) => `
-    <tr
-      data-tracking="${escapeHTML(p.tracking)}"
-      data-status="${escapeHTML(p.status)}"
-      data-pickup="${escapeHTML(p.pickup)}"
-      data-pickup_confirmed="${p.pickup_confirmed ? "true" : "false"}"
-      data-weight_lbs="${p.weight_lbs ?? ""}"
-      data-cost_jmd="${p.cost_jmd ?? ""}"
-    >
-      <td><strong>${escapeHTML(p.tracking)}</strong></td>
-      <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td>${escapeHTML(pickupLabel(p.pickup))}${
-        p.pickup_confirmed ? ` <span class="tag">Confirmed</span>` : ``
-      }</td>
-      <td>${p.pickup_confirmed ? "Yes" : "No"}</td>
-      <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
-    </tr>
-  `
+      <tr>
+        <td><strong>${escapeHTML(p.tracking)}</strong></td>
+        <td><span class="tag">${escapeHTML(p.status)}</span></td>
+        <td>${escapeHTML(pickupLabel(p.pickup))}${p.pickup_confirmed ? ` <span class="tag">Confirmed</span>` : ""}</td>
+        <td>${p.pickup_confirmed ? "Yes" : "No"}</td>
+        <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
+      </tr>
+    `
     )
     .join("");
 }
 
 async function renderInvoices() {
-  const list = $("invoiceList");
-  if (!list) return;
+  const ui = els();
+  if (!ui.invoiceList) return;
 
   if (!currentCustomer) {
-    list.innerHTML = `<li class="muted">Search a customer first.</li>`;
+    ui.invoiceList.innerHTML = `<li class="muted">Search a customer first.</li>`;
     return;
   }
 
@@ -226,66 +283,38 @@ async function renderInvoices() {
     .limit(30);
 
   if (error) {
-    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
+    ui.invoiceList.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
     return;
   }
   if (!data?.length) {
-    list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
+    ui.invoiceList.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
     return;
   }
 
-  list.innerHTML = data
+  ui.invoiceList.innerHTML = data
     .map(
       (i) => `
-    <li>
-      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
-        i.file_name
-      )} (${escapeHTML(i.file_type)})</div>
-      <div class="muted small">
-        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
-        i.pickup_confirmed ? "Confirmed" : "Pending"
-      } • ${new Date(i.created_at).toLocaleString()}
-        ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
-      </div>
-    </li>
-  `
+      <li>
+        <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name)} (${escapeHTML(i.file_type)})</div>
+        <div class="muted small">
+          Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${i.pickup_confirmed ? "Confirmed" : "Pending"} • ${new Date(i.created_at).toLocaleString()}
+          ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
+        </div>
+      </li>
+    `
     )
     .join("");
 }
 
-// --------------------
-// Chat (render + realtime + polling fallback)
-// --------------------
-function injectChatStyles() {
-  if (document.getElementById("adminChatStyles")) return;
-
-  const style = document.createElement("style");
-  style.id = "adminChatStyles";
-  style.textContent = `
-    /* Chat window text */
-    #chatBody, #chatBody * { color: #fff !important; }
-    #chatBody .meta { color: rgba(255,255,255,.75) !important; }
-
-    /* Chat input visibility */
-    #chatInput {
-      color: #fff !important;
-      background: rgba(255,255,255,0.06) !important;
-      border: 1px solid rgba(255,255,255,0.12) !important;
-    }
-    #chatInput::placeholder { color: rgba(255,255,255,.6) !important; }
-
-    /* File input label area */
-    #chatMsg { color: rgba(255,255,255,.75) !important; }
-  `;
-  document.head.appendChild(style);
-}
-
+// ========================
+// CHAT (AUTO UPDATE + FORCE REFRESH AFTER SEND)
+// ========================
 async function renderChat() {
-  const body = $("chatBody");
-  if (!body) return;
+  const ui = els();
+  if (!ui.chatBody) return;
 
   if (!currentCustomer) {
-    body.innerHTML = `<div class="muted small">Search a customer to view chat.</div>`;
+    ui.chatBody.innerHTML = `<div class="muted small">Search a customer to view chat.</div>`;
     return;
   }
 
@@ -297,38 +326,36 @@ async function renderChat() {
     .limit(200);
 
   if (error) {
-    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+    ui.chatBody.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
     return;
   }
 
-  body.innerHTML =
+  ui.chatBody.innerHTML =
     (data?.length ? data : [])
       .map(
         (m) => `
-    <div class="bubble ${m.sender === "staff" ? "me" : ""}" data-msg-id="m_${escapeHTML(m.id)}">
-      <div>${escapeHTML(m.body)}</div>
-      <div class="meta">
-        <span>${m.sender === "staff" ? "Support" : "Customer"}</span>
-        <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-      </div>
-    </div>
-  `
+        <div class="bubble ${m.sender === "staff" ? "me" : ""}" data-msg-id="m_${escapeHTML(m.id)}">
+          <div>${escapeHTML(m.body)}</div>
+          <div class="meta">
+            <span>${m.sender === "staff" ? "Support" : "Customer"}</span>
+            <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        </div>
+      `
       )
       .join("") || `<div class="muted small">No messages yet.</div>`;
 
-  body.scrollTop = body.scrollHeight;
+  ui.chatBody.scrollTop = ui.chatBody.scrollHeight;
 
-  if (data && data.length) {
-    lastChatSeenAt = data[data.length - 1].created_at;
-  }
+  if (data && data.length) lastChatSeenAt = data[data.length - 1].created_at;
 }
 
 function appendChatMessage(m) {
-  const body = $("chatBody");
-  if (!body || !m) return;
+  const ui = els();
+  if (!ui.chatBody || !m) return;
 
   const key = `m_${m.id}`;
-  if (m.id && body.querySelector(`[data-msg-id="${key}"]`)) return;
+  if (m.id && ui.chatBody.querySelector(`[data-msg-id="${key}"]`)) return;
 
   const html = `
     <div class="bubble ${m.sender === "staff" ? "me" : ""}" data-msg-id="${key}">
@@ -339,9 +366,8 @@ function appendChatMessage(m) {
       </div>
     </div>
   `;
-  body.insertAdjacentHTML("beforeend", html);
-  body.scrollTop = body.scrollHeight;
-
+  ui.chatBody.insertAdjacentHTML("beforeend", html);
+  ui.chatBody.scrollTop = ui.chatBody.scrollHeight;
   if (m.created_at) lastChatSeenAt = m.created_at;
 }
 
@@ -360,6 +386,7 @@ function startChatPolling() {
     try {
       if (!currentCustomer) return;
 
+      // Fetch only new messages
       let q = supabase
         .from("messages")
         .select("id,sender,body,created_at")
@@ -371,46 +398,19 @@ function startChatPolling() {
 
       const { data, error } = await q;
       if (error) return;
-
       if (data?.length) data.forEach(appendChatMessage);
     } catch (_) {}
-  }, 4000);
+  }, 3000); // every 3 seconds
 }
 
-function teardownChat() {
-  if (chatChannel) {
-    supabase.removeChannel(chatChannel);
-    chatChannel = null;
-  }
-  stopChatPolling();
-  lastChatSeenAt = null;
+function refreshChatAfter5s() {
+  setTimeout(() => {
+    renderChat();
+  }, 5000);
 }
 
-async function setupChatRealtime() {
-  if (chatChannel) {
-    supabase.removeChannel(chatChannel);
-    chatChannel = null;
-  }
-  stopChatPolling();
-  if (!currentCustomer) return;
-
-  // Realtime subscription (if enabled on messages table)
-  chatChannel = supabase
-    .channel(`staff_messages:${currentCustomer.id}`)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${currentCustomer.id}` },
-      (payload) => {
-        appendChatMessage(payload.new);
-      }
-    )
-    .subscribe();
-
-  // Always run polling fallback too (safe, ensures it works even if realtime is off)
-  startChatPolling();
-}
-
-async function sendStaff(text, file) {
+async function sendStaffMessage(text, file) {
+  const ui = els();
   if (!currentCustomer) return alert("Search customer first.");
 
   const { data: msg, error: mErr } = await supabase
@@ -421,22 +421,18 @@ async function sendStaff(text, file) {
 
   if (mErr) return alert(mErr.message);
 
-  // ✅ Show instantly even without realtime
+  // Show instantly
   appendChatMessage(msg);
 
-  // ✅ As requested: "auto refresh after 5 seconds"
-  // Instead of reloading the entire page, we re-fetch chat (safer).
-  setTimeout(() => {
-    renderChat();
-  }, 5000);
+  // Your requested behavior
+  refreshChatAfter5s();
 
+  // Optional attachment (if you have message_attachments table + storage bucket)
   if (file) {
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${currentCustomer.id}/messages/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage
-      .from(CHAT_BUCKET)
-      .upload(path, file, { upsert: false });
+    const up = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
     if (up.error) return alert(up.error.message);
 
     const ins = await supabase.from("message_attachments").insert({
@@ -446,45 +442,53 @@ async function sendStaff(text, file) {
       file_name: safeName,
       file_type: file.type || "unknown",
     });
-
     if (ins.error) return alert(ins.error.message);
   }
+
+  if (ui.chatMsg) ui.chatMsg.textContent = "";
 }
 
-// --------------------
-// Init
-// --------------------
+// ========================
+// INIT
+// ========================
 async function init() {
-  injectChatStyles();
+  injectAdminChatStyles();
 
-  $("logoutBtn")?.addEventListener("click", logout);
+  const ui = els();
 
-  $("staffLoginForm")?.addEventListener("submit", async (e) => {
+  // Logout
+  ui.logoutBtn?.addEventListener("click", logout);
+
+  // Login
+  ui.loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = $("staffEmail").value.trim().toLowerCase();
-    const password = $("staffPassword").value;
+    const email = (ui.email?.value || "").trim().toLowerCase();
+    const password = ui.password?.value || "";
 
-    const ok = await staffLogin(email, password);
+    const ok = await login(email, password);
     if (!ok) return;
 
     await requireStaff();
   });
 
-  // Gate UI on load
+  // Gate
   const gate = await requireStaff();
   if (!gate.ok) return;
 
-  $("findForm")?.addEventListener("submit", async (e) => {
+  // Customer search
+  ui.findForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("findMsg").textContent = "Searching...";
-    const email = $("custEmail").value.trim().toLowerCase();
+    if (ui.findMsg) ui.findMsg.textContent = "Searching...";
 
-    const { data, error } = await findCustomer(email);
+    const email = (ui.custEmail?.value || "").trim().toLowerCase();
+    const { data, error } = await findCustomerByEmail(email);
+
     if (error || !data) {
-      $("findMsg").textContent = error?.message || "Customer not found.";
       currentCustomer = null;
-      $("custId").textContent = "—";
-      teardownChat();
+      if (ui.findMsg) ui.findMsg.textContent = error?.message || "Customer not found.";
+      if (ui.custId) ui.custId.textContent = "—";
+      lastChatSeenAt = null;
+      stopChatPolling();
       await renderPackages();
       await renderInvoices();
       await renderChat();
@@ -492,38 +496,54 @@ async function init() {
     }
 
     currentCustomer = { id: data.id, email: data.email };
-    $("custId").textContent = data.id;
-    $("findMsg").textContent = `Found: ${data.email}`;
+    if (ui.custId) ui.custId.textContent = data.id;
+    if (ui.findMsg) ui.findMsg.textContent = `Found: ${data.email}`;
 
+    // Reset chat state and start auto updates
     lastChatSeenAt = null;
     await renderPackages();
     await renderInvoices();
     await renderChat();
-    await setupChatRealtime();
+    startChatPolling();
   });
 
-  $("chatForm")?.addEventListener("submit", async (e) => {
+  // Chat send
+  ui.chatForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = ($("chatInput").value || "").trim();
-    const file = $("chatFile")?.files?.[0] || null;
-    if (!text && !file) return;
+    const text = (ui.chatInput?.value || "").trim();
+    const file = ui.chatFile?.files?.[0] || null;
 
-    $("chatInput").value = "";
-    if ($("chatFile")) $("chatFile").value = "";
+    if (!text && !file) {
+      if (ui.chatMsg) ui.chatMsg.textContent = "Type a message or attach a file.";
+      return;
+    }
 
-    await sendStaff(text || "(Attachment)", file);
+    if (ui.chatMsg) ui.chatMsg.textContent = "Sending...";
+    if (ui.chatInput) ui.chatInput.value = "";
+    if (ui.chatFile) ui.chatFile.value = "";
+
+    await sendStaffMessage(text || "(Attachment)", file);
   });
 
-  // initial empties
+  // Initial renders
   await renderPackages();
   await renderInvoices();
   await renderChat();
 }
 
-// ✅ Subscribe ONCE (prevents multiple handlers piling up)
-if (!window.__ADMIN_AUTH_SUB__) {
-  window.__ADMIN_AUTH_SUB__ = supabase.auth.onAuthStateChange(() => {
-    setTimeout(() => requireStaff(), 0);
+// Subscribe once (prevents duplicate auth handlers)
+if (!__authSubSet) {
+  __authSubSet = true;
+  supabase.auth.onAuthStateChange(() => {
+    if (__authRenderLock) return;
+    __authRenderLock = true;
+    setTimeout(async () => {
+      try {
+        await requireStaff();
+      } finally {
+        __authRenderLock = false;
+      }
+    }, 0);
   });
 }
 
