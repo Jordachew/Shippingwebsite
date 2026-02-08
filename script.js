@@ -315,15 +315,23 @@ function setupLoginRegister() {
   // --------
   // LOGOUT
   // --------
-  $("logoutBtn")?.addEventListener("click", async () => {
-    try {
-      await supabase.auth.signOut();
-    } finally {
-      // Hard reset local session so you don't get "login once then stuck"
-      try { localStorage.removeItem(`sb-${new URL(SUPABASE_URL).host}-auth-token`); } catch (_) {}
-      window.location.reload();
-    }
-  });
+function clearSupabaseAuthStorage() {
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
+    localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch {}
+}
+
+$("logoutBtn")?.addEventListener("click", async () => {
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    clearSupabaseAuthStorage();
+    location.reload();
+  }
+});
+
 }
 
 // --------------------
