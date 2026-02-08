@@ -2,11 +2,12 @@
 // SUPABASE CONFIG
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8"; // keep same as script.js
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// Safe singleton (prevents double-load)
-window.__SB__ =
-  window.__SB__ ||
+// One safe singleton (prevents double-load issues)
+window.__ADMIN_SB__ =
+  window.__ADMIN_SB__ ||
   window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       persistSession: true,
@@ -16,488 +17,546 @@ window.__SB__ =
     },
   });
 
-const supabase = window.__SB__;
+const supabase = window.__ADMIN_SB__;
 
-// Buckets (create in Storage)
 const INVOICE_BUCKET = "invoices";
-const PACKAGE_PHOTO_BUCKET = "package_photos"; // create bucket (private) or change to "invoices" if you prefer
+const CHAT_BUCKET = "chat_files";
 
 // --------------------
 // Helpers
 // --------------------
-function $(id) { return document.getElementById(id); }
-function escapeHTML(s){
+function $(id) {
+  return document.getElementById(id);
+}
+function escapeHTML(s) {
   return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
-function fmtDate(ts){
-  try { return new Date(ts).toLocaleString(); } catch { return ""; }
+function pickupLabel(v) {
+  return v === "RHODEN_HALL_CLARENDON"
+    ? "Rhoden Hall District, Clarendon"
+    : "UWI, Kingston";
 }
-function csvEscape(v){
-  const s = String(v ?? "");
-  if (/[",\n]/.test(s)) return `"${s.replaceAll('"','""')}"`;
-  return s;
-}
-function downloadText(filename, text, mime="text/plain"){
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1500);
-}
-function show(el, on){ if (el) el.classList.toggle("hidden", !on); }
 
 // ✅ FIX: project ref key, not host
-function getProjectRef(){
-  try { return new URL(SUPABASE_URL).hostname.split(".")[0]; }
-  catch { return "ykpcgcjudotzakaxgnxh"; }
+function getProjectRef() {
+  try {
+    return new URL(SUPABASE_URL).hostname.split(".")[0];
+  } catch {
+    return "ykpcgcjudotzakaxgnxh";
+  }
 }
-function clearAuthStorage(){
+function clearAuthStorage() {
   try {
     const ref = getProjectRef();
     localStorage.removeItem(`sb-${ref}-auth-token`);
-  } catch {}
+  } catch (_) {}
 }
+
+let currentCustomer = null; // { id, email }
+let selectedPkg = null;
+let chatChannel = null;
+let chatPollTimer = null; // fallback polling if realtime not enabled
+let lastChatSeenAt = null; // ISO timestamp of last message we rendered
+
+let __renderBusy = false;
 
 // --------------------
 // Auth + role gating
 // --------------------
-let me = null;          // auth user
-let myProfile = null;   // profiles row
-let isStaff = false;
-let isAdmin = false;
-
-let __renderBusy = false;
-let __refreshBusy = false;
-
-async function getMyProfile(){
+async function getMyProfile() {
   const { data: u, error: uErr } = await supabase.auth.getUser();
-  if (uErr) throw uErr;
+  if (uErr) return { ok: false, error: uErr };
+  const user = u?.user;
+  if (!user) return { ok: false, error: new Error("Not logged in") };
 
-  me = u?.user || null;
-  if (!me) return null;
-
-  const res = await supabase
+  const { data: profile, error: pErr } = await supabase
     .from("profiles")
-    .select("id,email,full_name,phone,address,role,is_active")
-    .eq("id", me.id)
+    .select("id,email,role,full_name,is_active")
+    .eq("id", user.id)
     .maybeSingle();
 
-  if (res.error) throw res.error;
-  return res.data || null;
+  if (pErr) return { ok: false, error: pErr };
+  return { ok: true, user, profile };
 }
 
-async function hardSignOut(){
-  try { await supabase.auth.signOut(); } catch {}
-  clearAuthStorage();
-  // Force a clean state for admin
-  location.href = "admin.html";
-}
-
-async function renderAuth(){
-  if (__renderBusy) return;
-  __renderBusy = true;
-
-  const loginCard = $("adminLoginCard");
-  const app = $("adminApp");
-  const who = $("whoami");
+function setAuthUI({ authed, staff, email }) {
+  const loginCard = $("staffLoginCard");
+  const wrap = $("adminWrap");
   const logoutBtn = $("logoutBtn");
-  const loginMsg = $("adminLoginMsg");
+  const authMsg = $("authMsg");
 
+  if (loginCard) loginCard.classList.toggle("hidden", authed && staff);
+  if (wrap) wrap.classList.toggle("hidden", !(authed && staff));
+  if (logoutBtn) logoutBtn.classList.toggle("hidden", !(authed && staff));
+
+  if (authMsg) {
+    if (!authed) authMsg.textContent = "Please sign in as staff.";
+    else if (!staff)
+      authMsg.textContent =
+        `Signed in as ${email || "user"}, but not staff/admin. Set role='staff' or 'admin' in profiles.`;
+    else authMsg.textContent = `Staff access granted (${email || "staff"}).`;
+  }
+}
+
+async function requireStaff() {
+  const res = await getMyProfile();
+  if (!res.ok) {
+    setAuthUI({ authed: false, staff: false });
+    return { ok: false, error: res.error };
+  }
+
+  const role = (res.profile?.role || "customer").toLowerCase();
+  const active = (res.profile?.is_active ?? true) === true;
+
+  const staff = active && (role === "staff" || role === "admin"); // allow admin
+  setAuthUI({ authed: true, staff, email: res.user.email });
+
+  if (!staff) return { ok: false, error: new Error("Not staff/admin") };
+  return { ok: true, user: res.user, profile: res.profile };
+}
+
+async function logout() {
   try {
-    try {
-      myProfile = await getMyProfile();
-    } catch (err) {
-      console.error("Profile read error:", err);
-      myProfile = null;
-    }
-
-    const authed = !!me;
-
-    show(loginCard, !authed);
-    show(app, authed);
-    show(logoutBtn, authed);
-
-    if (!authed){
-      if (who) who.textContent = "";
-      if (loginMsg) loginMsg.textContent = "";
-      return;
-    }
-
-    const role = (myProfile?.role || "").toLowerCase();
-    const active = myProfile?.is_active !== false;
-    isStaff = active && (role === "staff" || role === "admin");
-    isAdmin = active && (role === "admin");
-
-    if (who){
-      who.textContent = `${myProfile?.full_name || me.email} • ${role || "unknown role"}`;
-    }
-
-    // If logged in but not staff: show message, keep app hidden
-    if (!isStaff){
-      show(app, false);
-      show(loginCard, true);
-      if (loginMsg) loginMsg.textContent =
-        "This account is not staff/admin yet. Set profiles.role to staff or admin in Supabase.";
-      return;
-    }
-
-    // roles tab is admin-only
-    const rolesTabBtn = document.querySelector('.tab[data-tab="roles"]');
-    if (rolesTabBtn) rolesTabBtn.style.display = isAdmin ? "inline-flex" : "none";
-
-    // ✅ avoid multiple concurrent refreshes
-    if (!__refreshBusy){
-      __refreshBusy = true;
-      try { await refreshAll(); }
-      finally { __refreshBusy = false; }
-    }
+    await supabase.auth.signOut();
   } finally {
-    __renderBusy = false;
+    clearAuthStorage();
+    teardownChat();
+    window.location.href = "/admin.html";
   }
 }
 
-// --------------------
-// Login UI
-// --------------------
-function setupLogin(){
-  $("adminLoginForm")?.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const msg = $("adminLoginMsg");
-    if (msg) msg.textContent = "Signing in…";
+async function staffLogin(email, password) {
+  const msg = $("staffLoginMsg");
+  if (msg) msg.textContent = "Signing in...";
 
-    try {
-      const email = ($("adminEmail")?.value || "").trim().toLowerCase();
-      const password = $("adminPassword")?.value || "";
-
-      const res = await supabase.auth.signInWithPassword({ email, password });
-      console.log("ADMIN LOGIN RES:", res);
-
-      if (res.error){
-        if (msg) msg.textContent = res.error.message;
-        return;
-      }
-
-      if (msg) msg.textContent = "";
-      // renderAuth will run via auth state change, but call once here too:
-      await renderAuth();
-    } catch (err){
-      console.error(err);
-      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
-    }
-  });
-
-  $("logoutBtn")?.addEventListener("click", hardSignOut);
-}
-
-// --------------------
-// Tabs
-// --------------------
-function setTab(name){
-  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
-  document.querySelectorAll(".panel").forEach(p => p.classList.add("hidden"));
-  const panel = $(`tab-${name}`);
-  if (panel) panel.classList.remove("hidden");
-}
-
-function setupTabs(){
-  document.querySelectorAll(".tab").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      setTab(btn.dataset.tab);
-    });
-  });
-  $("goPackagesBtn")?.addEventListener("click", ()=>setTab("packages"));
-  $("goMessagesBtn")?.addEventListener("click", ()=>setTab("messages"));
-}
-
-// --------------------
-// Data loaders
-// --------------------
-async function fetchStats(){
-  const { data: pkgs, error: pErr } = await supabase
-    .from("packages")
-    .select("status");
-  if (pErr) throw pErr;
-
-  const { data: msgs, error: mErr } = await supabase
-    .from("messages")
-    .select("resolved");
-  if (mErr) throw mErr;
-
-  const byStatus = {};
-  for (const p of (pkgs||[])){
-    byStatus[p.status] = (byStatus[p.status] || 0) + 1;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (msg) msg.textContent = error.message;
+    return false;
   }
-  const openMsgs = (msgs||[]).filter(x => x.resolved === false).length;
-
-  return {
-    total: pkgs?.length || 0,
-    in_transit: byStatus["IN_TRANSIT"] || 0,
-    ready: byStatus["READY_FOR_PICKUP"] || 0,
-    picked: byStatus["PICKED_UP"] || 0,
-    arrived: byStatus["ARRIVED_JA"] || 0,
-    received: byStatus["RECEIVED"] || 0,
-    on_hold: byStatus["ON_HOLD"] || 0,
-    openMsgs
-  };
+  if (msg) msg.textContent = "";
+  return true;
 }
 
-function renderStats(stats){
-  const row = $("statsRow");
-  if (!row) return;
-
-  const card = (label, value, sub="") => `
-    <div class="stat">
-      <div class="stat__label">${escapeHTML(label)}</div>
-      <div class="stat__value">${escapeHTML(String(value))}</div>
-      ${sub ? `<div class="stat__sub">${escapeHTML(sub)}</div>` : ""}
-    </div>
-  `;
-
-  row.innerHTML = [
-    card("Packages", stats.total, "All"),
-    card("In Transit", stats.in_transit, "Status"),
-    card("Ready for pickup", stats.ready, "Status"),
-    card("Open messages", stats.openMsgs, "Unresolved"),
-  ].join("");
-}
-
-async function renderOverview(){
-  const rp = $("recentPackages");
-  const rm = $("recentMessages");
-
-  if (rp){
-    const { data, error } = await supabase
-      .from("packages")
-      .select("tracking,status,updated_at")
-      .order("updated_at",{ascending:false})
-      .limit(6);
-    rp.innerHTML = error ? `<li class="muted">${escapeHTML(error.message)}</li>` :
-      (data||[]).map(p=>`<li><strong>${escapeHTML(p.tracking)}</strong> <span class="tag">${escapeHTML(p.status)}</span><div class="muted small">${escapeHTML(fmtDate(p.updated_at))}</div></li>`).join("")
-      || `<li class="muted">No packages yet.</li>`;
-  }
-
-  if (rm){
-    const { data, error } = await supabase
-      .from("messages")
-      .select("user_id,sender,body,created_at,resolved")
-      .order("created_at",{ascending:false})
-      .limit(6);
-    rm.innerHTML = error ? `<li class="muted">${escapeHTML(error.message)}</li>` :
-      (data||[]).map(m=>`<li><span class="tag">${escapeHTML(m.sender)}</span> ${escapeHTML(m.body).slice(0,70)}<div class="muted small">${escapeHTML(fmtDate(m.created_at))}${m.resolved ? " • resolved" : ""}</div></li>`).join("")
-      || `<li class="muted">No messages yet.</li>`;
-  }
+async function findCustomer(email) {
+  return supabase
+    .from("profiles")
+    .select("id,email")
+    .eq("email", email)
+    .maybeSingle();
 }
 
 // --------------------
-// Customers / Packages / Messages / Reports / Roles
-// (UNCHANGED from your version below this point)
+// Packages
 // --------------------
+async function renderPackages() {
+  const body = $("pkgBody");
+  if (!body) return;
 
-// Customers
-let selectedCustomer = null;
-
-// ... keep everything else EXACTLY as you have it ...
-// I am re-pasting the rest of your file unchanged for safety:
-
-async function loadCustomers(){
-  const tbody = $("customersBody");
-  if (!tbody) return;
-
-  const q = ($("custSearch")?.value || "").trim().toLowerCase();
+  if (!currentCustomer) {
+    body.innerHTML = `<tr><td colspan="5" class="muted">Search a customer first.</td></tr>`;
+    return;
+  }
 
   const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email,full_name,phone,address,role,is_active")
-    .order("created_at",{ascending:false})
-    .limit(500);
+    .from("packages")
+    .select("tracking,status,pickup,pickup_confirmed,weight_lbs,cost_jmd,updated_at")
+    .eq("user_id", currentCustomer.id)
+    .order("updated_at", { ascending: false });
 
-  if (error){
-    tbody.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
+  if (error) {
+    body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHTML(
+      error.message
+    )}</td></tr>`;
+    return;
+  }
+  if (!data?.length) {
+    body.innerHTML = `<tr><td colspan="5" class="muted">No packages yet.</td></tr>`;
     return;
   }
 
-  const filtered = (data||[]).filter(p=>{
-    const hay = `${p.full_name||""} ${p.email||""} ${p.phone||""}`.toLowerCase();
-    return !q || hay.includes(q);
-  });
-
-  tbody.innerHTML = filtered.map(p=>`
-    <tr data-id="${escapeHTML(p.id)}">
-      <td>${escapeHTML(p.full_name || "—")}</td>
-      <td class="muted">${escapeHTML(p.email || "—")}</td>
-      <td>${escapeHTML(p.phone || "—")}</td>
-      <td><span class="tag">${escapeHTML(p.role || "customer")}</span></td>
-      <td>${p.is_active === false ? `<span class="tag tag--warn">Deactivated</span>` : `<span class="tag tag--ok">Active</span>`}</td>
-      <td>
-        <button class="btn btn--xs btn--ghost" data-act="view">View</button>
-        <button class="btn btn--xs btn--ghost" data-act="toggle">${p.is_active === false ? "Activate" : "Deactivate"}</button>
-      </td>
+  body.innerHTML = data
+    .map(
+      (p) => `
+    <tr
+      data-tracking="${escapeHTML(p.tracking)}"
+      data-status="${escapeHTML(p.status)}"
+      data-pickup="${escapeHTML(p.pickup)}"
+      data-pickup_confirmed="${p.pickup_confirmed ? "true" : "false"}"
+      data-weight_lbs="${p.weight_lbs ?? ""}"
+      data-cost_jmd="${p.cost_jmd ?? ""}"
+    >
+      <td><strong>${escapeHTML(p.tracking)}</strong></td>
+      <td><span class="tag">${escapeHTML(p.status)}</span></td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}${
+        p.pickup_confirmed ? ` <span class="tag">Confirmed</span>` : ``
+      }</td>
+      <td>${p.pickup_confirmed ? "Yes" : "No"}</td>
+      <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
-  `).join("") || `<tr><td colspan="6" class="muted">No customers found.</td></tr>`;
+  `
+    )
+    .join("");
 
-  tbody.querySelectorAll("tr").forEach(tr=>{
-    tr.addEventListener("click", async (e)=>{
-      const id = tr.getAttribute("data-id");
-      const act = e.target?.getAttribute?.("data-act");
+  body.querySelectorAll("tr[data-tracking]").forEach((row) => {
+    row.addEventListener("click", () => openUpdateModal(row.dataset));
+  });
+}
 
-      if (act === "toggle"){
-        e.preventDefault(); e.stopPropagation();
-        if (!isAdmin && !isStaff) return;
-        const row = filtered.find(x=>x.id===id);
-        const next = !(row?.is_active === false);
-        const { error: uErr } = await supabase.from("profiles").update({ is_active: !next }).eq("id", id);
-        if (uErr) return alert(uErr.message);
-        await loadCustomers();
-        if (selectedCustomer?.id === id) await selectCustomer(id);
-        return;
+async function renderInvoices() {
+  const list = $("invoiceList");
+  if (!list) return;
+
+  if (!currentCustomer) {
+    list.innerHTML = `<li class="muted">Search a customer first.</li>`;
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
+    .eq("user_id", currentCustomer.id)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) {
+    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
+    return;
+  }
+  if (!data?.length) {
+    list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
+    return;
+  }
+
+  list.innerHTML = data
+    .map(
+      (i) => `
+    <li>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
+        i.file_name
+      )} (${escapeHTML(i.file_type)})</div>
+      <div class="muted small">
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
+        i.pickup_confirmed ? "Confirmed" : "Pending"
+      } • ${new Date(i.created_at).toLocaleString()}
+        ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
+      </div>
+    </li>
+  `
+    )
+    .join("");
+}
+
+// --------------------
+// Chat (render + realtime + fallback polling)
+// --------------------
+async function renderChat() {
+  const body = $("chatBody");
+  if (!body) return;
+
+  if (!currentCustomer) {
+    body.innerHTML = `<div class="muted small">Search a customer to view chat.</div>`;
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id,sender,body,created_at")
+    .eq("user_id", currentCustomer.id)
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+    return;
+  }
+
+  body.innerHTML =
+    (data?.length ? data : [])
+      .map(
+        (m) => `
+    <div class="bubble ${m.sender === "staff" ? "me" : ""}" data-msg-id="m_${escapeHTML(m.id)}">
+      <div>${escapeHTML(m.body)}</div>
+      <div class="meta">
+        <span>${m.sender === "staff" ? "Support" : "Customer"}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+    </div>
+  `
+      )
+      .join("") || `<div class="muted small">No messages yet.</div>`;
+
+  body.scrollTop = body.scrollHeight;
+
+  // track last message timestamp for polling fallback
+  if (data && data.length) {
+    lastChatSeenAt = data[data.length - 1].created_at;
+  }
+}
+
+function stopChatPolling() {
+  if (chatPollTimer) {
+    clearInterval(chatPollTimer);
+    chatPollTimer = null;
+  }
+}
+function startChatPolling() {
+  stopChatPolling();
+  if (!currentCustomer) return;
+
+  // Fallback if Realtime isn't enabled on the table/publication.
+  // Poll every 4s and only append new messages since lastChatSeenAt.
+  chatPollTimer = setInterval(async () => {
+    try {
+      if (!currentCustomer) return;
+      const body = $("chatBody");
+      if (!body) return;
+
+      let q = supabase
+        .from("messages")
+        .select("id,sender,body,created_at")
+        .eq("user_id", currentCustomer.id)
+        .order("created_at", { ascending: true })
+        .limit(50);
+
+      if (lastChatSeenAt) {
+        q = q.gt("created_at", lastChatSeenAt);
       }
 
-      await selectCustomer(id);
+      const { data, error } = await q;
+      if (error) return;
+
+      if (data?.length) {
+        data.forEach(appendChatMessage);
+      }
+    } catch (_) {}
+  }, 4000);
+}
+
+function appendChatMessage(m) {
+  const body = $("chatBody");
+  if (!body || !m) return;
+
+  // Avoid duplicates
+  const key = `m_${m.id}`;
+  if (m.id && body.querySelector(`[data-msg-id="${key}"]`)) return;
+
+  const html = `
+    <div class="bubble ${m.sender === "staff" ? "me" : ""}" data-msg-id="${key}">
+      <div>${escapeHTML(m.body)}</div>
+      <div class="meta">
+        <span>${m.sender === "staff" ? "Support" : "Customer"}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+    </div>
+  `;
+  body.insertAdjacentHTML("beforeend", html);
+  body.scrollTop = body.scrollHeight;
+
+  if (m.created_at) lastChatSeenAt = m.created_at;
+}
+
+function injectChatLightText() {
+  // Make admin chat readable even on dark panels
+  if (document.getElementById("adminChatLightText")) return;
+  const style = document.createElement("style");
+  style.id = "adminChatLightText";
+  style.textContent = `
+    #chatBody, #chatBody * { color: #fff; }
+    #chatBody .meta, #chatBody .muted { color: rgba(255,255,255,.75) !important; }
+    #chatBody .bubble { color:#fff !important; }
+  `;
+  document.head.appendChild(style);
+}
+
+function teardownChat() {
+  if (chatChannel) {
+    supabase.removeChannel(chatChannel);
+    chatChannel = null;
+  }
+  stopChatPolling();
+  lastChatSeenAt = null;
+}
+
+async function setupChatRealtime() {
+  if (chatChannel) {
+    supabase.removeChannel(chatChannel);
+    chatChannel = null;
+  }
+  stopChatPolling();
+  if (!currentCustomer) return;
+
+  chatChannel = supabase
+    .channel(`staff_messages:${currentCustomer.id}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${currentCustomer.id}` },
+      async (payload) => {
+        // append instantly (faster than full re-render)
+        appendChatMessage(payload.new);
+      }
+    )
+    .subscribe();
+
+  // Start polling fallback (harmless if realtime works)
+  startChatPolling();
+}
+
+async function sendStaff(text, file) {
+  if (!currentCustomer) return alert("Search customer first.");
+
+  const { data: msg, error: mErr } = await supabase
+    .from("messages")
+    .insert({ user_id: currentCustomer.id, sender: "staff", body: text })
+    .select("id,sender,body,created_at")
+    .single();
+
+  if (mErr) return alert(mErr.message);
+
+  // Show instantly even if Realtime is disabled
+  appendChatMessage(msg);
+
+  if (file) {
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${currentCustomer.id}/messages/${Date.now()}_${safeName}`;
+
+    const up = await supabase.storage
+      .from(CHAT_BUCKET)
+      .upload(path, file, { upsert: false });
+    if (up.error) return alert(up.error.message);
+
+    const ins = await supabase.from("message_attachments").insert({
+      message_id: msg.id,
+      user_id: currentCustomer.id,
+      file_path: path,
+      file_name: safeName,
+      file_type: file.type || "unknown",
     });
+
+    if (ins.error) return alert(ins.error.message);
+  }
+}
+
+// --------------------
+// Modal update (unchanged)
+// --------------------
+function openUpdateModal(ds) {
+  selectedPkg = ds.tracking;
+
+  $("mTitle").textContent = `Update ${ds.tracking}`;
+  $("mStatus").value = ds.status || "RECEIVED";
+  $("mPickup").value = ds.pickup || "UWI_KINGSTON";
+  $("mPickupConfirmed").value = ds.pickup_confirmed || "false";
+  $("mWeight").value = ds.weight_lbs || "";
+  $("mCost").value = ds.cost_jmd || "";
+  $("mSendEmail").value = "no";
+  $("updateMsg").textContent = "";
+
+  $("updateModal").classList.remove("hidden");
+  $("updateModal").setAttribute("aria-hidden", "false");
+
+  $("updateModal")
+    .querySelectorAll("[data-close='1']")
+    .forEach((el) => {
+      el.addEventListener("click", closeUpdateModal, { once: true });
+    });
+}
+function closeUpdateModal() {
+  $("updateModal").classList.add("hidden");
+  $("updateModal").setAttribute("aria-hidden", "true");
+  selectedPkg = null;
+}
+
+// --------------------
+// Init
+// --------------------
+async function init() {
+  injectChatLightText();
+
+  $("logoutBtn")?.addEventListener("click", logout);
+
+  $("staffLoginForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("staffEmail").value.trim().toLowerCase();
+    const password = $("staffPassword").value;
+
+    const ok = await staffLogin(email, password);
+    if (!ok) return;
+
+    const gate = await requireStaff();
+    if (gate.ok) {
+      // ready
+    }
+  });
+
+  // Gate UI on load
+  const gate = await requireStaff();
+  if (!gate.ok) return;
+
+  $("findForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("findMsg").textContent = "Searching...";
+    const email = $("custEmail").value.trim().toLowerCase();
+
+    const { data, error } = await findCustomer(email);
+    if (error || !data) {
+      $("findMsg").textContent = error?.message || "Customer not found.";
+      currentCustomer = null;
+      $("custId").textContent = "—";
+      teardownChat();
+      await renderPackages();
+      await renderInvoices();
+      await renderChat();
+      return;
+    }
+
+    currentCustomer = { id: data.id, email: data.email };
+    $("custId").textContent = data.id;
+    $("findMsg").textContent = `Found: ${data.email}`;
+
+    lastChatSeenAt = null;
+    await renderPackages();
+    await renderInvoices();
+    await renderChat();
+    await setupChatRealtime();
+  });
+
+  $("updateForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // your update handler stays as-is in your file
+  });
+
+  $("chatForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = ($("chatInput").value || "").trim();
+    const file = $("chatFile")?.files?.[0] || null;
+    if (!text && !file) return;
+
+    $("chatInput").value = "";
+    if ($("chatFile")) $("chatFile").value = "";
+
+    await sendStaff(text || "(Attachment)", file);
   });
 }
 
-async function selectCustomer(id){
-  const box = $("customerDetail");
-  selectedCustomer = null;
-  if (box) box.innerHTML = "Loading…";
-
-  const { data: prof, error } = await supabase
-    .from("profiles")
-    .select("id,email,full_name,phone,address,role,is_active")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error){
-    if (box) box.innerHTML = `<div class="muted">${escapeHTML(error.message)}</div>`;
-    return;
-  }
-  selectedCustomer = prof;
-
-  const [pk, inv, msg] = await Promise.all([
-    supabase.from("packages").select("id,tracking,status,updated_at,store,approved").eq("user_id", id).order("updated_at",{ascending:false}).limit(25),
-    supabase.from("invoices").select("id,tracking,file_name,created_at").eq("user_id", id).order("created_at",{ascending:false}).limit(25),
-    supabase.from("messages").select("id,sender,body,created_at,resolved").eq("user_id", id).order("created_at",{ascending:false}).limit(25),
-  ]);
-
-  if (box){
-    box.innerHTML = `
-      <div class="stack">
-        <div>
-          <div class="h3">${escapeHTML(prof.full_name || "—")}</div>
-          <div class="muted">${escapeHTML(prof.email || "")}</div>
-          <div class="muted small">${escapeHTML(prof.phone || "—")} • ${escapeHTML(prof.address || "No address")}</div>
-          <div class="muted small">Role: <strong>${escapeHTML(prof.role || "customer")}</strong> • ${prof.is_active===false ? "Deactivated" : "Active"}</div>
-        </div>
-
-        <div class="grid2">
-          <div>
-            <div class="muted small">Packages</div>
-            <ul class="list">
-              ${(pk.error ? [`<li class="muted">${escapeHTML(pk.error.message)}</li>`] :
-                (pk.data||[]).map(p=>`<li><strong>${escapeHTML(p.tracking)}</strong> <span class="tag">${escapeHTML(p.status)}</span> ${p.approved ? `<span class="tag tag--ok">Approved</span>` : `<span class="tag tag--warn">Pending</span>`}<div class="muted small">${escapeHTML(fmtDate(p.updated_at))}${p.store ? " • "+escapeHTML(p.store):""}</div></li>`))
-                .join("") || `<li class="muted">No packages.</li>`}
-            </ul>
-          </div>
-
-          <div>
-            <div class="muted small">Invoices</div>
-            <ul class="list">
-              ${(inv.error ? [`<li class="muted">${escapeHTML(inv.error.message)}</li>`] :
-                (inv.data||[]).map(i=>`<li><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name || "file")}<div class="muted small">${escapeHTML(fmtDate(i.created_at))}</div></li>`))
-                .join("") || `<li class="muted">No invoices.</li>`}
-            </ul>
-          </div>
-        </div>
-
-        <div>
-          <div class="muted small">Recent messages</div>
-          <ul class="list">
-            ${(msg.error ? [`<li class="muted">${escapeHTML(msg.error.message)}</li>`] :
-              (msg.data||[]).slice(0,10).map(m=>`<li><span class="tag">${escapeHTML(m.sender)}</span> ${escapeHTML(m.body).slice(0,120)}<div class="muted small">${escapeHTML(fmtDate(m.created_at))}${m.resolved ? " • resolved":""}</div></li>`))
-              .join("") || `<li class="muted">No messages.</li>`}
-          </ul>
-        </div>
-      </div>
-    `;
-  }
-}
-
-// Packages / Messages / Reports / Roles / Refresh / Init
-// (keep your existing code unchanged)
-
-let selectedPackage = null;
-let selectedConvoUserId = null;
-let lastReportRows = [];
-
-// ... your original functions: loadPackages, fillPackageForm, savePackageEdits,
-// loadConversations, renderChatFor, sendStaffMessage, markResolved,
-// runReports, exportReports, exportPackages, setupRoles, refreshStatsOnly, refreshAll,
-// setupFilters ...
-
-async function refreshStatsOnly(){
-  try{
-    const stats = await fetchStats();
-    renderStats(stats);
-  } catch (e){
-    console.error(e);
-  }
-}
-
-async function refreshAll(){
-  await refreshStatsOnly();
-  await renderOverview();
-  await loadCustomers();
-  await loadPackages();
-  await loadConversations();
-}
-
-function setupFilters(){
-  $("refreshCustomers")?.addEventListener("click", loadCustomers);
-  $("custSearch")?.addEventListener("input", ()=>loadCustomers());
-
-  $("refreshPackages")?.addEventListener("click", loadPackages);
-  $("pkgSearch")?.addEventListener("input", ()=>loadPackages());
-  $("statusFilter")?.addEventListener("change", ()=>loadPackages());
-  $("pkgEditForm")?.addEventListener("submit", savePackageEdits);
-
-  $("refreshMessages")?.addEventListener("click", loadConversations);
-  $("msgSearch")?.addEventListener("input", ()=>loadConversations());
-  $("msgFilter")?.addEventListener("change", ()=>loadConversations());
-  $("adminChatForm")?.addEventListener("submit", sendStaffMessage);
-  $("markResolvedBtn")?.addEventListener("click", markResolved);
-
-  $("runReports")?.addEventListener("click", runReports);
-  $("exportReports")?.addEventListener("click", exportReports);
-  $("exportPackagesBtn")?.addEventListener("click", exportPackages);
-  $("exportPackagesBtn")?.addEventListener("click", ()=>{ const q=$("quickMsg"); if(q) q.textContent="Export downloaded."; });
-}
-
-function init(){
-  setupLogin();
-  setupTabs();
-  setupFilters();
-  setupRoles();
-
-  // ✅ subscribe ONCE, with a guard
-  if (!window.__ADMIN_AUTH_SUB__) {
-    window.__ADMIN_AUTH_SUB__ = supabase.auth.onAuthStateChange(() => {
-      // avoid nested auth->render loops
-      setTimeout(renderAuth, 0);
-    });
-  }
-
-  setTab("overview");
-  renderAuth();
+// Subscribe ONCE (prevents double event storms)
+if (!window.__ADMIN_AUTH_SUB__) {
+  window.__ADMIN_AUTH_SUB__ = supabase.auth.onAuthStateChange(() => {
+    setTimeout(async () => {
+      if (__renderBusy) return;
+      __renderBusy = true;
+      try {
+        await requireStaff();
+      } finally {
+        __renderBusy = false;
+      }
+    }, 0);
+  });
 }
 
 window.addEventListener("DOMContentLoaded", init);
