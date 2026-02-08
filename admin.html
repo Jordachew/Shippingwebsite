@@ -18,6 +18,7 @@
     </a>
     <div class="header__actions">
       <a class="btn btn--ghost" href="/">Main site</a>
+      <!-- FIX: single class attribute -->
       <button class="btn btn--primary hidden" id="logoutBtn" type="button">Logout</button>
     </div>
   </div>
@@ -31,7 +32,7 @@
       <div class="muted small" id="authMsg"></div>
     </div>
 
-    <!-- LOGIN -->
+    <!-- LOGIN CARD -->
     <div class="card card--pad" id="staffLoginCard">
       <h3>Staff Login</h3>
       <form class="form" id="staffLoginForm">
@@ -42,7 +43,7 @@
       </form>
     </div>
 
-    <!-- DASHBOARD WRAP -->
+    <!-- IMPORTANT: Everything staff-only must be INSIDE this wrapper -->
     <div id="adminWrap" class="hidden">
 
       <div class="grid2">
@@ -81,7 +82,6 @@
             </label>
 
             <label>Weight (lbs) <input id="weight" type="number" step="0.1" /></label>
-            <label>Declared Value USD <input id="value" type="number" step="0.01" /></label>
             <label>Shipping Cost JMD <input id="cost" type="number" step="1" /></label>
             <label>Notes <input id="notes" type="text" /></label>
 
@@ -93,13 +93,13 @@
 
       <div class="section__head" style="margin-top:18px;">
         <h2>Bulk Upload Packages</h2>
-        <p class="muted small">Paste CSV lines: tracking,status,pickup,weight_lbs,declared_value_usd,shipping_cost_jmd,notes</p>
+        <p class="muted small">Paste CSV lines: tracking,status,pickup,weight_lbs,cost_jmd</p>
       </div>
 
       <div class="card card--pad">
         <form class="form" id="bulkForm">
           <label>CSV Lines
-            <textarea id="bulkText" rows="6" placeholder="SSX-1001,RECEIVED,UWI_KINGSTON,2.5,120,1800,No notes"></textarea>
+            <textarea id="bulkText" rows="6" placeholder="SSX-1001,RECEIVED,UWI_KINGSTON,2.5,1800"></textarea>
           </label>
           <button class="btn btn--primary" type="submit">Upload List</button>
           <div class="muted small" id="bulkMsg"></div>
@@ -108,7 +108,7 @@
 
       <div class="section__head" style="margin-top:18px;">
         <h2>Customer Packages</h2>
-        <p class="muted">Click a row to update status + confirm pickup.</p>
+        <p class="muted">Click a row to update status + confirm pickup + trigger Ready email.</p>
       </div>
 
       <div class="card card--pad">
@@ -136,7 +136,7 @@
         <div class="chat" style="position:static; width:100%; margin-top:12px;">
           <div class="chat__body" id="chatBody" style="height:260px;"></div>
           <form class="chat__form" id="chatForm">
-            <input id="chatInput" type="text" placeholder="Reply as staff..." autocomplete="off" />
+            <input id="chatInput" type="text" placeholder="Reply as support..." autocomplete="off" />
             <button class="btn btn--primary" type="submit">Send</button>
           </form>
         </div>
@@ -154,7 +154,7 @@
           <div class="modal__head">
             <div>
               <div class="modal__title" id="mTitle">Update</div>
-              <div class="muted small">Update status, confirm pickup.</div>
+              <div class="muted small">Update status, confirm pickup, optionally send ready email.</div>
             </div>
             <button class="btn btn--ghost" data-close="1" type="button">Close</button>
           </div>
@@ -185,7 +185,19 @@
                 </select>
               </label>
 
+              <!-- FIX: these were referenced in JS but missing in HTML -->
+              <label>Weight (lbs) <input id="mWeight" type="number" step="0.1"/></label>
+              <label>Shipping Cost (JMD) <input id="mCost" type="number" step="1"/></label>
+
               <label>Notes <input id="mNotes" type="text"/></label>
+
+              <label>
+                Send “Ready for Pickup” Email Now?
+                <select id="mSendEmail">
+                  <option value="no">No</option>
+                  <option value="yes">Yes (requires RESEND_API_KEY)</option>
+                </select>
+              </label>
 
               <button class="btn btn--primary" type="submit">Save</button>
               <div class="muted small" id="updateMsg"></div>
@@ -198,7 +210,7 @@
   </div>
 </main>
 
-<!-- IMPORTANT: correct script tag (no extra </script>) -->
+<!-- FIX: remove extra </script> -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="admin.js"></script>
 </body>
