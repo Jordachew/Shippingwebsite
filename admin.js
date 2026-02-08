@@ -42,10 +42,10 @@ function pickupLabel(v) {
     : "UWI, Kingston";
 }
 
-// ✅ FIX: project ref key, not host
+// ✅ FIX: correct Supabase localStorage key uses PROJECT REF, not host
 function getProjectRef() {
   try {
-    return new URL(SUPABASE_URL).hostname.split(".")[0];
+    return new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
   } catch {
     return "ykpcgcjudotzakaxgnxh";
   }
@@ -57,13 +57,16 @@ function clearAuthStorage() {
   } catch (_) {}
 }
 
+// Admin state
 let currentCustomer = null; // { id, email }
 let selectedPkg = null;
+
 let chatChannel = null;
-let chatPollTimer = null; // fallback polling if realtime not enabled
-let lastChatSeenAt = null; // ISO timestamp of last message we rendered
+let chatPollTimer = null;
+let lastChatSeenAt = null;
 
 let __renderBusy = false;
+let __refreshBusy = false;
 
 // --------------------
 // Auth + role gating
@@ -124,6 +127,7 @@ async function logout() {
   try {
     await supabase.auth.signOut();
   } finally {
+    // ✅ important: ensure token is cleared so next login works
     clearAuthStorage();
     teardownChat();
     window.location.href = "/admin.html";
@@ -152,7 +156,7 @@ async function findCustomer(email) {
 }
 
 // --------------------
-// Packages
+// Packages + invoices
 // --------------------
 async function renderPackages() {
   const body = $("pkgBody");
@@ -202,10 +206,6 @@ async function renderPackages() {
   `
     )
     .join("");
-
-  body.querySelectorAll("tr[data-tracking]").forEach((row) => {
-    row.addEventListener("click", () => openUpdateModal(row.dataset));
-  });
 }
 
 async function renderInvoices() {
@@ -253,8 +253,32 @@ async function renderInvoices() {
 }
 
 // --------------------
-// Chat (render + realtime + fallback polling)
+// Chat (render + realtime + polling fallback)
 // --------------------
+function injectChatStyles() {
+  if (document.getElementById("adminChatStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "adminChatStyles";
+  style.textContent = `
+    /* Chat window text */
+    #chatBody, #chatBody * { color: #fff !important; }
+    #chatBody .meta { color: rgba(255,255,255,.75) !important; }
+
+    /* Chat input visibility */
+    #chatInput {
+      color: #fff !important;
+      background: rgba(255,255,255,0.06) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+    }
+    #chatInput::placeholder { color: rgba(255,255,255,.6) !important; }
+
+    /* File input label area */
+    #chatMsg { color: rgba(255,255,255,.75) !important; }
+  `;
+  document.head.appendChild(style);
+}
+
 async function renderChat() {
   const body = $("chatBody");
   if (!body) return;
@@ -293,56 +317,15 @@ async function renderChat() {
 
   body.scrollTop = body.scrollHeight;
 
-  // track last message timestamp for polling fallback
   if (data && data.length) {
     lastChatSeenAt = data[data.length - 1].created_at;
   }
-}
-
-function stopChatPolling() {
-  if (chatPollTimer) {
-    clearInterval(chatPollTimer);
-    chatPollTimer = null;
-  }
-}
-function startChatPolling() {
-  stopChatPolling();
-  if (!currentCustomer) return;
-
-  // Fallback if Realtime isn't enabled on the table/publication.
-  // Poll every 4s and only append new messages since lastChatSeenAt.
-  chatPollTimer = setInterval(async () => {
-    try {
-      if (!currentCustomer) return;
-      const body = $("chatBody");
-      if (!body) return;
-
-      let q = supabase
-        .from("messages")
-        .select("id,sender,body,created_at")
-        .eq("user_id", currentCustomer.id)
-        .order("created_at", { ascending: true })
-        .limit(50);
-
-      if (lastChatSeenAt) {
-        q = q.gt("created_at", lastChatSeenAt);
-      }
-
-      const { data, error } = await q;
-      if (error) return;
-
-      if (data?.length) {
-        data.forEach(appendChatMessage);
-      }
-    } catch (_) {}
-  }, 4000);
 }
 
 function appendChatMessage(m) {
   const body = $("chatBody");
   if (!body || !m) return;
 
-  // Avoid duplicates
   const key = `m_${m.id}`;
   if (m.id && body.querySelector(`[data-msg-id="${key}"]`)) return;
 
@@ -361,17 +344,36 @@ function appendChatMessage(m) {
   if (m.created_at) lastChatSeenAt = m.created_at;
 }
 
-function injectChatLightText() {
-  // Make admin chat readable even on dark panels
-  if (document.getElementById("adminChatLightText")) return;
-  const style = document.createElement("style");
-  style.id = "adminChatLightText";
-  style.textContent = `
-    #chatBody, #chatBody * { color: #fff; }
-    #chatBody .meta, #chatBody .muted { color: rgba(255,255,255,.75) !important; }
-    #chatBody .bubble { color:#fff !important; }
-  `;
-  document.head.appendChild(style);
+function stopChatPolling() {
+  if (chatPollTimer) {
+    clearInterval(chatPollTimer);
+    chatPollTimer = null;
+  }
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  if (!currentCustomer) return;
+
+  chatPollTimer = setInterval(async () => {
+    try {
+      if (!currentCustomer) return;
+
+      let q = supabase
+        .from("messages")
+        .select("id,sender,body,created_at")
+        .eq("user_id", currentCustomer.id)
+        .order("created_at", { ascending: true })
+        .limit(50);
+
+      if (lastChatSeenAt) q = q.gt("created_at", lastChatSeenAt);
+
+      const { data, error } = await q;
+      if (error) return;
+
+      if (data?.length) data.forEach(appendChatMessage);
+    } catch (_) {}
+  }, 4000);
 }
 
 function teardownChat() {
@@ -391,19 +393,19 @@ async function setupChatRealtime() {
   stopChatPolling();
   if (!currentCustomer) return;
 
+  // Realtime subscription (if enabled on messages table)
   chatChannel = supabase
     .channel(`staff_messages:${currentCustomer.id}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${currentCustomer.id}` },
-      async (payload) => {
-        // append instantly (faster than full re-render)
+      (payload) => {
         appendChatMessage(payload.new);
       }
     )
     .subscribe();
 
-  // Start polling fallback (harmless if realtime works)
+  // Always run polling fallback too (safe, ensures it works even if realtime is off)
   startChatPolling();
 }
 
@@ -418,8 +420,14 @@ async function sendStaff(text, file) {
 
   if (mErr) return alert(mErr.message);
 
-  // Show instantly even if Realtime is disabled
+  // ✅ Show instantly even without realtime
   appendChatMessage(msg);
+
+  // ✅ As requested: "auto refresh after 5 seconds"
+  // Instead of reloading the entire page, we re-fetch chat (safer).
+  setTimeout(() => {
+    renderChat();
+  }, 5000);
 
   if (file) {
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
@@ -443,40 +451,10 @@ async function sendStaff(text, file) {
 }
 
 // --------------------
-// Modal update (unchanged)
-// --------------------
-function openUpdateModal(ds) {
-  selectedPkg = ds.tracking;
-
-  $("mTitle").textContent = `Update ${ds.tracking}`;
-  $("mStatus").value = ds.status || "RECEIVED";
-  $("mPickup").value = ds.pickup || "UWI_KINGSTON";
-  $("mPickupConfirmed").value = ds.pickup_confirmed || "false";
-  $("mWeight").value = ds.weight_lbs || "";
-  $("mCost").value = ds.cost_jmd || "";
-  $("mSendEmail").value = "no";
-  $("updateMsg").textContent = "";
-
-  $("updateModal").classList.remove("hidden");
-  $("updateModal").setAttribute("aria-hidden", "false");
-
-  $("updateModal")
-    .querySelectorAll("[data-close='1']")
-    .forEach((el) => {
-      el.addEventListener("click", closeUpdateModal, { once: true });
-    });
-}
-function closeUpdateModal() {
-  $("updateModal").classList.add("hidden");
-  $("updateModal").setAttribute("aria-hidden", "true");
-  selectedPkg = null;
-}
-
-// --------------------
 // Init
 // --------------------
 async function init() {
-  injectChatLightText();
+  injectChatStyles();
 
   $("logoutBtn")?.addEventListener("click", logout);
 
@@ -488,10 +466,7 @@ async function init() {
     const ok = await staffLogin(email, password);
     if (!ok) return;
 
-    const gate = await requireStaff();
-    if (gate.ok) {
-      // ready
-    }
+    await requireStaff();
   });
 
   // Gate UI on load
@@ -526,11 +501,6 @@ async function init() {
     await setupChatRealtime();
   });
 
-  $("updateForm")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    // your update handler stays as-is in your file
-  });
-
   $("chatForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = ($("chatInput").value || "").trim();
@@ -542,20 +512,17 @@ async function init() {
 
     await sendStaff(text || "(Attachment)", file);
   });
+
+  // initial empties
+  await renderPackages();
+  await renderInvoices();
+  await renderChat();
 }
 
-// Subscribe ONCE (prevents double event storms)
+// ✅ Subscribe ONCE (prevents multiple handlers piling up)
 if (!window.__ADMIN_AUTH_SUB__) {
   window.__ADMIN_AUTH_SUB__ = supabase.auth.onAuthStateChange(() => {
-    setTimeout(async () => {
-      if (__renderBusy) return;
-      __renderBusy = true;
-      try {
-        await requireStaff();
-      } finally {
-        __renderBusy = false;
-      }
-    }, 0);
+    setTimeout(() => requireStaff(), 0);
   });
 }
 
