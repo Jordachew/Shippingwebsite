@@ -13,6 +13,8 @@ window.__SB__ =
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // NOTE: you can remove storage override if you want,
+      // but keeping it is fine on same-origin deployments.
       storage: window.localStorage,
     },
   });
@@ -65,6 +67,35 @@ function pickupLabel(v) {
 // Business hours note (Mon–Fri 10–5)
 const HOURS_TEXT =
   "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// ========================
+// CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
+// ========================
+function injectCustomerChatStyles() {
+  if (document.getElementById("customerChatStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "customerChatStyles";
+  style.textContent = `
+    /* Chat messages */
+    #chatBody { color:#fff !important; }
+    #chatBody * { color:#fff !important; }
+    #chatBody .meta { color: rgba(255,255,255,.75) !important; }
+
+    /* Chat input */
+    #chatInput {
+      color:#fff !important;
+      background: rgba(255,255,255,0.07) !important;
+      border: 1px solid rgba(255,255,255,0.16) !important;
+    }
+    #chatInput::placeholder { color: rgba(255,255,255,.6) !important; }
+
+    /* Optional: make bubbles readable if your theme is dark */
+    .bubble { background: rgba(255,255,255,0.06) !important; }
+    .bubble.me { background: rgba(255,255,255,0.10) !important; }
+  `;
+  document.head.appendChild(style);
+}
 
 // ========================
 // CALCULATOR
@@ -184,17 +215,13 @@ async function ensureProfile({ full_name, phone } = {}) {
   const user = userData?.user;
   if (!user) return { ok: false, error: new Error("Not logged in") };
 
-  // Read profile
   const readRes = await supabase
     .from("profiles")
     .select("id, email, full_name, phone, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (readRes.error) {
-    console.error("PROFILE READ ERROR:", readRes.error);
-    // Keep going; we can still try upsert in case read is blocked but insert is allowed
-  }
+  if (readRes.error) console.error("PROFILE READ ERROR:", readRes.error);
 
   if (readRes.data && !readRes.error) {
     const profile = readRes.data;
@@ -208,7 +235,6 @@ async function ensureProfile({ full_name, phone } = {}) {
     return { ok: true, profile };
   }
 
-  // Upsert profile if missing
   const upsertRes = await supabase.from("profiles").upsert({
     id: user.id,
     email: user.email,
@@ -249,7 +275,6 @@ function renderAuthDebounced() {
 
 function getProjectRef() {
   try {
-    // ykpcgcjudotzakaxgnxh from https://ykpcgcjudotzakaxgnxh.supabase.co
     return new URL(SUPABASE_URL).hostname.split(".")[0];
   } catch {
     return "unknown";
@@ -259,10 +284,15 @@ function getProjectRef() {
 function clearSupabaseAuthStorage() {
   try {
     const ref = getProjectRef();
-    // Supabase v2 browser key format:
     localStorage.removeItem(`sb-${ref}-auth-token`);
     localStorage.removeItem("pending_profile");
   } catch {}
+}
+
+// ✅ If login gets stuck, this resets local auth state without wiping your whole browser storage.
+async function hardResetAuthState() {
+  try { await supabase.auth.signOut(); } catch {}
+  clearSupabaseAuthStorage();
 }
 
 // ========================
@@ -279,24 +309,61 @@ function setupLoginRegister() {
     const msg = $("loginMsg");
     if (msg) msg.textContent = "Signing in...";
 
+    // Safety timeout so it never hangs forever
+    let timeoutHit = false;
+    const t = setTimeout(() => {
+      timeoutHit = true;
+      if (msg) msg.textContent = "Still signing in… (If this keeps happening, we’ll reset auth and try again.)";
+    }, 9000);
+
     try {
       const email = $("loginEmail")?.value?.trim()?.toLowerCase();
       const password = $("loginPassword")?.value;
 
+      // If a broken token is in storage, sign-in can behave weirdly.
+      // Reset stale storage first if we already have a junk session.
+      const sess0 = await supabase.auth.getSession();
+      logSB("PRE LOGIN SESSION", sess0);
+
+      // Attempt login
       const res = await supabase.auth.signInWithPassword({ email, password });
       logSB("LOGIN RES", res);
 
       if (res.error) {
-        if (msg) msg.textContent = `Login error: ${res.error.message}`;
+        // If auth storage is corrupted, retry once after clearing
+        const m = res.error.message || "";
+        if (m.toLowerCase().includes("refresh") || m.toLowerCase().includes("token") || timeoutHit) {
+          await hardResetAuthState();
+          const res2 = await supabase.auth.signInWithPassword({ email, password });
+          logSB("LOGIN RES (RETRY)", res2);
+          if (res2.error) {
+            if (msg) msg.textContent = `Login error: ${res2.error.message}`;
+            return;
+          }
+        } else {
+          if (msg) msg.textContent = `Login error: ${res.error.message}`;
+          return;
+        }
+      }
+
+      // ✅ Force UI update immediately (don’t rely only on onAuthStateChange)
+      const sess = await supabase.auth.getSession();
+      logSB("POST LOGIN SESSION", sess);
+
+      if (!sess?.data?.session) {
+        if (msg) msg.textContent = "Logged in but no session returned. Check Supabase Auth settings (email confirmation?).";
+        // Still try to rerender UI
+        renderAuthDebounced();
         return;
       }
 
-      // DO NOT call renderAuth() directly here (prevents recursion).
       if (msg) msg.textContent = "";
-      // Auth change listener will refresh UI
+      renderAuthDebounced();
     } catch (err) {
       console.error(err);
       if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    } finally {
+      clearTimeout(t);
     }
   });
 
@@ -313,7 +380,6 @@ function setupLoginRegister() {
       const email = $("regEmail")?.value?.trim()?.toLowerCase();
       const password = $("regPassword")?.value;
 
-      // Save in case confirm-email is ON
       stashPendingProfile(full_name, phone, email);
 
       const res = await supabase.auth.signUp({
@@ -329,7 +395,6 @@ function setupLoginRegister() {
         return;
       }
 
-      // If confirm-email is OFF, a session may exist. We’ll let onAuthStateChange handle UI.
       if (msg) msg.textContent = "Account created. If email confirmation is ON, confirm email then sign in.";
       regForm.reset();
     } catch (err) {
@@ -484,7 +549,6 @@ function setupInvoiceUpload() {
 
     const file = fileInput.files[0];
 
-    // Allowed: PDF, JPEG/JPG, DOCX, XLS/XLSX
     const allowed =
       /(\.pdf|\.jpe?g|\.docx|\.xlsx|\.xls)$/i.test(file.name) ||
       [
@@ -584,6 +648,16 @@ async function renderChat() {
   body.scrollTop = body.scrollHeight;
 }
 
+let __chatQueued = false;
+function renderChatDebounced() {
+  if (__chatQueued) return;
+  __chatQueued = true;
+  setTimeout(async () => {
+    __chatQueued = false;
+    await renderChat();
+  }, 0);
+}
+
 async function setupChatRealtime() {
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user;
@@ -602,16 +676,6 @@ async function setupChatRealtime() {
       () => renderChatDebounced()
     )
     .subscribe();
-}
-
-let __chatQueued = false;
-function renderChatDebounced() {
-  if (__chatQueued) return;
-  __chatQueued = true;
-  setTimeout(async () => {
-    __chatQueued = false;
-    await renderChat();
-  }, 0);
 }
 
 async function sendChatMessage(text, file) {
@@ -653,6 +717,7 @@ async function sendChatMessage(text, file) {
 }
 
 function openChat() {
+  injectCustomerChatStyles(); // ✅ ensure styles apply even if widget loads later
   $("chatWidget")?.classList.remove("hidden");
   $("chatWidget")?.setAttribute("aria-hidden", "false");
   if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
@@ -691,6 +756,7 @@ function setupChatUI() {
 
     await sendChatMessage(text || "(Attachment)", file);
     if (msgEl) msgEl.textContent = "";
+    renderChatDebounced(); // ✅ immediate refresh
   });
 }
 
@@ -723,7 +789,6 @@ async function renderAuth() {
       return;
     }
 
-    // Ensure profile exists
     const pending = readPendingProfile();
     const ensured = pending
       ? await ensureProfile({ full_name: pending.full_name, phone: pending.phone })
@@ -731,14 +796,6 @@ async function renderAuth() {
 
     if (ensured?.ok && pending) clearPendingProfile();
 
-    if (!ensured?.ok) {
-      const msg = ensured?.error?.message || "Unknown profile error";
-      console.error("PROFILE ENSURE ERROR:", ensured?.error);
-      // Optional: surface to UI
-      if ($("loginMsg")) $("loginMsg").textContent = `Profile error: ${msg}`;
-    }
-
-    // Read profile for role/name display
     const profRes = await supabase
       .from("profiles")
       .select("full_name,role")
@@ -751,7 +808,6 @@ async function renderAuth() {
     const displayName = profile?.full_name || user.email || "Customer";
     if ($("userName")) $("userName").textContent = displayName;
 
-    // show admin link for staff OR admin
     const role = profile?.role || "customer";
     const isStaff = role === "staff" || role === "admin";
     if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
@@ -763,10 +819,9 @@ async function renderAuth() {
   }
 }
 
-// Subscribe ONCE (prevents double-listeners when script loads twice)
+// Subscribe ONCE
 if (!window.__AUTH_SUB__) {
   window.__AUTH_SUB__ = supabase.auth.onAuthStateChange((event, session) => {
-    // Avoid sync recursion; schedule
     console.log("AUTH EVENT:", event, !!session);
     renderAuthDebounced();
   });
@@ -775,9 +830,8 @@ if (!window.__AUTH_SUB__) {
 // ========================
 // INIT
 // ========================
-function setupInvoiceUploadUIBindings() {} // placeholder (kept for readability)
-
 function init() {
+  injectCustomerChatStyles(); // ✅ apply customer chat fix immediately
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
