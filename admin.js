@@ -51,7 +51,18 @@ function downloadText(filename, text) {
   a.remove();
 }
 
-function injectAdminChatContrastFix(){ /* styles handled in styles.css */ }
+function injectAdminChatContrastFix() {
+  // Makes chat text + input readable even if theme is dark.
+  const css = `
+    #adminChatBody { color: #fff !important; }
+    #adminChatInput { color: #fff !important; background: rgba(0,0,0,0.35) !important; border: 1px solid rgba(255,255,255,0.15) !important; }
+    #adminChatInput::placeholder { color: rgba(255,255,255,0.6) !important; }
+  `;
+  const style = document.createElement("style");
+  style.setAttribute("data-admin-fix", "chat-contrast");
+  style.textContent = css;
+  document.head.appendChild(style);
+}
 
 // ========================
 // GLOBAL STATE
@@ -94,9 +105,7 @@ function validateDom() {
 async function readProfileById(userId) {
   return await supabase
     .from("profiles")
-    // Keep minimal so the query doesn't fail if optional columns
-    // (phone/address) are not present yet.
-    .select("id,email,full_name,role,is_active")
+    .select("id,email,full_name,role,is_active,phone,address")
     .eq("id", userId)
     .maybeSingle();
 }
@@ -750,42 +759,8 @@ function teardownRealtime() {
 }
 
 function ensureMessageLiveUpdates() {
-  // Always keep a fallback poll running (5 sec)
-  if (!pollTimer) {
-    pollTimer = setInterval(async () => {
-      if (!currentUser) return;
-      if ($("adminApp")?.classList.contains("hidden")) return;
-
-      // If viewing messages tab and a convo is selected, refresh chat and convo list.
-      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
-      if (!messagesPanelVisible) return;
-
-      await loadConversations();
-      if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
-    }, 5000);
-  }
-
-  // Realtime subscription for inserts (best case)
-  // If Realtime isn't enabled for table "messages", this won't fire, but poll will still work.
-  if (msgChannel) {
-    supabase.removeChannel(msgChannel);
-    msgChannel = null;
-  }
-
-  msgChannel = supabase
-    .channel("admin-messages-live")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, async (payload) => {
-      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
-      if (!messagesPanelVisible) return;
-
-      await loadConversations();
-
-      const m = payload?.new;
-      if (selectedConvoUserId && m?.user_id === selectedConvoUserId) {
-        await renderChatFor(selectedConvoUserId);
-      }
-    })
-    .subscribe();
+  // Realtime-only: polling caused constant refresh and hid replies.
+  // If you want polling later, reintroduce it carefully per selected conversation.
 }
 
 // ========================

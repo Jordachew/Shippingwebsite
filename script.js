@@ -69,49 +69,6 @@ const HOURS_TEXT =
   "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
 
 // ========================
-// SHIPPING ADDRESS (U.S. WAREHOUSE)
-// ========================
-const WAREHOUSE_ADDRESS_LINES = [
-  "SNS-JM",
-  "8465 W 44th Ave",
-  "STE119, SNS-JM2 43935 KIN",
-  "Hialeah, FL 33018"
-];
-
-function buildShipToText(customerName){
-  const nameLine = (customerName || "Customer").trim();
-  return [
-    nameLine,
-    ...WAREHOUSE_ADDRESS_LINES
-  ].join("\n");
-}
-
-function renderShipTo(customerName){
-  const el = $("shipToBlock");
-  if(!el) return;
-  const txt = buildShipToText(customerName);
-  // Show as formatted block
-  el.textContent = txt;
-}
-
-function setupShipToCopy(){
-  const btn = $("shipToCopy");
-  const msg = $("shipToMsg");
-  if(!btn) return;
-  btn.addEventListener("click", async () => {
-    try{
-      const customerName = ($("userName")?.textContent || "Customer").trim();
-      const txt = buildShipToText(customerName);
-      await navigator.clipboard.writeText(txt);
-      if(msg) msg.textContent = "Copied.";
-      setTimeout(()=>{ if(msg) msg.textContent=""; }, 2000);
-    }catch(e){
-      if(msg) msg.textContent = "Copy failed. Select and copy manually.";
-    }
-  });
-}
-
-// ========================
 // CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
 // ========================
 function injectCustomerChatStyles() {
@@ -258,19 +215,34 @@ async function ensureProfile({ full_name, phone } = {}) {
   const user = userData?.user;
   if (!user) return { ok: false, error: new Error("Not logged in") };
 
-  const readRes = await supabase
+  // Many of your earlier errors were caused by profiles columns not existing (e.g. phone).
+  // So we always try a "minimal" profile read first, then we opportunistically write extras.
+  const minimalSelect = "id,email,full_name,role,is_active";
+
+  const read1 = await supabase
     .from("profiles")
-    .select("id, email, full_name, phone, role")
+    .select(minimalSelect)
     .eq("id", user.id)
     .maybeSingle();
 
-  if (readRes.error) console.error("PROFILE READ ERROR:", readRes.error);
+  if (read1.error) console.error("PROFILE READ ERROR:", read1.error);
 
-  if (readRes.data && !readRes.error) {
-    const profile = readRes.data;
+  // If it exists, update missing minimal fields
+  if (read1.data && !read1.error) {
+    const profile = read1.data;
     const patch = {};
     if (full_name && !profile.full_name) patch.full_name = full_name;
-    if (phone && !profile.phone) patch.phone = phone;
+
+    // Try phone update only if the column exists (we detect by trying an update and retrying w/out)
+    if (phone) {
+      const upPhone = await supabase.from("profiles").update({ phone }).eq("id", user.id);
+      if (upPhone?.error && upPhone.error.code === "42703") {
+        // column doesn't exist; ignore
+      } else if (upPhone?.error) {
+        console.error("PROFILE PHONE UPDATE ERROR:", upPhone.error);
+      }
+    }
+
     if (Object.keys(patch).length) {
       const up = await supabase.from("profiles").update(patch).eq("id", user.id);
       if (up.error) console.error("PROFILE UPDATE ERROR:", up.error);
@@ -278,21 +250,30 @@ async function ensureProfile({ full_name, phone } = {}) {
     return { ok: true, profile };
   }
 
-  const upsertRes = await supabase.from("profiles").upsert({
+  // If not found, attempt upsert with minimal columns, then try phone separately.
+  const upsertMinimal = await supabase.from("profiles").upsert({
     id: user.id,
     email: user.email,
     full_name: full_name || "",
-    phone: phone || "",
   });
 
-  if (upsertRes.error) {
-    console.error("PROFILE UPSERT ERROR:", upsertRes.error);
-    return { ok: false, error: upsertRes.error };
+  if (upsertMinimal.error) {
+    console.error("PROFILE UPSERT ERROR:", upsertMinimal.error);
+    return { ok: false, error: upsertMinimal.error };
+  }
+
+  if (phone) {
+    const upPhone2 = await supabase.from("profiles").update({ phone }).eq("id", user.id);
+    if (upPhone2?.error && upPhone2.error.code === "42703") {
+      // ignore missing column
+    } else if (upPhone2?.error) {
+      console.error("PROFILE PHONE UPDATE ERROR:", upPhone2.error);
+    }
   }
 
   const read2 = await supabase
     .from("profiles")
-    .select("id, email, full_name, phone, role")
+    .select(minimalSelect)
     .eq("id", user.id)
     .maybeSingle();
 
@@ -300,6 +281,23 @@ async function ensureProfile({ full_name, phone } = {}) {
 
   return { ok: true, profile: read2.data || null };
 }
+
+function sanitizeAuthStorage() {
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split(".")[0];
+    const key = `sb-${ref}-auth-token`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    // If we have a token but Supabase can't produce a session, clear it.
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error || !data?.session) {
+        console.warn("Auth token exists but session is invalid. Clearing stored token.");
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (_) {}
+}
+
 
 // ========================
 // AUTH: STOP RECURSION / MULTI-LISTENERS
@@ -367,6 +365,9 @@ function setupLoginRegister() {
       // Reset stale storage first if we already have a junk session.
       const sess0 = await supabase.auth.getSession();
       logSB("PRE LOGIN SESSION", sess0);
+
+      // Clear any stale session first (prevents one-login-only issues)
+      try { await supabase.auth.signOut(); } catch (_) {}
 
       // Attempt login
       const res = await supabase.auth.signInWithPassword({ email, password });
@@ -851,8 +852,6 @@ async function renderAuth() {
     const displayName = profile?.full_name || user.email || "Customer";
     if ($("userName")) $("userName").textContent = displayName;
 
-    renderShipTo(displayName);
-
     const role = profile?.role || "customer";
     const isStaff = role === "staff" || role === "admin";
     if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
@@ -876,8 +875,8 @@ if (!window.__AUTH_SUB__) {
 // INIT
 // ========================
 function init() {
-  injectCustomerChatStyles(); 
-  setupShipToCopy();// ✅ apply customer chat fix immediately
+  sanitizeAuthStorage();
+  injectCustomerChatStyles(); // ✅ apply customer chat fix immediately
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
