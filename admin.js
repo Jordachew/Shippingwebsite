@@ -1257,7 +1257,7 @@ function setupEvents() {
 // ========================
 // INIT
 // ========================
-async async function init() {
+async function init() {
   validateDom();
   injectAdminChatContrastFix();
   tabAPI = setupTabs();
