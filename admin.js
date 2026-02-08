@@ -94,7 +94,9 @@ function validateDom() {
 async function readProfileById(userId) {
   return await supabase
     .from("profiles")
-    .select("id,email,full_name,role,is_active,phone,address")
+    // Keep minimal so the query doesn't fail if optional columns
+    // (phone/address) are not present yet.
+    .select("id,email,full_name,role,is_active")
     .eq("id", userId)
     .maybeSingle();
 }
