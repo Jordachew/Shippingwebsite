@@ -1,72 +1,45 @@
-console.log("✅ ADMIN.JS LOADED v2026-02-08-DIAG");
-
-
 /* =========================================================
-   Sueños Shipping — Staff/Admin Dashboard (admin.html v2)
-   Works with IDs in admin.html:
-   adminLoginCard, adminLoginForm, adminApp, customersBody,
-   packagesBody, convoList, adminChatBody, adminChatForm, etc.
+   Sueños Shipping — Admin Dashboard (admin.js)
+   - Robust auth (fix "login once"/stuck sign-in)
+   - Safe session-first user checks (no AuthSessionMissingError crash)
+   - Staff/admin role gating
+   - Packages, customers, messages
+   - Sender constraint fallbacks: staff -> admin -> support
+   - Optional Bulk CSV upload if DOM exists
 ========================================================= */
 
 // ========================
-// CONFIG (PASTE YOUR VALUES)
+// CONFIG
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// Storage buckets (must exist in Supabase Storage)
+// Storage buckets (optional; code handles if missing)
 const INVOICE_BUCKET = "invoices";
-const CHAT_BUCKET = "chat_files"; // optional (if you later add attachments)
+const PKG_PHOTO_BUCKET = "package_photos";
 
-// Safe singleton (prevents double-load issues)
-window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ========================
+// SUPABASE CLIENT (singleton)
+// ========================
+if (!window.supabase || !window.supabase.createClient) {
+  console.error("Supabase UMD library missing. Ensure supabase.min.js loads before admin.js");
+}
+
+window.__SB__ =
+  window.__SB__ ||
+  window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
+
 const supabase = window.__SB__;
 
-
-
 // ========================
-// AUTH HELPERS (ADMIN) — prevents "Auth session missing" + one-login issues
+// DOM HELPERS
 // ========================
-function getProjectRef() {
-  try { return new URL(SUPABASE_URL).hostname.split(".")[0]; } catch { return ""; }
+function $(id) {
+  return document.getElementById(id);
 }
-function clearSupabaseAuthStorage() {
-  try {
-    const ref = getProjectRef();
-    if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
-  } catch (_) {}
-}
-async function safeGetSession() {
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return { session: null, error };
-    return { session: data?.session || null, error: null };
-  } catch (e) {
-    return { session: null, error: e };
-  }
-}
-async function safeGetUser() {
-  const { session, error: sErr } = await safeGetSession();
-  if (sErr) return { user: null, session: null, error: sErr };
-  if (!session) return { user: null, session: null, error: null };
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return { user: session.user || null, session, error };
-    return { user: data?.user || session.user || null, session, error: null };
-  } catch (e) {
-    return { user: session.user || null, session, error: e };
-  }
-}
-async function hardResetAuth(reason="") {
-  console.warn("Admin hardResetAuth:", reason);
-  try { await supabase.auth.signOut(); } catch (_) {}
-  clearSupabaseAuthStorage();
-}
-// ========================
-// HELPERS
-// ========================
-function $(id) { return document.getElementById(id); }
 
 function escapeHTML(s) {
   return String(s ?? "")
@@ -77,397 +50,464 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
-function fmtDate(iso) {
-  try { return new Date(iso).toLocaleString(); } catch { return String(iso || ""); }
+function getProjectRef() {
+  try {
+    return new URL(SUPABASE_URL).hostname.split(".")[0];
+  } catch {
+    return "";
+  }
 }
 
-function downloadText(filename, text) {
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-function injectAdminChatContrastFix(){ /* styles handled in styles.css */ }
-
-// ========================
-// GLOBAL STATE
-// ========================
-let currentUser = null;
-let currentProfile = null; // staff/admin profile row
-let authSub = null;
-
-let msgChannel = null;      // realtime channel for messages
-let pollTimer = null;       // fallback poll for messages
-let selectedConvoUserId = null;
-
-let selectedPackage = null; // currently selected package object
-
-// ========================
-// DOM VALIDATION (for your debugging)
-// ========================
-function validateDom() {
-  const required = [
-    "adminLoginCard", "adminLoginForm", "adminApp",
-    "adminEmail", "adminPassword", "adminLoginMsg",
-    "logoutBtn", "whoami",
-    "statsRow", "recentPackages", "recentMessages",
-    "customersBody", "custSearch", "refreshCustomers", "customerDetail",
-    "packagesBody", "pkgSearch", "statusFilter", "refreshPackages", "pkgMsg",
-    "pkgEditForm", "pkgEditId", "pkgEditTracking", "pkgEditStatus", "pkgEditStore", "pkgEditApproved", "pkgEditNotes", "pkgEditMsg",
-    "convoList", "adminChatBody", "adminChatForm", "adminChatInput", "adminChatMsg", "convoTitle", "markResolvedBtn",
-    "msgSearch", "msgFilter", "refreshMessages",
-    "reportRange", "runReports", "exportReports", "shipmentsChart", "storesChart",
-    "roleForm", "roleEmail", "roleValue", "roleMsg",
-    "goPackagesBtn", "goMessagesBtn", "exportPackagesBtn", "quickMsg"
-  ];
-  const missing = required.filter(id => !$(id));
-  if (missing.length) console.warn("⚠️ Missing DOM elements:", missing);
+function clearSupabaseAuthToken() {
+  // Clears the stored session that causes “login works once then stuck”
+  try {
+    const ref = getProjectRef();
+    if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
+  } catch (_) {}
 }
 
 // ========================
-// AUTH + ROLE GATE
+// SAFE AUTH HELPERS
 // ========================
-async function readProfileById(userId) {
-  return await supabase
+async function safeGetSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { session: null, error };
+    return { session: data?.session || null, error: null };
+  } catch (e) {
+    return { session: null, error: e };
+  }
+}
+
+async function safeGetUser() {
+  // IMPORTANT: session-first to avoid AuthSessionMissingError
+  const { session, error: sErr } = await safeGetSession();
+  if (sErr) return { user: null, session: null, error: sErr };
+  if (!session) return { user: null, session: null, error: null };
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { user: session.user || null, session, error };
+    return { user: data?.user || session.user || null, session, error: null };
+  } catch (e) {
+    return { user: session.user || null, session, error: e };
+  }
+}
+
+async function hardResetAuth(reason = "") {
+  console.warn("Hard reset auth:", reason);
+  try {
+    await supabase.auth.signOut();
+  } catch (_) {}
+  clearSupabaseAuthToken();
+}
+
+// If token exists but session is missing, clear it once to prevent “stuck sign-in”
+async function sanitizeStaleTokenOnce() {
+  const onceKey = "admin_sanitize_once";
+  if (sessionStorage.getItem(onceKey) === "1") return;
+
+  const ref = getProjectRef();
+  const tokenKey = ref ? `sb-${ref}-auth-token` : null;
+  const tokenExists = tokenKey ? !!localStorage.getItem(tokenKey) : false;
+
+  const { session, error } = await safeGetSession();
+  if (error) return;
+
+  if (tokenExists && !session) {
+    sessionStorage.setItem(onceKey, "1");
+    clearSupabaseAuthToken();
+    location.reload();
+  }
+}
+
+// Timeout wrapper so UI doesn’t hang forever
+async function withTimeout(promise, ms = 12000) {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error("Request timed out (blocked or not returning).")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// ========================
+// ROLE GATE
+// ========================
+async function getMyProfile() {
+  const { user } = await safeGetUser();
+  if (!user) return { profile: null, error: null };
+
+  // Minimal columns only (avoid “column not found” crashes)
+  const { data, error } = await supabase
     .from("profiles")
-    // Keep minimal so the query doesn't fail if optional columns
-    // (phone/address) are not present yet.
     .select("id,email,full_name,role,is_active")
-    .eq("id", userId)
+    .eq("id", user.id)
     .maybeSingle();
+
+  return { profile: data || null, error };
 }
 
 function isStaffRole(role) {
   return role === "staff" || role === "admin";
 }
 
-async function requireStaffSession() {
-  // Session-first avoids AuthSessionMissingError poisoning the UI
-  const { user, error: uErr } = await safeGetUser();
-  if (uErr) return { ok: false, error: uErr };
-  if (!user) return { ok: false, error: new Error("Not logged in") };
-
-  const profRes = await readProfileById(user.id);
-  if (profRes.error) return { ok: false, error: profRes.error };
-  const prof = profRes.data;
-
-  if (!prof) return { ok: false, error: new Error("No profile row for this user (profiles table).") };
-  if (prof.is_active === false) return { ok: false, error: new Error("Account is deactivated.") };
-  if (!isStaffRole(prof.role)) return { ok: false, error: new Error("Not staff. Set role=staff or admin in profiles.") };
-
-  currentUser = user;
-  currentProfile = prof;
-  return { ok: true, user, profile: prof };
-}
-
-
-async function renderAuthState() {
-  const loginCard = $("adminLoginCard");
-  const app = $("adminApp");
-  const logoutBtn = $("logoutBtn");
-  const whoami = $("whoami");
-
-  // reset UI
-  if (whoami) whoami.textContent = "";
-  if (logoutBtn) logoutBtn.classList.add("hidden");
-
-  const gate = await requireStaffSession();
-  if (!gate.ok) {
-    // show login UI
-    currentUser = null;
-    currentProfile = null;
-    if (loginCard) loginCard.classList.remove("hidden");
-    if (app) app.classList.add("hidden");
-    teardownRealtime();
-    return;
-  }
-
-  // show app
-  if (loginCard) loginCard.classList.add("hidden");
-  if (app) app.classList.remove("hidden");
-  if (logoutBtn) logoutBtn.classList.remove("hidden");
-  if (whoami) whoami.textContent = `${gate.profile.full_name || gate.user.email} • ${gate.profile.role}`;
-
-  // Load initial data
-  await refreshAll();
-}
+// ========================
+// APP STATE
+// ========================
+let currentAdmin = null; // { id, email, role, full_name }
+let currentCustomer = null; // { id, email, full_name }
+let msgChannel = null;
 
 // ========================
 // TABS
 // ========================
 function setupTabs() {
-  const tabs = Array.from(document.querySelectorAll(".tab[data-tab]"));
-  const panels = (name) => $(`tab-${name}`);
+  const buttons = Array.from(document.querySelectorAll(".tab[data-tab]"));
+  if (!buttons.length) return;
 
-  function setTab(name) {
-    tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === name));
-    ["overview", "customers", "packages", "messages", "reports", "roles"].forEach(n => {
-      const p = panels(n);
-      if (!p) return;
-      p.classList.toggle("hidden", n !== name);
+  function showTab(tabName) {
+    buttons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
+
+    const panels = ["overview", "customers", "packages", "messages", "reports", "roles"];
+    panels.forEach((p) => {
+      const el = $(`tab-${p}`);
+      if (el) el.classList.toggle("hidden", p !== tabName);
     });
-    if (name === "messages") {
-      // ensure messages list keeps updating
-      loadConversations();
-      ensureMessageLiveUpdates();
-    }
+
+    // Lazy refresh on tab switch
+    if (tabName === "overview") renderOverview();
+    if (tabName === "customers") renderCustomers();
+    if (tabName === "packages") renderPackages();
+    if (tabName === "messages") renderConversations();
   }
 
-  tabs.forEach(btn => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
+  buttons.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
-  $("goPackagesBtn")?.addEventListener("click", () => setTab("packages"));
-  $("goMessagesBtn")?.addEventListener("click", () => setTab("messages"));
-
-  return { setTab };
+  // Default
+  showTab("overview");
 }
 
-let tabAPI = null;
+// ========================
+// LOGIN / LOGOUT
+// ========================
+function setupAuthUI() {
+  $("logoutBtn")?.addEventListener("click", async () => {
+    await hardResetAuth("logout");
+    location.reload();
+  });
+
+  $("adminLoginForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("adminLoginMsg");
+    if (msg) msg.textContent = "Signing in...";
+
+    const email = ($("adminEmail")?.value || "").trim().toLowerCase();
+    const password = $("adminPassword")?.value || "";
+
+    try {
+      // If we already have a session, just render app
+      const { session } = await safeGetSession();
+      if (session?.user) {
+        if (msg) msg.textContent = "";
+        await renderApp();
+        return;
+      }
+
+      // Sign in (timeout so we don’t hang indefinitely)
+      let res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
+
+      if (res?.error) {
+        console.warn("Admin login error (first try):", res.error);
+        // Clear possible poisoned token and retry once
+        await hardResetAuth("login retry after error");
+        res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
+      }
+
+      if (res?.error) {
+        if (msg) msg.textContent = res.error.message;
+        return;
+      }
+
+      // Verify session exists
+      const check = await safeGetSession();
+      if (!check.session) {
+        if (msg) msg.textContent = "Signed in, but no session found (domain/caching issue). Try clearing site data.";
+        return;
+      }
+
+      if (msg) msg.textContent = "";
+      await renderApp();
+    } catch (err) {
+      console.error(err);
+      if (msg) msg.textContent = err?.message || String(err);
+    }
+  });
+}
 
 // ========================
-// STATS + OVERVIEW
+// APP RENDER (auth gate)
 // ========================
-async function refreshStatsOnly() {
-  const row = $("statsRow");
-  if (!row) return;
+async function renderApp() {
+  const loginCard = $("adminLoginCard");
+  const app = $("adminApp");
+  const logoutBtn = $("logoutBtn");
+  const who = $("whoami");
 
-  const { data: pkgs, error } = await supabase
-    .from("packages")
-    .select("status")
-    .limit(5000);
+  const { user, error } = await safeGetUser();
+  if (error) console.warn("Admin safeGetUser error:", error);
 
-  if (error) {
-    row.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+  const authed = !!user;
+
+  if (loginCard) loginCard.classList.toggle("hidden", authed);
+  if (app) app.classList.toggle("hidden", !authed);
+  if (logoutBtn) logoutBtn.classList.toggle("hidden", !authed);
+
+  if (!authed) {
+    currentAdmin = null;
+    if (who) who.textContent = "";
+    teardownMessageRealtime();
     return;
   }
 
-  const counts = {};
-  for (const p of (pkgs || [])) {
-    const k = p.status || "UNKNOWN";
-    counts[k] = (counts[k] || 0) + 1;
+  // Profile/role gate
+  const { profile, error: pErr } = await getMyProfile();
+  if (pErr) console.warn("Profile read error:", pErr);
+
+  const role = profile?.role || "customer";
+  const active = profile?.is_active !== false;
+
+  if (!active) {
+    await hardResetAuth("inactive staff");
+    if (who) who.textContent = "";
+    if ($("adminLoginMsg")) $("adminLoginMsg").textContent = "Account deactivated.";
+    return;
   }
-  const total = (pkgs || []).length;
 
-  const cards = [
-    ["Total packages", total],
-    ["In Transit", counts.IN_TRANSIT || 0],
-    ["Ready for Pickup", counts.READY_FOR_PICKUP || 0],
-    ["Picked Up", counts.PICKED_UP || 0],
-    ["On Hold", counts.ON_HOLD || 0],
-  ];
+  if (!isStaffRole(role)) {
+    await hardResetAuth("not staff");
+    if (who) who.textContent = "";
+    if ($("adminLoginMsg")) $("adminLoginMsg").textContent =
+      "Not authorized (role must be staff/admin). Ask admin to update your profile role.";
+    return;
+  }
 
-  row.innerHTML = cards.map(([label, value]) => `
-    <div class="stat">
-      <div class="stat__k">${escapeHTML(label)}</div>
-      <div class="stat__v">${escapeHTML(String(value))}</div>
-    </div>
-  `).join("");
+  currentAdmin = {
+    id: profile?.id || user.id,
+    email: profile?.email || user.email,
+    full_name: profile?.full_name || user.email,
+    role,
+  };
+
+  if (who) who.textContent = `${currentAdmin.full_name} • ${currentAdmin.role}`;
+
+  setupTabs();
+  setupOverviewButtons();
+
+  // Initial loads
+  await renderOverview();
 }
 
-async function loadOverviewLists() {
-  const rp = $("recentPackages");
-  const rm = $("recentMessages");
-  if (rp) rp.innerHTML = `<li class="muted">Loading…</li>`;
-  if (rm) rm.innerHTML = `<li class="muted">Loading…</li>`;
+// Keep UI responsive on auth changes
+let __authSub = null;
+function setupAuthSubOnce() {
+  if (__authSub) return;
+  __authSub = supabase.auth.onAuthStateChange(() => renderApp());
+}
 
-  const pkgRes = await supabase
-    .from("packages")
-    .select("tracking,status,updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(8);
+// ========================
+// OVERVIEW
+// ========================
+function setupOverviewButtons() {
+  $("goPackagesBtn")?.addEventListener("click", () => {
+    document.querySelector('.tab[data-tab="packages"]')?.click();
+  });
+  $("goMessagesBtn")?.addEventListener("click", () => {
+    document.querySelector('.tab[data-tab="messages"]')?.click();
+  });
+  $("exportPackagesBtn")?.addEventListener("click", exportPackagesCSV);
+}
 
-  if (rp) {
-    if (pkgRes.error) rp.innerHTML = `<li class="muted">${escapeHTML(pkgRes.error.message)}</li>`;
-    else rp.innerHTML = (pkgRes.data || []).map(p => `
-      <li>
-        <strong>${escapeHTML(p.tracking)}</strong>
-        <span class="tag">${escapeHTML(p.status || "")}</span>
-        <div class="muted small">${escapeHTML(fmtDate(p.updated_at))}</div>
-      </li>
-    `).join("") || `<li class="muted">No recent packages.</li>`;
+async function renderOverview() {
+  // Stats: packages by status + customers + messages
+  const statsRow = $("statsRow");
+  if (!statsRow) return;
+
+  // Pull last N packages/messages for “Recent”
+  const [pkgRes, msgRes, custRes] = await Promise.all([
+    supabase
+      .from("packages")
+      .select("id,tracking,status,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("messages")
+      .select("id,user_id,sender,body,created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("profiles")
+      .select("id")
+      .limit(1),
+  ]);
+
+  // Build quick status counts (lightweight)
+  const statusCounts = {};
+  if (pkgRes.data) {
+    for (const p of pkgRes.data) {
+      statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+    }
   }
 
-  const msgRes = await supabase
-    .from("messages")
-    .select("sender,body,created_at,resolved")
-    .order("created_at", { ascending: false })
-    .limit(8);
+  const stats = [
+    { label: "Recent packages", value: pkgRes.data?.length || 0 },
+    { label: "Recent messages", value: msgRes.data?.length || 0 },
+    { label: "Statuses shown", value: Object.keys(statusCounts).length },
+  ];
 
-  if (rm) {
-    if (msgRes.error) rm.innerHTML = `<li class="muted">${escapeHTML(msgRes.error.message)}</li>`;
-    else rm.innerHTML = (msgRes.data || []).map(m => `
-      <li>
-        <span class="tag">${escapeHTML(m.sender || "")}</span>
-        ${escapeHTML((m.body || "").slice(0, 90))}
-        <div class="muted small">${escapeHTML(fmtDate(m.created_at))}${m.resolved ? " • resolved" : ""}</div>
-      </li>
-    `).join("") || `<li class="muted">No recent messages.</li>`;
+  statsRow.innerHTML = stats
+    .map(
+      (s) => `
+      <div class="stat">
+        <div class="stat__value">${escapeHTML(s.value)}</div>
+        <div class="stat__label">${escapeHTML(s.label)}</div>
+      </div>
+    `
+    )
+    .join("");
+
+  const recentPackages = $("recentPackages");
+  if (recentPackages) {
+    recentPackages.innerHTML =
+      (pkgRes.data || [])
+        .map(
+          (p) => `
+        <div class="rowline">
+          <strong>${escapeHTML(p.tracking)}</strong>
+          <span class="tag">${escapeHTML(p.status)}</span>
+          <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
+        </div>
+      `
+        )
+        .join("") || `<div class="muted">No recent packages.</div>`;
+  }
+
+  const recentMessages = $("recentMessages");
+  if (recentMessages) {
+    recentMessages.innerHTML =
+      (msgRes.data || [])
+        .map(
+          (m) => `
+        <div class="rowline">
+          <span class="tag">${escapeHTML(m.sender)}</span>
+          <span>${escapeHTML((m.body || "").slice(0, 80))}</span>
+          <span class="muted small">${new Date(m.created_at).toLocaleString()}</span>
+        </div>
+      `
+        )
+        .join("") || `<div class="muted">No recent messages.</div>`;
   }
 }
 
 // ========================
 // CUSTOMERS
 // ========================
-let selectedCustomerId = null;
+function setupCustomersUI() {
+  $("custSearch")?.addEventListener("input", () => renderCustomers());
+  $("refreshCustomers")?.addEventListener("click", () => renderCustomers());
+}
 
-async function loadCustomers() {
+async function renderCustomers() {
+  setupCustomersUI();
+
   const body = $("customersBody");
   if (!body) return;
 
-  body.innerHTML = `<tr><td colspan="6" class="muted">Loading…</td></tr>`;
-
   const q = ($("custSearch")?.value || "").trim().toLowerCase();
 
-  const { data: profs, error } = await supabase
+  let query = supabase
     .from("profiles")
-    .select("id,full_name,email,phone,role,is_active")
+    .select("id,email,full_name,role,is_active,created_at")
     .order("created_at", { ascending: false })
-    .limit(1000);
+    .limit(200);
 
+  if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+
+  const { data, error } = await query;
   if (error) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
-  const filtered = (profs || []).filter(p => {
-    if (!q) return true;
-    const hay = `${p.full_name || ""} ${p.email || ""} ${p.phone || ""}`.toLowerCase();
-    return hay.includes(q);
-  });
+  if (!data?.length) {
+    body.innerHTML = `<tr><td colspan="4" class="muted">No customers found.</td></tr>`;
+    return;
+  }
 
-  body.innerHTML = filtered.map(p => `
-    <tr data-id="${escapeHTML(p.id)}">
-      <td>${escapeHTML(p.full_name || "—")}</td>
-      <td>${escapeHTML(p.email || "—")}</td>
-      <td>${escapeHTML(p.phone || "—")}</td>
-      <td><span class="tag">${escapeHTML(p.role || "customer")}</span></td>
-      <td>${p.is_active === false ? `<span class="tag tag--warn">Deactivated</span>` : `<span class="tag tag--ok">Active</span>`}</td>
-      <td>
-        <button class="btn btn--ghost btn--sm" data-act="view">View</button>
-        <button class="btn btn--ghost btn--sm" data-act="toggle">${p.is_active === false ? "Activate" : "Deactivate"}</button>
-      </td>
+  body.innerHTML = data
+    .map(
+      (c) => `
+    <tr data-id="${escapeHTML(c.id)}" class="clickrow">
+      <td><strong>${escapeHTML(c.full_name || "—")}</strong></td>
+      <td>${escapeHTML(c.email || "—")}</td>
+      <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
+      <td class="muted small">${c.is_active === false ? "Inactive" : "Active"}</td>
     </tr>
-  `).join("") || `<tr><td colspan="6" class="muted">No customers found.</td></tr>`;
+  `
+    )
+    .join("");
 
-  // row handlers
-  body.querySelectorAll("tr[data-id]").forEach(tr => {
-    const id = tr.getAttribute("data-id");
-    tr.querySelectorAll("button[data-act]").forEach(btn => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const act = btn.getAttribute("data-act");
-        if (act === "view") {
-          selectedCustomerId = id;
-          await renderCustomerDetail(id);
-        } else if (act === "toggle") {
-          await toggleCustomerActive(id);
-          await loadCustomers();
-          if (selectedCustomerId === id) await renderCustomerDetail(id);
-        }
-      });
-    });
-
+  body.querySelectorAll("tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", async () => {
-      selectedCustomerId = id;
-      await renderCustomerDetail(id);
+      const id = tr.getAttribute("data-id");
+      const customer = data.find((x) => x.id === id);
+      currentCustomer = customer
+        ? { id: customer.id, email: customer.email, full_name: customer.full_name }
+        : null;
+
+      await renderCustomerDetail();
+      // jump to messages tab with convo
+      document.querySelector('.tab[data-tab="messages"]')?.click();
+      await selectConversationByCustomer(currentCustomer?.id);
     });
   });
 }
 
-async function toggleCustomerActive(userId) {
-  // only admin should do this in a real system; keep it simple here.
-  const detail = $("customerDetail");
-  if (detail) detail.textContent = "Updating…";
+async function renderCustomerDetail() {
+  const card = $("customerDetail");
+  if (!card || !currentCustomer) return;
 
-  const profRes = await supabase.from("profiles").select("is_active").eq("id", userId).maybeSingle();
-  if (profRes.error) {
-    if (detail) detail.textContent = profRes.error.message;
-    return;
-  }
-  const next = !(profRes.data?.is_active === false);
-
-  const { error } = await supabase.from("profiles").update({ is_active: next ? false : true }).eq("id", userId);
-  if (error && detail) detail.textContent = error.message;
-}
-
-async function renderCustomerDetail(userId) {
-  const box = $("customerDetail");
-  if (!box) return;
-  box.textContent = "Loading…";
-
-  const prof = await supabase
-    .from("profiles")
-    .select("id,full_name,email,phone,address,role,is_active")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const pk = await supabase
+  // fetch packages for that customer
+  const { data: pkgs } = await supabase
     .from("packages")
-    .select("tracking,status,updated_at,store,approved")
-    .eq("user_id", userId)
+    .select("id,tracking,status,updated_at")
+    .eq("user_id", currentCustomer.id)
     .order("updated_at", { ascending: false })
-    .limit(15);
+    .limit(50);
 
-  const inv = await supabase
-    .from("invoices")
-    .select("tracking,file_name,created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  const msg = await supabase
-    .from("messages")
-    .select("sender,body,created_at,resolved")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (prof.error) {
-    box.textContent = prof.error.message;
-    return;
-  }
-
-  const p = prof.data || {};
-  box.innerHTML = `
+  card.innerHTML = `
+    <div class="card__head">
+      <h3 class="h3">${escapeHTML(currentCustomer.full_name || "Customer")}</h3>
+      <p class="muted small">${escapeHTML(currentCustomer.email || "")}</p>
+    </div>
+    <div class="muted small">Recent packages</div>
     <div class="stack">
-      <div>
-        <div class="h3">${escapeHTML(p.full_name || "—")}</div>
-        <div class="muted">${escapeHTML(p.email || "")}</div>
-        <div class="muted small">${escapeHTML(p.phone || "—")} • ${escapeHTML(p.address || "No address")}</div>
-        <div class="muted small">Role: <strong>${escapeHTML(p.role || "customer")}</strong> • ${p.is_active === false ? "Deactivated" : "Active"}</div>
-      </div>
-
-      <div class="grid2">
-        <div>
-          <div class="muted small">Packages</div>
-          <ul class="list">
-            ${(pk.error ? [`<li class="muted">${escapeHTML(pk.error.message)}</li>`] :
-              (pk.data||[]).map(x => `<li><strong>${escapeHTML(x.tracking)}</strong> <span class="tag">${escapeHTML(x.status)}</span> ${x.approved ? `<span class="tag tag--ok">Approved</span>` : `<span class="tag tag--warn">Pending</span>`}<div class="muted small">${escapeHTML(fmtDate(x.updated_at))}${x.store ? " • "+escapeHTML(x.store):""}</div></li>`))
-              .join("") || `<li class="muted">No packages.</li>`}
-          </ul>
-        </div>
-
-        <div>
-          <div class="muted small">Invoices</div>
-          <ul class="list">
-            ${(inv.error ? [`<li class="muted">${escapeHTML(inv.error.message)}</li>`] :
-              (inv.data||[]).map(x => `<li><strong>${escapeHTML(x.tracking)}</strong> • ${escapeHTML(x.file_name || "file")}<div class="muted small">${escapeHTML(fmtDate(x.created_at))}</div></li>`))
-              .join("") || `<li class="muted">No invoices.</li>`}
-          </ul>
-        </div>
-      </div>
-
-      <div>
-        <div class="muted small">Recent messages</div>
-        <ul class="list">
-          ${(msg.error ? [`<li class="muted">${escapeHTML(msg.error.message)}</li>`] :
-            (msg.data||[]).map(x => `<li><span class="tag">${escapeHTML(x.sender)}</span> ${escapeHTML(x.body).slice(0,120)}<div class="muted small">${escapeHTML(fmtDate(x.created_at))}${x.resolved ? " • resolved":""}</div></li>`))
-            .join("") || `<li class="muted">No messages.</li>`}
-        </ul>
-      </div>
+      ${
+        (pkgs || [])
+          .map(
+            (p) => `
+          <div class="rowline">
+            <strong>${escapeHTML(p.tracking)}</strong>
+            <span class="tag">${escapeHTML(p.status)}</span>
+            <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
+          </div>
+        `
+          )
+          .join("") || `<div class="muted">No packages assigned.</div>`
+      }
     </div>
   `;
 }
@@ -475,595 +515,569 @@ async function renderCustomerDetail(userId) {
 // ========================
 // PACKAGES
 // ========================
-async function loadPackages() {
-  const tbody = $("packagesBody");
-  const msg = $("pkgMsg");
-  if (msg) msg.textContent = "";
-  if (!tbody) return;
+function setupPackagesUI() {
+  $("pkgSearch")?.addEventListener("input", () => renderPackages());
+  $("statusFilter")?.addEventListener("change", () => renderPackages());
+  $("refreshPackages")?.addEventListener("click", () => renderPackages());
 
-  const q = ($("pkgSearch")?.value || "").trim().toLowerCase();
-  const statusFilter = ($("statusFilter")?.value || "").trim();
+  $("pkgEditForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await savePackageEdits();
+  });
+}
 
-  const { data: pkgs, error: pErr } = await supabase
+async function renderPackages() {
+  setupPackagesUI();
+
+  const body = $("packagesBody");
+  if (!body) return;
+
+  const q = ($("pkgSearch")?.value || "").trim();
+  const status = ($("statusFilter")?.value || "").trim();
+
+  let query = supabase
     .from("packages")
-    .select("id,user_id,tracking,status,notes,updated_at,created_at,store,photo_paths,approved")
+    .select("id,tracking,status,store,approved,notes,user_id,updated_at")
     .order("updated_at", { ascending: false })
-    .limit(500);
+    .limit(200);
 
-  if (pErr) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">${escapeHTML(pErr.message)}</td></tr>`;
+  if (q) query = query.ilike("tracking", `%${q}%`);
+  if (status) query = query.eq("status", status);
+
+  const { data, error } = await query;
+  if (error) {
+    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
-  // load profiles (for label)
-  const userIds = Array.from(new Set((pkgs || []).map(p => p.user_id).filter(Boolean)));
-  let profMap = {};
-  if (userIds.length) {
-    const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", userIds);
-    for (const p of (profs || [])) profMap[p.id] = p;
+  if (!data?.length) {
+    body.innerHTML = `<tr><td colspan="6" class="muted">No packages.</td></tr>`;
+    return;
   }
 
-  const filtered = (pkgs || []).filter(p => {
-    if (statusFilter && p.status !== statusFilter) return false;
-    if (!q) return true;
-    const cust = profMap[p.user_id];
-    const hay = `${p.tracking || ""} ${p.status || ""} ${p.store || ""} ${cust?.full_name || ""} ${cust?.email || ""}`.toLowerCase();
-    return hay.includes(q);
-  });
+  body.innerHTML = data
+    .map(
+      (p) => `
+    <tr data-id="${escapeHTML(p.id)}" class="clickrow">
+      <td><strong>${escapeHTML(p.tracking)}</strong></td>
+      <td><span class="tag">${escapeHTML(p.status)}</span></td>
+      <td>${escapeHTML(p.store || "—")}</td>
+      <td class="muted small">${p.approved ? "Yes" : "No"}</td>
+      <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
+      <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
+    </tr>
+  `
+    )
+    .join("");
 
-  tbody.innerHTML = filtered.map(p => {
-    const cust = profMap[p.user_id];
-    const custLabel = cust ? (cust.full_name || cust.email) : (p.user_id ? p.user_id.slice(0, 8) + "…" : "—");
-    return `
-      <tr data-id="${escapeHTML(String(p.id))}">
-        <td><strong>${escapeHTML(p.tracking)}</strong></td>
-        <td><span class="tag">${escapeHTML(p.status || "")}</span></td>
-        <td>${p.approved ? `<span class="tag tag--ok">Yes</span>` : `<span class="tag tag--warn">No</span>`}</td>
-        <td>${escapeHTML(custLabel)}</td>
-        <td>${escapeHTML(p.store || "—")}</td>
-        <td class="muted">${escapeHTML(fmtDate(p.updated_at))}</td>
-        <td><button class="btn btn--ghost btn--sm" data-act="edit">Edit</button></td>
-      </tr>
-    `;
-  }).join("") || `<tr><td colspan="7" class="muted">No packages found.</td></tr>`;
-
-  tbody.querySelectorAll("tr[data-id]").forEach(tr => {
-    const id = tr.getAttribute("data-id");
-    tr.querySelector("button[data-act='edit']")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const pkg = (pkgs || []).find(x => String(x.id) === String(id));
-      if (!pkg) return;
-      selectedPackage = pkg;
-      fillPackageEditForm(pkg);
-    });
+  body.querySelectorAll("tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", () => {
-      const pkg = (pkgs || []).find(x => String(x.id) === String(id));
+      const id = tr.getAttribute("data-id");
+      const pkg = data.find((x) => x.id === id);
       if (!pkg) return;
-      selectedPackage = pkg;
-      fillPackageEditForm(pkg);
+      fillPackageEditor(pkg);
     });
   });
 }
 
-function fillPackageEditForm(p) {
-  $("pkgEditId").value = p.id || "";
-  $("pkgEditTracking").value = p.tracking || "";
-  $("pkgEditStatus").value = p.status || "RECEIVED";
-  $("pkgEditStore").value = p.store || "";
-  $("pkgEditApproved").value = String(!!p.approved);
-  $("pkgEditNotes").value = p.notes || "";
+function fillPackageEditor(pkg) {
+  if ($("pkgEditId")) $("pkgEditId").value = pkg.id || "";
+  if ($("pkgEditTracking")) $("pkgEditTracking").value = pkg.tracking || "";
+  if ($("pkgEditStatus")) $("pkgEditStatus").value = pkg.status || "";
+  if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
+  if ($("pkgEditApproved")) $("pkgEditApproved").checked = !!pkg.approved;
+  if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
   if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
 }
 
-async function onSavePackage(e) {
-  e.preventDefault();
+async function savePackageEdits() {
   const msg = $("pkgEditMsg");
-  if (msg) msg.textContent = "Saving…";
+  if (msg) msg.textContent = "Saving...";
 
+  const id = $("pkgEditId")?.value;
+  if (!id) {
+    if (msg) msg.textContent = "Select a package first.";
+    return;
+  }
+
+  const patch = {
+    tracking: ($("pkgEditTracking")?.value || "").trim(),
+    status: ($("pkgEditStatus")?.value || "").trim(),
+    store: ($("pkgEditStore")?.value || "").trim() || null,
+    approved: !!$("pkgEditApproved")?.checked,
+    notes: ($("pkgEditNotes")?.value || "").trim() || null,
+  };
+
+  const { error } = await supabase.from("packages").update(patch).eq("id", id);
+  if (error) {
+    if (msg) msg.textContent = error.message;
+    return;
+  }
+
+  // Optional uploads (photo/invoice) if bucket exists
+  const photoFile = $("pkgPhotoFile")?.files?.[0] || null;
+  const invoiceFile = $("pkgInvoiceFile")?.files?.[0] || null;
+
+  if (photoFile) await uploadPackageFile(id, photoFile, PKG_PHOTO_BUCKET, "photo", msg);
+  if (invoiceFile) await uploadPackageFile(id, invoiceFile, INVOICE_BUCKET, "invoice", msg);
+
+  if ($("pkgPhotoFile")) $("pkgPhotoFile").value = "";
+  if ($("pkgInvoiceFile")) $("pkgInvoiceFile").value = "";
+
+  if (msg) msg.textContent = "Saved.";
+  await renderPackages();
+}
+
+async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
   try {
-    const id = $("pkgEditId").value;
-    if (!id) throw new Error("Select a package first.");
-
-    const tracking = $("pkgEditTracking").value.trim();
-    const status = $("pkgEditStatus").value;
-    const store = $("pkgEditStore").value.trim() || null;
-    const approved = $("pkgEditApproved").value === "true";
-    const notes = $("pkgEditNotes").value.trim() || null;
-
-    // Optional: upload invoice file from staff
-    const invFile = $("pkgInvoiceFile")?.files?.[0] || null;
-    if (invFile) {
-      if (!selectedPackage?.user_id) throw new Error("This package has no customer assigned (user_id).");
-      const safe = invFile.name.replace(/[^\w.\-]+/g, "_");
-      const invPath = `${selectedPackage.user_id}/${tracking}/${Date.now()}_${safe}`;
-      const upInv = await supabase.storage.from(INVOICE_BUCKET).upload(invPath, invFile, { upsert: false });
-      if (upInv.error) throw upInv.error;
-
-      const insInv = await supabase.from("invoices").insert({
-        user_id: selectedPackage.user_id,
-        tracking,
-        file_path: invPath,
-        file_name: safe,
-        file_type: invFile.type || "unknown",
-        note: "Uploaded by staff"
-      });
-      if (insInv.error) throw insInv.error;
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `packages/${pkgId}/${Date.now()}_${kind}_${safeName}`;
+    const up = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
+    if (up.error) {
+      console.warn(`Upload ${kind} error:`, up.error);
+      if (msgEl) msgEl.textContent = `Saved, but ${kind} upload failed: ${up.error.message}`;
     }
-
-    // Optional: photo file (if you later add a bucket + column)
-    // We won't force it here because your schema may differ.
-
-    const payload = {
-      tracking,
-      status,
-      store,
-      approved,
-      notes,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error } = await supabase.from("packages").update(payload).eq("id", id);
-    if (error) throw error;
-
-    if (msg) msg.textContent = "Saved.";
-    if ($("pkgPhotoFile")) $("pkgPhotoFile").value = "";
-    if ($("pkgInvoiceFile")) $("pkgInvoiceFile").value = "";
-
-    await loadPackages();
-    await refreshStatsOnly();
-    await loadOverviewLists();
-  } catch (err) {
-    console.error(err);
-    if (msg) msg.textContent = err?.message || String(err);
+  } catch (e) {
+    console.warn(`Upload ${kind} exception:`, e);
+    if (msgEl) msgEl.textContent = `Saved, but ${kind} upload failed.`;
   }
 }
 
 // ========================
-// MESSAGES (Realtime + Poll fallback)
+// MESSAGES
 // ========================
-async function loadConversations() {
-  const list = $("convoList");
-  if (!list) return;
-
-  const q = ($("msgSearch")?.value || "").trim().toLowerCase();
-  const filter = ($("msgFilter")?.value || "open");
-
-  const { data: msgs, error } = await supabase
-    .from("messages")
-    .select("id,user_id,sender,body,created_at,resolved")
-    .order("created_at", { ascending: false })
-    .limit(1000);
-
-  if (error) {
-    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
-    return;
-  }
-
-  // Group by user_id
-  const byUser = new Map();
-  for (const m of (msgs || [])) {
-    if (filter === "open" && m.resolved === true) continue;
-    const key = m.user_id;
-    if (!byUser.has(key)) byUser.set(key, []);
-    byUser.get(key).push(m);
-  }
-
-  const userIds = Array.from(byUser.keys()).filter(Boolean);
-  let profMap = {};
-  if (userIds.length) {
-    const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", userIds);
-    for (const p of (profs || [])) profMap[p.id] = p;
-  }
-
-  const items = userIds.map(uid => {
-    const latest = byUser.get(uid)?.[0];
-    const prof = profMap[uid];
-    const label = prof ? (prof.full_name || prof.email) : (uid.slice(0, 8) + "…");
-    const preview = (latest?.body || "").slice(0, 60);
-    const unresolved = (byUser.get(uid) || []).some(x => x.resolved === false);
-    const text = `${label} ${preview}`.toLowerCase();
-    if (q && !text.includes(q)) return null;
-    return { uid, label, latest, unresolved };
-  }).filter(Boolean);
-
-  list.innerHTML = items.map(it => `
-    <li class="listItem ${it.uid === selectedConvoUserId ? "active" : ""}" data-uid="${escapeHTML(it.uid)}">
-      <div class="listItem__title">
-        ${escapeHTML(it.label)}
-        ${it.unresolved ? `<span class="tag tag--warn">Open</span>` : `<span class="tag tag--ok">Resolved</span>`}
-      </div>
-      <div class="muted small">${escapeHTML(it.latest?.body || "")}</div>
-      <div class="muted small">${escapeHTML(fmtDate(it.latest?.created_at))}</div>
-    </li>
-  `).join("") || `<li class="muted">No conversations.</li>`;
-
-  list.querySelectorAll(".listItem").forEach(li => {
-    li.addEventListener("click", async () => {
-      selectedConvoUserId = li.getAttribute("data-uid");
-      await renderChatFor(selectedConvoUserId);
-      await loadConversations();
-      ensureMessageLiveUpdates(); // ensure subscription targets selected
-    });
-  });
-}
-
-async function renderChatFor(userId) {
-  selectedConvoUserId = userId;
-
-  const title = $("convoTitle");
-  const body = $("adminChatBody");
-  if (title) title.textContent = "Loading…";
-  if (body) body.innerHTML = "";
-
-  // label
-  const { data: prof } = await supabase.from("profiles").select("full_name,email").eq("id", userId).maybeSingle();
-  if (title) title.textContent = prof ? (prof.full_name || prof.email || userId) : userId;
-
-  const { data: msgs, error } = await supabase
-    .from("messages")
-    .select("id,sender,body,created_at,resolved")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(500);
-
-  if (error) {
-    if (body) body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
-    return;
-  }
-
-  if (body) {
-    body.innerHTML = (msgs || []).map(m => `
-      <div class="bubble ${m.sender === "staff" ? "me" : ""}">
-        <div>${escapeHTML(m.body || "")}</div>
-        <div class="meta">
-          <span>${escapeHTML(m.sender === "staff" ? "Staff" : "Customer")}</span>
-          <span>${escapeHTML(new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>
-        </div>
-      </div>
-    `).join("") || `<div class="muted small">No messages yet.</div>`;
-
-    body.scrollTop = body.scrollHeight;
-  }
-}
-
-async function sendStaffMessage(text) {
-  const msgEl = $("adminChatMsg");
-  if (!selectedConvoUserId) {
-    if (msgEl) msgEl.textContent = "Select a conversation first.";
-    return;
-  }
-
-  if (msgEl) msgEl.textContent = "Sending…";
-
-  const { error } = let ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "staff", body: text, resolved: false });
-
-  // If DB constraint blocks "staff", retry with "admin" then "support"
-  if (ins.error && String(ins.error.message || "").toLowerCase().includes("messages_sender_check")) {
-    ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "admin", body: text, resolved: false });
-  }
-  if (ins.error && String(ins.error.message || "").toLowerCase().includes("messages_sender_check")) {
-    ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "support", body: text, resolved: false });
-  }
-
-  const { error } = ins;
-
-  if (error) {
-    if (msgEl) msgEl.textContent = error.message;
-    return;
-  }
-
-  if (msgEl) msgEl.textContent = "Sent.";
-  // Immediately refresh (for cases where realtime isn't enabled)
-  await renderChatFor(selectedConvoUserId);
-  await loadConversations();
-}
-
-async function markResolved() {
-  const msgEl = $("adminChatMsg");
-  if (!selectedConvoUserId) {
-    if (msgEl) msgEl.textContent = "Select a conversation first.";
-    return;
-  }
-
-  if (msgEl) msgEl.textContent = "Marking resolved…";
-
-  const { error } = await supabase
-    .from("messages")
-    .update({ resolved: true })
-    .eq("user_id", selectedConvoUserId)
-    .eq("resolved", false);
-
-  if (error) {
-    if (msgEl) msgEl.textContent = error.message;
-    return;
-  }
-
-  if (msgEl) msgEl.textContent = "Resolved.";
-  await renderChatFor(selectedConvoUserId);
-  await loadConversations();
-}
-
-function teardownRealtime() {
-  if (msgChannel) {
-    supabase.removeChannel(msgChannel);
-    msgChannel = null;
-  }
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-}
-
-function ensureMessageLiveUpdates() {
-  // Always keep a fallback poll running (5 sec)
-  if (!pollTimer) {
-    pollTimer = setInterval(async () => {
-      if (!currentUser) return;
-      if ($("adminApp")?.classList.contains("hidden")) return;
-
-      // If viewing messages tab and a convo is selected, refresh chat and convo list.
-      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
-      if (!messagesPanelVisible) return;
-
-      await loadConversations();
-      if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
-    }, 5000);
-  }
-
-  // Realtime subscription for inserts (best case)
-  // If Realtime isn't enabled for table "messages", this won't fire, but poll will still work.
-  if (msgChannel) {
-    supabase.removeChannel(msgChannel);
-    msgChannel = null;
-  }
-
-  msgChannel = supabase
-    .channel("admin-messages-live")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, async (payload) => {
-      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
-      if (!messagesPanelVisible) return;
-
-      await loadConversations();
-
-      const m = payload?.new;
-      if (selectedConvoUserId && m?.user_id === selectedConvoUserId) {
-        await renderChatFor(selectedConvoUserId);
-      }
-    })
-    .subscribe();
-}
-
-// ========================
-// REPORTS (simple, no charts lib)
-// ========================
-let lastReport = null;
-
-async function runReports() {
-  const rangeDays = parseInt($("reportRange")?.value || "30", 10);
-  const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
-
-  $("shipmentsChart").textContent = "Loading…";
-  $("storesChart").textContent = "Loading…";
-
-  const { data: pkgs, error } = await supabase
-    .from("packages")
-    .select("created_at,store,status")
-    .gte("created_at", since)
-    .order("created_at", { ascending: true })
-    .limit(5000);
-
-  if (error) {
-    $("shipmentsChart").textContent = error.message;
-    $("storesChart").textContent = "";
-    return;
-  }
-
-  // group by day
-  const byDay = {};
-  const storeCounts = {};
-  for (const p of (pkgs || [])) {
-    const day = (p.created_at || "").slice(0, 10);
-    byDay[day] = (byDay[day] || 0) + 1;
-    const s = (p.store || "Unknown").trim();
-    storeCounts[s] = (storeCounts[s] || 0) + 1;
-  }
-
-  const days = Object.keys(byDay).sort();
-  const lines = days.map(d => `${d}: ${byDay[d]}`).join("\n");
-  const topStores = Object.entries(storeCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
-  $("shipmentsChart").textContent = lines || "No shipments in this range.";
-  $("storesChart").innerHTML = topStores.map(([s, c]) => `<div>${escapeHTML(s)} — <strong>${c}</strong></div>`).join("") || "No stores data.";
-
-  lastReport = { since, pkgs };
-}
-
-function exportReportsCSV() {
-  if (!lastReport?.pkgs) {
-    alert("Run reports first.");
-    return;
-  }
-  const rows = [["created_at", "store", "status"]];
-  for (const p of lastReport.pkgs) rows.push([p.created_at || "", p.store || "", p.status || ""]);
-  const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"', '""')}"`).join(",")).join("\n");
-  downloadText(`reports_${lastReport.since.slice(0, 10)}.csv`, csv);
-}
-
-// ========================
-// ROLES
-// ========================
-async function onRoleUpdate(e) {
-  e.preventDefault();
-  const msg = $("roleMsg");
-  if (msg) msg.textContent = "Updating…";
-
-  if (currentProfile?.role !== "admin") {
-    if (msg) msg.textContent = "Only admin can change roles.";
-    return;
-  }
-
-  const email = $("roleEmail").value.trim().toLowerCase();
-  const role = $("roleValue").value;
-
-  const { data: prof, error: pErr } = await supabase.from("profiles").select("id,email").eq("email", email).maybeSingle();
-  if (pErr) { if (msg) msg.textContent = pErr.message; return; }
-  if (!prof) { if (msg) msg.textContent = "No profile found for that email."; return; }
-
-  const { error } = await supabase.from("profiles").update({ role }).eq("id", prof.id);
-  if (error) { if (msg) msg.textContent = error.message; return; }
-
-  if (msg) msg.textContent = "Role updated.";
-  $("roleForm").reset();
-  await loadCustomers();
-}
-
-// ========================
-// EXPORT PACKAGES (CSV)
-// ========================
-async function exportPackagesCSV() {
-  const qm = $("quickMsg");
-  if (qm) qm.textContent = "Exporting…";
-
-  const { data: pkgs, error } = await supabase
-    .from("packages")
-    .select("tracking,status,store,approved,user_id,updated_at,created_at")
-    .order("updated_at", { ascending: false })
-    .limit(5000);
-
-  if (error) {
-    if (qm) qm.textContent = error.message;
-    return;
-  }
-
-  const rows = [["tracking","status","store","approved","user_id","updated_at","created_at"]];
-  for (const p of (pkgs || [])) {
-    rows.push([p.tracking||"", p.status||"", p.store||"", String(!!p.approved), p.user_id||"", p.updated_at||"", p.created_at||""]);
-  }
-  const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(",")).join("\n");
-  downloadText(`packages_${new Date().toISOString().slice(0,10)}.csv`, csv);
-  if (qm) qm.textContent = "Exported.";
-}
-
-// ========================
-// REFRESH ALL
-// ========================
-async function refreshAll() {
-  await refreshStatsOnly();
-  await loadOverviewLists();
-  await loadCustomers();
-  await loadPackages();
-  await loadConversations();
-  ensureMessageLiveUpdates();
-}
-
-// ========================
-// EVENTS
-// ========================
-function setupEvents() {
-  // Login
-  $("adminLoginForm")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = $("adminLoginMsg");
-    if (msg) msg.textContent = "Signing in…";
-
-    const email = $("adminEmail").value.trim().toLowerCase();
-    const password = $("adminPassword").value;
-
-    let __loginRes = await supabase.auth.signInWithPassword({ email, password });
-    if (__loginRes.error) {
-      console.warn("ADMIN LOGIN ERROR:", __loginRes.error);
-      await hardResetAuth("login retry");
-      __loginRes = await supabase.auth.signInWithPassword({ email, password });
-    }
-    const { error } = __loginRes;
-if (error) {
-      if (msg) msg.textContent = error.message;
-      return;
-    }
-    if (msg) msg.textContent = "";
-    await renderAuthState();
-  });
-
-  // Logout
-  $("logoutBtn")?.addEventListener("click", async () => {
-    teardownRealtime();
-    await hardResetAuth("logout");
-    location.reload();
-});
-
-  // Filters
-  $("refreshCustomers")?.addEventListener("click", loadCustomers);
-  $("custSearch")?.addEventListener("input", () => { loadCustomers(); });
-
-  $("refreshPackages")?.addEventListener("click", loadPackages);
-  $("pkgSearch")?.addEventListener("input", () => { loadPackages(); });
-  $("statusFilter")?.addEventListener("change", () => { loadPackages(); });
-
-  // Package edit
-  $("pkgEditForm")?.addEventListener("submit", onSavePackage);
-
-  // Messages
-  $("refreshMessages")?.addEventListener("click", async () => {
-    await loadConversations();
-    if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
-  });
-  $("msgSearch")?.addEventListener("input", loadConversations);
-  $("msgFilter")?.addEventListener("change", loadConversations);
+function setupMessagesUI() {
+  $("refreshMessages")?.addEventListener("click", () => renderConversations());
+  $("msgSearch")?.addEventListener("input", () => renderConversations());
+  $("msgFilter")?.addEventListener("change", () => renderConversations());
 
   $("adminChatForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("adminChatInput");
     const text = (input?.value || "").trim();
     if (!text) return;
-    input.value = "";
+    if (input) input.value = "";
     await sendStaffMessage(text);
   });
 
-  $("markResolvedBtn")?.addEventListener("click", markResolved);
+  $("markResolvedBtn")?.addEventListener("click", async () => {
+    if (!currentCustomer) return;
+    await markConversationResolved(currentCustomer.id);
+  });
+}
 
-  // Reports
-  $("runReports")?.addEventListener("click", runReports);
-  $("exportReports")?.addEventListener("click", exportReportsCSV);
+async function renderConversations() {
+  setupMessagesUI();
 
-  // Roles
-  $("roleForm")?.addEventListener("submit", onRoleUpdate);
+  const list = $("convoList");
+  if (!list) return;
 
-  // Export packages quick action
-  $("exportPackagesBtn")?.addEventListener("click", exportPackagesCSV);
+  const q = ($("msgSearch")?.value || "").trim().toLowerCase();
+  const filter = ($("msgFilter")?.value || "").trim();
 
-  // Auth state listener (one-time)
-  if (!authSub) {
-    authSub = supabase.auth.onAuthStateChange(async () => {
-      await renderAuthState();
-    });
+  // Fetch recent messages and group in JS (simple + reliable)
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id,user_id,sender,body,created_at,resolved")
+    .order("created_at", { ascending: false })
+    .limit(400);
+
+  if (error) {
+    list.innerHTML = `<div class="muted">${escapeHTML(error.message)}</div>`;
+    return;
   }
+
+  const grouped = new Map();
+  for (const m of data || []) {
+    if (!grouped.has(m.user_id)) grouped.set(m.user_id, m);
+  }
+
+  let convos = Array.from(grouped.values());
+
+  if (filter === "open") convos = convos.filter((m) => !m.resolved);
+  if (filter === "resolved") convos = convos.filter((m) => !!m.resolved);
+
+  if (q) {
+    convos = convos.filter((m) => (m.body || "").toLowerCase().includes(q));
+  }
+
+  if (!convos.length) {
+    list.innerHTML = `<div class="muted">No conversations.</div>`;
+    return;
+  }
+
+  // Show list
+  list.innerHTML = convos
+    .map(
+      (m) => `
+    <button class="convo ${m.user_id === currentCustomer?.id ? "active" : ""}" type="button" data-uid="${escapeHTML(
+        m.user_id
+      )}">
+      <div class="row">
+        <strong>${escapeHTML(m.user_id)}</strong>
+        ${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}
+      </div>
+      <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
+      <div class="muted small">${new Date(m.created_at).toLocaleString()}</div>
+    </button>
+  `
+    )
+    .join("");
+
+  list.querySelectorAll("button[data-uid]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.getAttribute("data-uid");
+      await selectConversationByCustomer(uid);
+    });
+  });
+}
+
+async function selectConversationByCustomer(userId) {
+  if (!userId) return;
+
+  // Load minimal profile for header
+  const prof = await supabase
+    .from("profiles")
+    .select("id,email,full_name")
+    .eq("id", userId)
+    .maybeSingle();
+
+  currentCustomer = prof.data
+    ? { id: prof.data.id, email: prof.data.email, full_name: prof.data.full_name }
+    : { id: userId, email: "", full_name: "" };
+
+  if ($("convoTitle")) {
+    $("convoTitle").textContent =
+      currentCustomer.full_name || currentCustomer.email || `Customer ${currentCustomer.id}`;
+  }
+
+  await renderChat();
+  await setupMessageRealtime(userId);
+}
+
+async function renderChat() {
+  const body = $("adminChatBody");
+  if (!body) return;
+
+  if (!currentCustomer) {
+    body.innerHTML = `<div class="muted small">Select a conversation.</div>`;
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id,sender,body,created_at,resolved")
+    .eq("user_id", currentCustomer.id)
+    .order("created_at", { ascending: true })
+    .limit(300);
+
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+    return;
+  }
+
+  body.innerHTML =
+    (data || [])
+      .map(
+        (m) => `
+      <div class="bubble ${m.sender !== "customer" ? "me" : ""}">
+        <div>${escapeHTML(m.body)}</div>
+        <div class="meta">
+          <span>${escapeHTML(m.sender)}</span>
+          <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+      </div>
+    `
+      )
+      .join("") || `<div class="muted small">No messages yet.</div>`;
+
+  body.scrollTop = body.scrollHeight;
+}
+
+async function sendStaffMessage(text) {
+  const msg = $("adminChatMsg");
+  if (msg) msg.textContent = "Sending...";
+
+  if (!currentCustomer) {
+    if (msg) msg.textContent = "Select a conversation first.";
+    return;
+  }
+
+  const trySend = async (sender) => {
+    return await supabase.from("messages").insert({
+      user_id: currentCustomer.id,
+      sender,
+      body: text,
+      resolved: false,
+    });
+  };
+
+  let res = await trySend("staff");
+  if (res.error) res = await trySend("admin");
+  if (res.error) res = await trySend("support");
+
+  if (res.error) {
+    if (msg) msg.textContent = res.error.message;
+    return;
+  }
+
+  if (msg) msg.textContent = "";
+  await renderChat();
+  setTimeout(() => renderChat(), 800); // helps if realtime is off/slow
+  await renderConversations();
+}
+
+async function markConversationResolved(userId) {
+  const msg = $("adminChatMsg");
+  if (msg) msg.textContent = "Marking resolved...";
+
+  const { error } = await supabase
+    .from("messages")
+    .update({ resolved: true })
+    .eq("user_id", userId);
+
+  if (error) {
+    if (msg) msg.textContent = error.message;
+    return;
+  }
+
+  if (msg) msg.textContent = "Resolved.";
+  await renderConversations();
+  await renderChat();
+}
+
+// Realtime subscription for new messages (if enabled on Supabase)
+function teardownMessageRealtime() {
+  if (msgChannel) {
+    supabase.removeChannel(msgChannel);
+    msgChannel = null;
+  }
+}
+
+async function setupMessageRealtime(userId) {
+  teardownMessageRealtime();
+
+  msgChannel = supabase
+    .channel(`admin_messages_${userId}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${userId}` },
+      async () => {
+        await renderChat();
+        await renderConversations();
+      }
+    )
+    .subscribe();
+}
+
+// ========================
+// ROLES TAB (admin-only action)
+// ========================
+function setupRolesUI() {
+  $("roleForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("roleMsg");
+    if (msg) msg.textContent = "Saving...";
+
+    if (!currentAdmin || currentAdmin.role !== "admin") {
+      if (msg) msg.textContent = "Only admins can change roles.";
+      return;
+    }
+
+    const email = ($("roleEmail")?.value || "").trim().toLowerCase();
+    const role = ($("roleValue")?.value || "").trim();
+
+    const { error } = await supabase.from("profiles").update({ role }).eq("email", email);
+    if (error) {
+      if (msg) msg.textContent = error.message;
+      return;
+    }
+
+    if (msg) msg.textContent = "Role updated.";
+  });
+}
+
+// ========================
+// EXPORT PACKAGES CSV
+// ========================
+async function exportPackagesCSV() {
+  const { data, error } = await supabase
+    .from("packages")
+    .select("tracking,status,store,approved,notes,user_id,updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(2000);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  const rows = data || [];
+  const header = ["tracking", "status", "store", "approved", "notes", "user_id", "updated_at"];
+  const csv = [
+    header.join(","),
+    ...rows.map((r) =>
+      header
+        .map((k) => {
+          const v = r[k] ?? "";
+          const s = String(v).replaceAll('"', '""');
+          return `"${s}"`;
+        })
+        .join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `packages_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// ========================
+// OPTIONAL: BULK CSV UPLOAD (only runs if DOM exists)
+// Expected DOM ids (add these to admin.html if you want):
+// bulkCsvFile, bulkCsvText, bulkUploadBtn, bulkTemplateBtn, bulkMsg
+// ========================
+function setupBulkUploadIfPresent() {
+  const file = $("bulkCsvFile");
+  const text = $("bulkCsvText");
+  const uploadBtn = $("bulkUploadBtn");
+  const tplBtn = $("bulkTemplateBtn");
+  const msg = $("bulkMsg");
+
+  if (!uploadBtn) return; // feature not on this admin.html yet
+
+  const template = `tracking,customer_email,status,store,approved,notes
+1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile
+`;
+
+  tplBtn?.addEventListener("click", () => {
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "bulk_packages_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  uploadBtn.addEventListener("click", async () => {
+    if (msg) msg.textContent = "Reading CSV...";
+
+    let csv = (text?.value || "").trim();
+    if (!csv && file?.files?.[0]) {
+      csv = await file.files[0].text();
+    }
+
+    if (!csv) {
+      if (msg) msg.textContent = "Paste CSV or choose a file.";
+      return;
+    }
+
+    try {
+      const rows = parseCsv(csv);
+      if (!rows.length) throw new Error("No rows found.");
+
+      if (msg) msg.textContent = `Uploading ${rows.length}...`;
+
+      // Map emails -> ids
+      const emails = Array.from(
+        new Set(rows.map((r) => (r.customer_email || "").trim().toLowerCase()).filter(Boolean))
+      );
+
+      let emailToId = new Map();
+      if (emails.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id,email")
+          .in("email", emails);
+
+        for (const p of profs || []) emailToId.set((p.email || "").toLowerCase(), p.id);
+      }
+
+      // Build insert payload
+      const payload = rows.map((r) => ({
+        tracking: (r.tracking || "").trim(),
+        status: (r.status || "RECEIVED").trim(),
+        store: (r.store || "").trim() || null,
+        approved: String(r.approved || "true").toLowerCase() !== "false",
+        notes: (r.notes || "").trim() || null,
+        user_id: emailToId.get((r.customer_email || "").trim().toLowerCase()) || null,
+      })).filter((p) => p.tracking);
+
+      // Upsert by tracking (requires unique index on tracking; if not, it’ll just insert)
+      const { error } = await supabase.from("packages").upsert(payload, { onConflict: "tracking" });
+      if (error) throw error;
+
+      if (msg) msg.textContent = "Bulk upload complete.";
+      if (file) file.value = "";
+      if (text) text.value = "";
+      await renderPackages();
+    } catch (e) {
+      console.error(e);
+      if (msg) msg.textContent = e?.message || String(e);
+    }
+  });
+}
+
+function parseCsv(csvText) {
+  // basic CSV parser supporting quoted values
+  const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length);
+  if (lines.length < 2) return [];
+
+  const headers = splitCsvLine(lines[0]).map((h) => h.trim());
+  const out = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCsvLine(lines[i]);
+    const row = {};
+    headers.forEach((h, idx) => (row[h] = cols[idx] ?? ""));
+    out.push(row);
+  }
+  return out;
+}
+
+function splitCsvLine(line) {
+  const res = [];
+  let cur = "";
+  let inQ = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === '"' && line[i + 1] === '"') {
+      cur += '"';
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQ = !inQ;
+      continue;
+    }
+    if (ch === "," && !inQ) {
+      res.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  res.push(cur);
+  return res.map((s) => s.trim());
 }
 
 // ========================
 // INIT
 // ========================
 async function init() {
-  validateDom();
-  injectAdminChatContrastFix();
-  tabAPI = setupTabs();
-  setupEvents();
-  await renderAuthState();
+  await sanitizeStaleTokenOnce();
+  setupAuthUI();
+  setupAuthSubOnce();
+  setupRolesUI();
+  setupBulkUploadIfPresent();
+  await renderApp();
 }
 
 window.addEventListener("DOMContentLoaded", init);
-
-
-// Admin boot sanitize: if an auth token exists but session is missing, clear once and reload.
-(async function adminBootSanitize(){
-  try {
-    const ref = getProjectRef();
-    const tokenKey = ref ? `sb-${ref}-auth-token` : "";
-    const hasToken = tokenKey ? !!localStorage.getItem(tokenKey) : false;
-    const { session } = await safeGetSession();
-    if (hasToken && !session) {
-      console.warn("Admin sanitize: token present but no session. Clearing token.");
-      clearSupabaseAuthStorage();
-      location.reload();
-    }
-  } catch (_) {}
-})(); 
