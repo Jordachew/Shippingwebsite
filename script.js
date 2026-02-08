@@ -1,3 +1,13 @@
+/* =========================================================
+   Sueños Shipping — Customer Portal (script.js)
+   Fixes:
+   - AuthSessionMissingError (safe session-first auth)
+   - “login only once” / stuck sign-in (stale token handling)
+   - Chat readability (white text in chat area + input)
+   - Chat updates immediately after sending
+   - Profile ensure (no trigger required)
+========================================================= */
+
 // ========================
 // CONFIG (PASTE YOUR VALUES)
 // ========================
@@ -5,42 +15,46 @@ const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// Safe singleton (prevents double-load issues)
-window.__SB__ =
-  window.__SB__ ||
-  window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      // NOTE: you can remove storage override if you want,
-      // but keeping it is fine on same-origin deployments.
-      storage: window.localStorage,
-    },
-  });
+const INVOICE_BUCKET = "invoices";
+const CHAT_BUCKET = "chat_files"; // only used if you later allow chat attachments
 
+// Business hours note (Mon–Fri 10–5)
+const HOURS_TEXT = "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// Warehouse address (rendered if your HTML has the fields)
+const WAREHOUSE = {
+  companyCode: "SNS-JM",
+  line1: "8465 W 44th Ave",
+  line2: "STE119, SNS-JM2 43935 KIN",
+  cityStateZip: "Hialeah, FL 33018",
+};
+
+// ========================
+// SUPABASE CLIENT (safe singleton)
+// ========================
+(function initSupabase() {
+  if (!window.supabase || !window.supabase.createClient) {
+    console.error("Supabase client library not loaded. Make sure supabase.min.js is included before script.js");
+    return;
+  }
+  if (!window.__SB__) {
+    window.__SB__ = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        // use default storage (localStorage) unless you have a reason to override
+      },
+    });
+  }
+})();
 const supabase = window.__SB__;
 
-const INVOICE_BUCKET = "invoices";
-const CHAT_BUCKET = "chat_files";
+// ========================
+// BASIC HELPERS
+// ========================
+function $(id) { return document.getElementById(id); }
 
-// ========================
-// DEBUG HELPERS
-// ========================
-function logSB(label, obj) {
-  try {
-    console.log("🟣", label, JSON.parse(JSON.stringify(obj || {})));
-  } catch {
-    console.log("🟣", label, obj);
-  }
-}
-
-// ========================
-// UI HELPERS
-// ========================
-function $(id) {
-  return document.getElementById(id);
-}
 function escapeHTML(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")
@@ -49,6 +63,7 @@ function escapeHTML(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 function formatJMD(n) {
   return new Intl.NumberFormat("en-JM", {
     style: "currency",
@@ -57,19 +72,63 @@ function formatJMD(n) {
   }).format(Number(n || 0));
 }
 
-// Your DB values appear to be: UWI_KINGSTON and RHODEN_HALL_CLARENDON
 function pickupLabel(v) {
   return v === "RHODEN_HALL_CLARENDON"
     ? "Rhoden Hall District, Clarendon"
     : "UWI, Kingston";
 }
 
-// Business hours note (Mon–Fri 10–5)
-const HOURS_TEXT =
-  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+function getProjectRef() {
+  try { return new URL(SUPABASE_URL).hostname.split(".")[0]; }
+  catch { return ""; }
+}
+
+function clearSupabaseAuthStorage() {
+  // clears the stored sb token that causes “login works once then breaks”
+  try {
+    const ref = getProjectRef();
+    if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch (_) {}
+}
+
+async function hardResetAuth(reason = "") {
+  console.warn("Hard resetting auth:", reason);
+  try { await supabase.auth.signOut(); } catch (_) {}
+  clearSupabaseAuthStorage();
+}
 
 // ========================
-// CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
+// AUTH — SAFE USER ACCESS (prevents AuthSessionMissingError)
+// ========================
+async function safeGetSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { session: null, error };
+    return { session: data?.session || null, error: null };
+  } catch (e) {
+    return { session: null, error: e };
+  }
+}
+
+async function safeGetUser() {
+  // session-first; only calls getUser if we actually have a session
+  const { session, error: sErr } = await safeGetSession();
+  if (sErr) return { user: null, session: null, error: sErr };
+  if (!session) return { user: null, session: null, error: null };
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { user: session.user || null, session, error };
+    return { user: data?.user || session.user || null, session, error: null };
+  } catch (e) {
+    // Covers AuthSessionMissingError and other throws
+    return { user: session.user || null, session, error: e };
+  }
+}
+
+// ========================
+// UI FIX: CUSTOMER CHAT READABILITY
 // ========================
 function injectCustomerChatStyles() {
   if (document.getElementById("customerChatStyles")) return;
@@ -90,11 +149,43 @@ function injectCustomerChatStyles() {
     }
     #chatInput::placeholder { color: rgba(255,255,255,.6) !important; }
 
-    /* Optional: make bubbles readable if your theme is dark */
+    /* Optional bubbles */
     .bubble { background: rgba(255,255,255,0.06) !important; }
     .bubble.me { background: rgba(255,255,255,0.10) !important; }
   `;
   document.head.appendChild(style);
+}
+
+// ========================
+// MOBILE NAV + AUTH TABS
+// ========================
+function setupMobileNav() {
+  const toggle = $("navToggle");
+  const nav = $("nav");
+  if (!toggle || !nav) return;
+  toggle.addEventListener("click", () => {
+    const open = nav.style.display === "flex";
+    nav.style.display = open ? "none" : "flex";
+  });
+}
+
+function setupAuthTabs() {
+  const tabLogin = $("tabLogin");
+  const tabRegister = $("tabRegister");
+  const loginPane = $("loginPane");
+  const registerPane = $("registerPane");
+  if (!tabLogin || !tabRegister || !loginPane || !registerPane) return;
+
+  const setTab = (which) => {
+    const isLogin = which === "login";
+    tabLogin.classList.toggle("active", isLogin);
+    tabRegister.classList.toggle("active", !isLogin);
+    loginPane.classList.toggle("hidden", !isLogin);
+    registerPane.classList.toggle("hidden", isLogin);
+  };
+
+  tabLogin.addEventListener("click", () => setTab("login"));
+  tabRegister.addEventListener("click", () => setTab("register"));
 }
 
 // ========================
@@ -151,49 +242,13 @@ function setupCalculator() {
 }
 
 // ========================
-// NAV + TABS
-// ========================
-function setupMobileNav() {
-  const toggle = $("navToggle");
-  const nav = $("nav");
-  if (!toggle || !nav) return;
-  toggle.addEventListener("click", () => {
-    const open = nav.style.display === "flex";
-    nav.style.display = open ? "none" : "flex";
-  });
-}
-
-function setupAuthTabs() {
-  const tabLogin = $("tabLogin");
-  const tabRegister = $("tabRegister");
-  const loginPane = $("loginPane");
-  const registerPane = $("registerPane");
-  if (!tabLogin || !tabRegister || !loginPane || !registerPane) return;
-
-  const setTab = (which) => {
-    const isLogin = which === "login";
-    tabLogin.classList.toggle("active", isLogin);
-    tabRegister.classList.toggle("active", !isLogin);
-    loginPane.classList.toggle("hidden", !isLogin);
-    registerPane.classList.toggle("hidden", isLogin);
-  };
-
-  tabLogin.addEventListener("click", () => setTab("login"));
-  tabRegister.addEventListener("click", () => setTab("register"));
-}
-
-// ========================
-// PROFILE creation (NO TRIGGER REQUIRED)
+// PROFILE: local “pending profile” for email-confirm flows
 // ========================
 function stashPendingProfile(full_name, phone, email) {
   try {
-    localStorage.setItem(
-      "pending_profile",
-      JSON.stringify({ full_name, phone, email, at: Date.now() })
-    );
+    localStorage.setItem("pending_profile", JSON.stringify({ full_name, phone, email, at: Date.now() }));
   } catch (_) {}
 }
-
 function readPendingProfile() {
   try {
     const raw = localStorage.getItem("pending_profile");
@@ -202,110 +257,100 @@ function readPendingProfile() {
     return null;
   }
 }
-
 function clearPendingProfile() {
-  try {
-    localStorage.removeItem("pending_profile");
-  } catch (_) {}
+  try { localStorage.removeItem("pending_profile"); } catch (_) {}
 }
 
+// Ensure profile row exists (NO trigger required)
 async function ensureProfile({ full_name, phone } = {}) {
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr) return { ok: false, error: userErr };
-  const user = userData?.user;
+  const { user } = await safeGetUser();
   if (!user) return { ok: false, error: new Error("Not logged in") };
 
-  // Many of your earlier errors were caused by profiles columns not existing (e.g. phone).
-  // So we always try a "minimal" profile read first, then we opportunistically write extras.
-  const minimalSelect = "id,email,full_name,role,is_active";
-
-  const read1 = await supabase
+  // Try read minimal columns (avoid “column does not exist” crashes)
+  const read = await supabase
     .from("profiles")
-    .select(minimalSelect)
+    .select("id,email,full_name,role")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (read1.error) console.error("PROFILE READ ERROR:", read1.error);
-
-  // If it exists, update missing minimal fields
-  if (read1.data && !read1.error) {
-    const profile = read1.data;
+  if (!read.error && read.data) {
+    // Patch missing full_name only (safe)
     const patch = {};
-    if (full_name && !profile.full_name) patch.full_name = full_name;
-
-    // Try phone update only if the column exists (we detect by trying an update and retrying w/out)
-    if (phone) {
-      const upPhone = await supabase.from("profiles").update({ phone }).eq("id", user.id);
-      if (upPhone?.error && upPhone.error.code === "42703") {
-        // column doesn't exist; ignore
-      } else if (upPhone?.error) {
-        console.error("PROFILE PHONE UPDATE ERROR:", upPhone.error);
-      }
-    }
+    if (full_name && !read.data.full_name) patch.full_name = full_name;
 
     if (Object.keys(patch).length) {
       const up = await supabase.from("profiles").update(patch).eq("id", user.id);
-      if (up.error) console.error("PROFILE UPDATE ERROR:", up.error);
+      if (up.error) console.warn("PROFILE UPDATE ERROR:", up.error);
     }
-    return { ok: true, profile };
+    return { ok: true, profile: read.data };
   }
 
-  // If not found, attempt upsert with minimal columns, then try phone separately.
-  const upsertMinimal = await supabase.from("profiles").upsert({
+  // If missing or blocked, attempt an upsert using only safe columns
+  const upsert = await supabase.from("profiles").upsert({
     id: user.id,
     email: user.email,
     full_name: full_name || "",
+    // phone only if your table has it; if not, it will fail.
+    // We avoid inserting phone here to prevent schema mismatch.
   });
 
-  if (upsertMinimal.error) {
-    console.error("PROFILE UPSERT ERROR:", upsertMinimal.error);
-    return { ok: false, error: upsertMinimal.error };
-  }
-
-  if (phone) {
-    const upPhone2 = await supabase.from("profiles").update({ phone }).eq("id", user.id);
-    if (upPhone2?.error && upPhone2.error.code === "42703") {
-      // ignore missing column
-    } else if (upPhone2?.error) {
-      console.error("PROFILE PHONE UPDATE ERROR:", upPhone2.error);
-    }
-  }
+  if (upsert.error) return { ok: false, error: upsert.error };
 
   const read2 = await supabase
     .from("profiles")
-    .select(minimalSelect)
+    .select("id,email,full_name,role")
     .eq("id", user.id)
     .maybeSingle();
-
-  if (read2.error) console.error("PROFILE READ2 ERROR:", read2.error);
 
   return { ok: true, profile: read2.data || null };
 }
 
-function sanitizeAuthStorage() {
-  try {
-    const ref = new URL(SUPABASE_URL).hostname.split(".")[0];
-    const key = `sb-${ref}-auth-token`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    // If we have a token but Supabase can't produce a session, clear it.
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error || !data?.session) {
-        console.warn("Auth token exists but session is invalid. Clearing stored token.");
-        localStorage.removeItem(key);
+// ========================
+// SHIPPING ADDRESS RENDER (optional; won’t crash if elements missing)
+// ========================
+function renderShipTo(displayName) {
+  const box = $("shipToBlock");      // container
+  const nameEl = $("shipToName");    // name span
+  const linesEl = $("shipToLines");  // lines container
+  const copyBtn = $("shipToCopy");   // button
+  const msgEl = $("shipToMsg");      // message span
+
+  if (!box || !linesEl) return;
+
+  if (nameEl) nameEl.textContent = displayName || "Customer";
+
+  const textLines = [
+    `${displayName || "Customer"} — ${WAREHOUSE.companyCode}`,
+    WAREHOUSE.line1,
+    WAREHOUSE.line2,
+    WAREHOUSE.cityStateZip,
+  ];
+
+  linesEl.innerHTML = textLines.map(l => `<div>${escapeHTML(l)}</div>`).join("");
+
+  if (copyBtn && !copyBtn.__bound) {
+    copyBtn.__bound = true;
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(textLines.join("\n"));
+        if (msgEl) msgEl.textContent = "Copied!";
+        setTimeout(() => { if (msgEl) msgEl.textContent = ""; }, 1500);
+      } catch {
+        if (msgEl) msgEl.textContent = "Copy failed (browser blocked).";
       }
     });
-  } catch (_) {}
+  }
+
+  box.classList.remove("hidden");
 }
 
-
 // ========================
-// AUTH: STOP RECURSION / MULTI-LISTENERS
+// AUTH UI (debounced; no recursion)
 // ========================
-let __renderAuthBusy = false;
+let __renderAuthRunning = false;
 let __renderAuthQueued = false;
 
-function renderAuthDebounced() {
+function queueRenderAuth() {
   if (__renderAuthQueued) return;
   __renderAuthQueued = true;
   setTimeout(async () => {
@@ -314,30 +359,73 @@ function renderAuthDebounced() {
   }, 0);
 }
 
-function getProjectRef() {
+async function renderAuth() {
+  if (__renderAuthRunning) return;
+  __renderAuthRunning = true;
+
   try {
-    return new URL(SUPABASE_URL).hostname.split(".")[0];
-  } catch {
-    return "unknown";
+    const loginCard = $("loginCard");
+    const dashCard = $("dashCard");
+
+    const { user, error } = await safeGetUser();
+    if (error) console.warn("GET USER ERROR:", error);
+
+    const authed = !!user;
+
+    if (loginCard) loginCard.classList.toggle("hidden", authed);
+    if (dashCard) dashCard.classList.toggle("hidden", !authed);
+
+    if (!authed) {
+      if ($("adminLink")) $("adminLink").style.display = "none";
+      teardownChatRealtime();
+      return;
+    }
+
+    // If they signed up w/ email confirm ON, pending profile may exist
+    const pending = readPendingProfile();
+    if (pending) {
+      await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
+      clearPendingProfile();
+    } else {
+      await ensureProfile();
+    }
+
+    // Read profile name for display (safe minimal select)
+    const prof = await supabase
+      .from("profiles")
+      .select("full_name,role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const profile = prof?.data || {};
+    const displayName = profile?.full_name || user.email || "Customer";
+    if ($("userName")) $("userName").textContent = displayName;
+
+    // Admin link only if staff/admin
+    const role = profile?.role || "customer";
+    const isStaff = role === "staff" || role === "admin";
+    if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
+
+    // Render shipping address card (if your HTML includes it)
+    renderShipTo(displayName);
+
+    // Render dashboard data
+    await renderPackages("");
+    await renderUploads();
+  } finally {
+    __renderAuthRunning = false;
   }
 }
 
-function clearSupabaseAuthStorage() {
-  try {
-    const ref = getProjectRef();
-    localStorage.removeItem(`sb-${ref}-auth-token`);
-    localStorage.removeItem("pending_profile");
-  } catch {}
-}
-
-// ✅ If login gets stuck, this resets local auth state without wiping your whole browser storage.
-async function hardResetAuthState() {
-  try { await supabase.auth.signOut(); } catch {}
-  clearSupabaseAuthStorage();
+// Subscribe once
+if (!window.__CUSTOMER_AUTH_SUB__) {
+  window.__CUSTOMER_AUTH_SUB__ = supabase.auth.onAuthStateChange(() => {
+    queueRenderAuth();
+  });
 }
 
 // ========================
-// Login / Register / Logout
+// LOGIN / REGISTER / LOGOUT
 // ========================
 function setupLoginRegister() {
   const loginForm = $("loginForm");
@@ -350,126 +438,92 @@ function setupLoginRegister() {
     const msg = $("loginMsg");
     if (msg) msg.textContent = "Signing in...";
 
-    // Safety timeout so it never hangs forever
-    let timeoutHit = false;
-    const t = setTimeout(() => {
-      timeoutHit = true;
-      if (msg) msg.textContent = "Still signing in… (If this keeps happening, we’ll reset auth and try again.)";
-    }, 9000);
+    const email = ($("loginEmail")?.value || "").trim().toLowerCase();
+    const password = $("loginPassword")?.value || "";
 
-    try {
-      const email = $("loginEmail")?.value?.trim()?.toLowerCase();
-      const password = $("loginPassword")?.value;
+    // If a stale token exists, it can poison future logins — reset first
+    // (this is what fixes “only once” cases)
+    const { session } = await safeGetSession();
+    if (session && session.user) {
+      // Already signed in (maybe invisible UI state). Force render and exit.
+      if (msg) msg.textContent = "";
+      queueRenderAuth();
+      return;
+    }
 
-      // If a broken token is in storage, sign-in can behave weirdly.
-      // Reset stale storage first if we already have a junk session.
-      const sess0 = await supabase.auth.getSession();
-      logSB("PRE LOGIN SESSION", sess0);
+    // Try sign-in
+    const res = await supabase.auth.signInWithPassword({ email, password });
 
-      // Clear any stale session first (prevents one-login-only issues)
-      try { await supabase.auth.signOut(); } catch (_) {}
-
-      // Attempt login
-      const res = await supabase.auth.signInWithPassword({ email, password });
-      logSB("LOGIN RES", res);
-
-      if (res.error) {
-        // If auth storage is corrupted, retry once after clearing
-        const m = res.error.message || "";
-        if (m.toLowerCase().includes("refresh") || m.toLowerCase().includes("token") || timeoutHit) {
-          await hardResetAuthState();
-          const res2 = await supabase.auth.signInWithPassword({ email, password });
-          logSB("LOGIN RES (RETRY)", res2);
-          if (res2.error) {
-            if (msg) msg.textContent = `Login error: ${res2.error.message}`;
-            return;
-          }
-        } else {
-          if (msg) msg.textContent = `Login error: ${res.error.message}`;
-          return;
-        }
-      }
-
-      // ✅ Force UI update immediately (don’t rely only on onAuthStateChange)
-      const sess = await supabase.auth.getSession();
-      logSB("POST LOGIN SESSION", sess);
-
-      if (!sess?.data?.session) {
-        if (msg) msg.textContent = "Logged in but no session returned. Check Supabase Auth settings (email confirmation?).";
-        // Still try to rerender UI
-        renderAuthDebounced();
+    if (res.error) {
+      // If token storage is corrupt, reset and retry once.
+      console.warn("LOGIN ERROR:", res.error);
+      await hardResetAuth("login error retry");
+      const res2 = await supabase.auth.signInWithPassword({ email, password });
+      if (res2.error) {
+        if (msg) msg.textContent = res2.error.message;
         return;
       }
-
-      if (msg) msg.textContent = "";
-      renderAuthDebounced();
-    } catch (err) {
-      console.error(err);
-      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
-    } finally {
-      clearTimeout(t);
     }
+
+    // Force UI update even if auth event doesn’t fire
+    if (msg) msg.textContent = "";
+    queueRenderAuth();
   });
 
   // REGISTER
   regForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const msg = $("regMsg");
     if (msg) msg.textContent = "Creating account...";
 
-    try {
-      const full_name = $("regName")?.value?.trim() || "";
-      const phone = $("regPhone")?.value?.trim() || "";
-      const email = $("regEmail")?.value?.trim()?.toLowerCase();
-      const password = $("regPassword")?.value;
+    const full_name = ($("regName")?.value || "").trim();
+    const phone = ($("regPhone")?.value || "").trim();
+    const email = ($("regEmail")?.value || "").trim().toLowerCase();
+    const password = $("regPassword")?.value || "";
 
-      stashPendingProfile(full_name, phone, email);
+    // Save locally for confirm-email flows
+    stashPendingProfile(full_name, phone, email);
 
-      const res = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name, phone } },
-      });
+    const res = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name, phone } },
+    });
 
-      logSB("SIGNUP RES", res);
-
-      if (res.error) {
-        if (msg) msg.textContent = `Signup error: ${res.error.message}`;
-        return;
-      }
-
-      if (msg) msg.textContent = "Account created. If email confirmation is ON, confirm email then sign in.";
-      regForm.reset();
-    } catch (err) {
-      console.error(err);
-      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    if (res.error) {
+      if (msg) msg.textContent = res.error.message;
+      return;
     }
+
+    // If confirmation is off, a session may exist immediately; ensure profile then.
+    const ensured = await ensureProfile({ full_name, phone });
+    if (msg) {
+      if (ensured.ok) {
+        msg.textContent = "Account created. You can now log in.";
+        clearPendingProfile();
+      } else {
+        msg.textContent = "Account created. Check email to confirm, then log in.";
+      }
+    }
+
+    regForm.reset();
   });
 
-  // LOGOUT (bind once)
-  if (!window.__LOGOUT_BOUND__) {
-    window.__LOGOUT_BOUND__ = true;
-    $("logoutBtn")?.addEventListener("click", async () => {
-      try {
-        await supabase.auth.signOut();
-      } finally {
-        clearSupabaseAuthStorage();
-        location.reload();
-      }
-    });
-  }
+  // LOGOUT
+  $("logoutBtn")?.addEventListener("click", async () => {
+    await hardResetAuth("logout");
+    location.reload();
+  });
 }
 
 // ========================
-// Packages + invoices
+// PACKAGES + INVOICES
 // ========================
 async function renderPackages(filter = "") {
   const body = $("pkgBody");
   if (!body) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const { user } = await safeGetUser();
   if (!user) {
     body.innerHTML = `<tr><td colspan="4" class="muted">Please log in.</td></tr>`;
     return;
@@ -480,7 +534,9 @@ async function renderPackages(filter = "") {
     .select("tracking,status,pickup,pickup_confirmed,updated_at")
     .order("updated_at", { ascending: false });
 
-  if (filter.trim()) q = q.ilike("tracking", `%${filter.trim()}%`);
+  if (filter.trim()) {
+    q = q.ilike("tracking", `%${filter.trim()}%`);
+  }
 
   const { data, error } = await q;
   if (error) {
@@ -493,55 +549,42 @@ async function renderPackages(filter = "") {
     return;
   }
 
-  body.innerHTML = data
-    .map(
-      (p) => `
+  body.innerHTML = data.map(p => `
     <tr>
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td>${escapeHTML(pickupLabel(p.pickup))}${
-        p.pickup_confirmed
-          ? ` <span class="tag">Confirmed</span>`
-          : ` <span class="tag">Pending</span>`
-      }</td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}${p.pickup_confirmed ? ` <span class="tag">Confirmed</span>` : ` <span class="tag">Pending</span>`}</td>
       <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
-  `
-    )
-    .join("");
+  `).join("");
 }
 
 async function renderUploads() {
   const list = $("uploadsList");
   if (!list) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const { user } = await safeGetUser();
   if (!user) {
     list.innerHTML = `<li class="muted">Log in to see uploads.</li>`;
     return;
   }
 
-  const res = await supabase
+  const { data, error } = await supabase
     .from("invoices")
     .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
     .order("created_at", { ascending: false })
     .limit(10);
 
-  logSB("INVOICES SELECT", res);
-
-  if (res.error) {
-    list.innerHTML = `<li class="muted">${escapeHTML(res.error.message)}</li>`;
+  if (error) {
+    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
     return;
   }
-  if (!res.data?.length) {
+  if (!data?.length) {
     list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
     return;
   }
 
-  list.innerHTML = res.data
-    .map(
-      (i) => `
+  list.innerHTML = data.map(i => `
     <li>
       <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name)} (${escapeHTML(i.file_type)})</div>
       <div class="muted small">
@@ -549,9 +592,7 @@ async function renderUploads() {
         ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
       </div>
     </li>
-  `
-    )
-    .join("");
+  `).join("");
 }
 
 function setupPackageSearch() {
@@ -570,16 +611,15 @@ function setupInvoiceUpload() {
     e.preventDefault();
     if ($("invMsg")) $("invMsg").textContent = "Uploading...";
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
+    const { user } = await safeGetUser();
     if (!user) {
       if ($("invMsg")) $("invMsg").textContent = "Please log in.";
       return;
     }
 
-    const tracking = $("invTracking")?.value?.trim();
+    const tracking = ($("invTracking")?.value || "").trim();
     const pickup = $("invPickup")?.value;
-    const note = $("invNote")?.value?.trim();
+    const note = ($("invNote")?.value || "").trim();
     const fileInput = $("invFile");
 
     if (!tracking) {
@@ -592,28 +632,10 @@ function setupInvoiceUpload() {
     }
 
     const file = fileInput.files[0];
-
-    const allowed =
-      /(\.pdf|\.jpe?g|\.docx|\.xlsx|\.xls)$/i.test(file.name) ||
-      [
-        "application/pdf",
-        "image/jpeg",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-excel",
-      ].includes(file.type);
-
-    if (!allowed) {
-      if ($("invMsg")) $("invMsg").textContent = "Allowed: PDF, JPEG, DOCX, XLS/XLSX.";
-      return;
-    }
-
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
     const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { upsert: false });
-    logSB("INVOICE UPLOAD", up);
-
     if (up.error) {
       if ($("invMsg")) $("invMsg").textContent = up.error.message;
       return;
@@ -630,8 +652,6 @@ function setupInvoiceUpload() {
       note: note || null,
     });
 
-    logSB("INVOICE INSERT", ins);
-
     if (ins.error) {
       if ($("invMsg")) $("invMsg").textContent = ins.error.message;
       return;
@@ -644,40 +664,39 @@ function setupInvoiceUpload() {
 }
 
 // ========================
-// Chat (messages + optional attachment)
+// CHAT (customer)
 // ========================
 let chatChannel = null;
+
+function teardownChatRealtime() {
+  if (chatChannel) {
+    supabase.removeChannel(chatChannel);
+    chatChannel = null;
+  }
+}
 
 async function renderChat() {
   const body = $("chatBody");
   if (!body) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const { user } = await safeGetUser();
   if (!user) {
     body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`;
     return;
   }
 
-  const res = await supabase
+  const { data, error } = await supabase
     .from("messages")
     .select("id,sender,body,created_at")
     .order("created_at", { ascending: true })
     .limit(200);
 
-  logSB("MESSAGES SELECT", res);
-
-  if (res.error) {
-    body.innerHTML = `<div class="muted small">${escapeHTML(res.error.message)}</div>`;
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
     return;
   }
 
-  const data = res.data || [];
-
-  body.innerHTML =
-    (data.length ? data : [])
-      .map(
-        (m) => `
+  body.innerHTML = (data || []).map(m => `
     <div class="bubble ${m.sender === "customer" ? "me" : ""}">
       <div>${escapeHTML(m.body)}</div>
       <div class="meta">
@@ -685,87 +704,50 @@ async function renderChat() {
         <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
     </div>
-  `
-      )
-      .join("") || `<div class="muted small">Start the conversation. ${escapeHTML(HOURS_TEXT)}</div>`;
+  `).join("") || `<div class="muted small">Start the conversation. ${escapeHTML(HOURS_TEXT)}</div>`;
 
   body.scrollTop = body.scrollHeight;
 }
 
-let __chatQueued = false;
-function renderChatDebounced() {
-  if (__chatQueued) return;
-  __chatQueued = true;
-  setTimeout(async () => {
-    __chatQueued = false;
-    await renderChat();
-  }, 0);
-}
-
 async function setupChatRealtime() {
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const { user } = await safeGetUser();
   if (!user) return;
 
-  if (chatChannel) {
-    supabase.removeChannel(chatChannel);
-    chatChannel = null;
-  }
+  teardownChatRealtime();
 
   chatChannel = supabase
     .channel(`messages:${user.id}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
-      () => renderChatDebounced()
+      async () => {
+        await renderChat();
+      }
     )
     .subscribe();
 }
 
-async function sendChatMessage(text, file) {
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+async function sendChatMessage(text) {
+  const { user } = await safeGetUser();
   if (!user) return alert("Please log in to chat.");
 
-  const msgRes = await supabase
-    .from("messages")
-    .insert({ user_id: user.id, sender: "customer", body: text })
-    .select("id")
-    .single();
+  const { error } = await supabase.from("messages").insert({
+    user_id: user.id,
+    sender: "customer",
+    body: text,
+    resolved: false,
+  });
 
-  logSB("MESSAGE INSERT", msgRes);
-
-  if (msgRes.error) return alert(msgRes.error.message);
-
-  if (file) {
-    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-    const path = `${user.id}/messages/${Date.now()}_${safeName}`;
-
-    const up = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
-    logSB("CHAT FILE UPLOAD", up);
-
-    if (up.error) return alert(up.error.message);
-
-    const attRes = await supabase.from("message_attachments").insert({
-      message_id: msgRes.data.id,
-      user_id: user.id,
-      file_path: path,
-      file_name: safeName,
-      file_type: file.type || "unknown",
-    });
-
-    logSB("ATTACHMENT INSERT", attRes);
-
-    if (attRes.error) return alert(attRes.error.message);
-  }
+  if (error) throw error;
 }
 
 function openChat() {
-  injectCustomerChatStyles(); // ✅ ensure styles apply even if widget loads later
+  injectCustomerChatStyles();
   $("chatWidget")?.classList.remove("hidden");
   $("chatWidget")?.setAttribute("aria-hidden", "false");
   if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
-  renderChatDebounced();
+
+  renderChat();
   setupChatRealtime();
 }
 
@@ -785,89 +767,27 @@ function setupChatUI() {
   $("chatForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("chatInput");
-    const file = $("chatFile")?.files?.[0] || null;
     const msgEl = $("chatMsg");
 
     const text = (input?.value || "").trim();
-    if (!text && !file) {
-      if (msgEl) msgEl.textContent = "Type a message or attach a file.";
+    if (!text) {
+      if (msgEl) msgEl.textContent = "Type a message.";
       return;
     }
 
     if (msgEl) msgEl.textContent = "Sending...";
     if (input) input.value = "";
-    if ($("chatFile")) $("chatFile").value = "";
 
-    await sendChatMessage(text || "(Attachment)", file);
-    if (msgEl) msgEl.textContent = "";
-    renderChatDebounced(); // ✅ immediate refresh
-  });
-}
-
-// ========================
-// Auth render (GUARDED)
-// ========================
-async function renderAuth() {
-  if (__renderAuthBusy) return;
-  __renderAuthBusy = true;
-
-  try {
-    const loginCard = $("loginCard");
-    const dashCard = $("dashCard");
-
-    const { data: userData, error: uErr } = await supabase.auth.getUser();
-    if (uErr) console.error("GET USER ERROR:", uErr);
-
-    const user = userData?.user;
-    const authed = !!user;
-
-    if (loginCard) loginCard.classList.toggle("hidden", authed);
-    if (dashCard) dashCard.classList.toggle("hidden", !authed);
-
-    if (!authed) {
-      if ($("adminLink")) $("adminLink").style.display = "none";
-      if (chatChannel) {
-        supabase.removeChannel(chatChannel);
-        chatChannel = null;
-      }
-      return;
+    try {
+      await sendChatMessage(text);
+      if (msgEl) msgEl.textContent = "";
+      // immediate refresh so you see it even if realtime is off
+      await renderChat();
+      setTimeout(() => renderChat(), 1200);
+    } catch (err) {
+      console.error(err);
+      if (msgEl) msgEl.textContent = err?.message || String(err);
     }
-
-    const pending = readPendingProfile();
-    const ensured = pending
-      ? await ensureProfile({ full_name: pending.full_name, phone: pending.phone })
-      : await ensureProfile();
-
-    if (ensured?.ok && pending) clearPendingProfile();
-
-    const profRes = await supabase
-      .from("profiles")
-      .select("full_name,role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profRes.error) console.error("PROFILE READ (renderAuth) ERROR:", profRes.error);
-
-    const profile = profRes.data;
-    const displayName = profile?.full_name || user.email || "Customer";
-    if ($("userName")) $("userName").textContent = displayName;
-
-    const role = profile?.role || "customer";
-    const isStaff = role === "staff" || role === "admin";
-    if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
-
-    await renderPackages("");
-    await renderUploads();
-  } finally {
-    __renderAuthBusy = false;
-  }
-}
-
-// Subscribe ONCE
-if (!window.__AUTH_SUB__) {
-  window.__AUTH_SUB__ = supabase.auth.onAuthStateChange((event, session) => {
-    console.log("AUTH EVENT:", event, !!session);
-    renderAuthDebounced();
   });
 }
 
@@ -875,8 +795,7 @@ if (!window.__AUTH_SUB__) {
 // INIT
 // ========================
 function init() {
-  sanitizeAuthStorage();
-  injectCustomerChatStyles(); // ✅ apply customer chat fix immediately
+  injectCustomerChatStyles();
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
@@ -884,7 +803,17 @@ function init() {
   setupPackageSearch();
   setupInvoiceUpload();
   setupChatUI();
-  renderAuthDebounced();
+
+  // If there is a corrupt/stale token stored, reset it so login works repeatedly.
+  // This prevents “login only once” loops.
+  safeGetSession().then(async ({ session, error }) => {
+    if (error) {
+      await hardResetAuth("session read error at boot");
+    } else if (!session) {
+      // ok; just render logged-out UI
+    }
+    queueRenderAuth();
+  });
 }
 
 window.addEventListener("DOMContentLoaded", init);
