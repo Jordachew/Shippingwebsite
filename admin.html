@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
   <meta name="theme-color" content="#ffffff" />
 </head>
-<body class="bg">
+<body class="bg admin-page">
   <header class="topbar">
     <div class="container topbar__inner">
       <a class="brand" href="index.html">
@@ -119,6 +119,34 @@
           <div class="panel__actions">
             <input id="custSearch" class="input" placeholder="Search name / email / phone" />
             <button id="refreshCustomers" class="btn btn--ghost" type="button">Refresh</button>
+          </div>
+        </div>
+
+
+        <div class="card" id="bulkUploadCard">
+          <div class="card__head">
+            <h3 class="h3">Bulk upload packages</h3>
+            <p class="muted small">Upload a CSV to create many packages at once. Customer email is optional (if provided, the package will be assigned).</p>
+          </div>
+          <div class="card__body">
+            <div class="grid2" style="gap:12px;">
+              <div>
+                <label class="label">CSV file</label>
+                <input id="bulkPkgFile" class="input" type="file" accept=".csv,text/csv" />
+                <div class="muted small" style="margin-top:6px;">
+                  Columns: <code>tracking</code> (required), <code>status</code>, <code>store</code>, <code>approved</code>, <code>notes</code>, <code>customer_email</code>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                  <button id="bulkPkgTemplateBtn" class="btn btn--ghost" type="button">Download template</button>
+                  <button id="bulkPkgUploadBtn" class="btn" type="button">Upload CSV</button>
+                </div>
+              </div>
+              <div>
+                <label class="label">Or paste CSV</label>
+                <textarea id="bulkPkgText" class="input" rows="8" placeholder="tracking,status,store,approved,notes,customer_email&#10;1Z999...,RECEIVED,Amazon,true,,customer@example.com"></textarea>
+              </div>
+            </div>
+            <div id="bulkPkgMsg" class="muted small" style="margin-top:10px;"></div>
           </div>
         </div>
 

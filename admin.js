@@ -22,6 +22,52 @@ const CHAT_BUCKET = "chat_files"; // optional (if you later add attachments)
 // Safe singleton (prevents double-load issues)
 window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabase = window.__SB__;
+// ========================
+// AUTH SAFE HELPERS (prevents AuthSessionMissingError + "login once" bugs)
+// ========================
+function getProjectRef(){
+  try { return new URL(SUPABASE_URL).hostname.split(".")[0]; } catch { return ""; }
+}
+function clearSupabaseAuthStorage(){
+  try{
+    const ref=getProjectRef();
+    if(ref) localStorage.removeItem(`sb-${ref}-auth-token`);
+  }catch(_){}
+}
+async function safeGetSession(){
+  try{
+    const { data, error } = await supabase.auth.getSession();
+    return { session: data?.session || null, error: error || null };
+  }catch(e){ return { session:null, error:e }; }
+}
+async function safeGetUser(){
+  const { session, error: sErr } = await safeGetSession();
+  if(sErr) return { user:null, session:null, error:sErr };
+  if(!session) return { user:null, session:null, error:null };
+  try{
+    const { data, error } = await supabase.auth.getUser();
+    if(error) return { user: session.user || null, session, error };
+    return { user: data?.user || session.user || null, session, error:null };
+  }catch(e){ return { user: session?.user || null, session, error:e }; }
+}
+(function sanitizeAuthOnBoot(){
+  try{
+    const ref=getProjectRef();
+    const k = ref ? `sb-${ref}-auth-token` : "";
+    const hasToken = k && !!localStorage.getItem(k);
+    if(!hasToken) return;
+    safeGetSession().then(({session})=>{
+      if(!session){
+        localStorage.removeItem(k);
+        if(!sessionStorage.getItem("sb_admin_sanitized_once")){
+          sessionStorage.setItem("sb_admin_sanitized_once","1");
+          location.reload();
+        }
+      }
+    });
+  }catch(_){}
+})();
+
 
 // ========================
 // HELPERS
@@ -704,12 +750,23 @@ async function sendStaffMessage(text) {
 
   if (msgEl) msgEl.textContent = "Sending…";
 
-  const { error } = await supabase.from("messages").insert({
+  let { error } = await supabase.from("messages").insert({
     user_id: selectedConvoUserId,
     sender: "staff",
     body: text,
     resolved: false
   });
+
+  // If DB constraint does not allow "staff", retry with "admin"
+  if (error && (String(error.message || "").includes("messages_sender_check") || error.code === "23514")) {
+    const retry = await supabase.from("messages").insert({
+      user_id: selectedConvoUserId,
+      sender: "admin",
+      body: text,
+      resolved: false
+    });
+    error = retry.error || null;
+  }
 
   if (error) {
     if (msgEl) msgEl.textContent = error.message;
@@ -759,8 +816,42 @@ function teardownRealtime() {
 }
 
 function ensureMessageLiveUpdates() {
-  // Realtime-only: polling caused constant refresh and hid replies.
-  // If you want polling later, reintroduce it carefully per selected conversation.
+  // Always keep a fallback poll running (5 sec)
+  if (!pollTimer) {
+    pollTimer = setInterval(async () => {
+      if (!currentUser) return;
+      if ($("adminApp")?.classList.contains("hidden")) return;
+
+      // If viewing messages tab and a convo is selected, refresh chat and convo list.
+      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
+      if (!messagesPanelVisible) return;
+
+      await loadConversations();
+      if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
+    }, 5000);
+  }
+
+  // Realtime subscription for inserts (best case)
+  // If Realtime isn't enabled for table "messages", this won't fire, but poll will still work.
+  if (msgChannel) {
+    supabase.removeChannel(msgChannel);
+    msgChannel = null;
+  }
+
+  msgChannel = supabase
+    .channel("admin-messages-live")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, async (payload) => {
+      const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
+      if (!messagesPanelVisible) return;
+
+      await loadConversations();
+
+      const m = payload?.new;
+      if (selectedConvoUserId && m?.user_id === selectedConvoUserId) {
+        await renderChatFor(selectedConvoUserId);
+      }
+    })
+    .subscribe();
 }
 
 // ========================
@@ -889,7 +980,207 @@ async function refreshAll() {
 // ========================
 // EVENTS
 // ========================
+
+// ========================
+// BULK UPLOAD PACKAGES (CSV)
+// ========================
+function parseCSV(text) {
+  // Minimal CSV parser: supports quoted values, commas, and newlines.
+  // Returns array of objects using header row.
+  const rows = [];
+  if (!text) return rows;
+
+  const lines = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (ch === '"' && inQuotes && next === '"') {
+      cur += '"';
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && (ch === "\n" || ch === "\r")) {
+      if (ch === "\r" && next === "\n") i++;
+      lines.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur.length) lines.push(cur);
+
+  const splitLine = (line) => {
+    const out = [];
+    let v = "";
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      const next = line[i + 1];
+      if (ch === '"' && q && next === '"') { v += '"'; i++; continue; }
+      if (ch === '"') { q = !q; continue; }
+      if (!q && ch === ",") { out.push(v.trim()); v = ""; continue; }
+      v += ch;
+    }
+    out.push(v.trim());
+    return out;
+  };
+
+  const headerLine = lines.find(l => l.trim().length);
+  if (!headerLine) return rows;
+
+  const headers = splitLine(headerLine).map(h => h.trim().toLowerCase());
+  for (const line of lines.slice(lines.indexOf(headerLine) + 1)) {
+    if (!line.trim()) continue;
+    const cols = splitLine(line);
+    const obj = {};
+    headers.forEach((h, idx) => obj[h] = (cols[idx] ?? "").trim());
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function downloadCSVTemplate() {
+  const template =
+`tracking,status,store,approved,notes,customer_email
+1Z999AA10123456784,RECEIVED,Amazon,true,,customer@example.com
+1Z999AA10123456785,IN_TRANSIT,SHEIN,true,Fragile,
+`;
+  const blob = new Blob([template], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bulk_packages_template.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toBool(v, fallback = true) {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return fallback;
+  if (["true", "1", "yes", "y"].includes(s)) return true;
+  if (["false", "0", "no", "n"].includes(s)) return false;
+  return fallback;
+}
+
+async function lookupUserIdByEmail(email) {
+  if (!email) return null;
+  const e = email.trim().toLowerCase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .eq("email", e)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id || null;
+}
+
+async function bulkUploadPackagesFromRows(rows) {
+  const msg = $("bulkPkgMsg");
+  if (!rows?.length) {
+    if (msg) msg.textContent = "No rows found. Upload a CSV or paste content first.";
+    return;
+  }
+
+  // Require staff/admin already signed in
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) {
+    if (msg) msg.textContent = "Please sign in first.";
+    return;
+  }
+
+  if (msg) msg.textContent = `Validating ${rows.length} rows…`;
+
+  const prepared = [];
+  let assigned = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || {};
+    const tracking = (r.tracking || r.tracking_number || r.trackingno || "").trim();
+    if (!tracking) {
+      throw new Error(`Row ${i + 2}: tracking is required.`);
+    }
+    const status = (r.status || "RECEIVED").trim().toUpperCase();
+    const store = (r.store || "").trim() || null;
+    const notes = (r.notes || r.note || "").trim() || null;
+    const approved = toBool(r.approved, true);
+
+    let user_id = null;
+    const email = (r.customer_email || r.email || "").trim();
+    if (email) {
+      user_id = await lookupUserIdByEmail(email);
+      if (!user_id) {
+        console.warn(`Row ${i + 2}: customer_email not found in profiles: ${email}`);
+      } else {
+        assigned++;
+      }
+    }
+
+    // Only use columns known to exist from the admin dashboard code
+    prepared.push({
+      tracking,
+      status,
+      store,
+      notes,
+      approved,
+      user_id, // can be null (unassigned)
+    });
+  }
+
+  // Insert in batches
+  const batchSize = 200;
+  let inserted = 0;
+
+  for (let i = 0; i < prepared.length; i += batchSize) {
+    const batch = prepared.slice(i, i + batchSize);
+    if (msg) msg.textContent = `Uploading… (${Math.min(i + batch.length, prepared.length)}/${prepared.length})`;
+
+    // If you want upsert by tracking, change to .upsert(batch, { onConflict: "tracking" })
+    const { error } = await supabase.from("packages").insert(batch);
+    if (error) throw error;
+    inserted += batch.length;
+  }
+
+  if (msg) msg.textContent = `✅ Uploaded ${inserted} packages. Assigned to customers: ${assigned}.`;
+  await loadPackages();
+}
+
+function setupBulkUploadUI() {
+  $("bulkPkgTemplateBtn")?.addEventListener("click", downloadCSVTemplate);
+
+  $("bulkPkgUploadBtn")?.addEventListener("click", async () => {
+    const msg = $("bulkPkgMsg");
+    try {
+      if (msg) msg.textContent = "";
+
+      let text = ($("bulkPkgText")?.value || "").trim();
+
+      const file = $("bulkPkgFile")?.files?.[0];
+      if (file) {
+        text = await file.text();
+      }
+
+      const rows = parseCSV(text);
+      await bulkUploadPackagesFromRows(rows);
+    } catch (e) {
+      console.error(e);
+      if (msg) msg.textContent = `❌ ${e?.message || String(e)}`;
+    }
+  });
+}
+
+
 function setupEvents() {
+  setupBulkUploadUI();
   // Login
   $("adminLoginForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -966,7 +1257,7 @@ function setupEvents() {
 // ========================
 // INIT
 // ========================
-async function init() {
+async async function init() {
   validateDom();
   injectAdminChatContrastFix();
   tabAPI = setupTabs();
