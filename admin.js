@@ -23,27 +23,20 @@ const CHAT_BUCKET = "chat_files"; // optional (if you later add attachments)
 window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabase = window.__SB__;
 
+
+
 // ========================
-// AUTH HARDENING (fixes “login once” / stuck sign-in)
+// AUTH HELPERS (ADMIN) — prevents "Auth session missing" + one-login issues
 // ========================
 function getProjectRef() {
   try { return new URL(SUPABASE_URL).hostname.split(".")[0]; } catch { return ""; }
 }
-
 function clearSupabaseAuthStorage() {
   try {
     const ref = getProjectRef();
     if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
-    localStorage.removeItem("pending_profile");
   } catch (_) {}
 }
-
-async function hardResetAuth(reason = "") {
-  console.warn("[admin] hardResetAuth:", reason);
-  try { await supabase.auth.signOut(); } catch (_) {}
-  clearSupabaseAuthStorage();
-}
-
 async function safeGetSession() {
   try {
     const { data, error } = await supabase.auth.getSession();
@@ -53,13 +46,10 @@ async function safeGetSession() {
     return { session: null, error: e };
   }
 }
-
 async function safeGetUser() {
-  // Session-first: avoids AuthSessionMissingError
   const { session, error: sErr } = await safeGetSession();
   if (sErr) return { user: null, session: null, error: sErr };
   if (!session) return { user: null, session: null, error: null };
-
   try {
     const { data, error } = await supabase.auth.getUser();
     if (error) return { user: session.user || null, session, error };
@@ -68,19 +58,11 @@ async function safeGetUser() {
     return { user: session.user || null, session, error: e };
   }
 }
-
-async function withTimeout(promise, ms = 12000) {
-  let t;
-  const timeout = new Promise((_, reject) => {
-    t = setTimeout(() => reject(new Error("Request timed out")), ms);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(t);
-  }
+async function hardResetAuth(reason="") {
+  console.warn("Admin hardResetAuth:", reason);
+  try { await supabase.auth.signOut(); } catch (_) {}
+  clearSupabaseAuthStorage();
 }
-
 // ========================
 // HELPERS
 // ========================
@@ -123,7 +105,6 @@ let pollTimer = null;       // fallback poll for messages
 let selectedConvoUserId = null;
 
 let selectedPackage = null; // currently selected package object
-let lastChatUpdatedAt = null; // used to avoid constant re-render polling
 
 // ========================
 // DOM VALIDATION (for your debugging)
@@ -136,7 +117,6 @@ function validateDom() {
     "statsRow", "recentPackages", "recentMessages",
     "customersBody", "custSearch", "refreshCustomers", "customerDetail",
     "packagesBody", "pkgSearch", "statusFilter", "refreshPackages", "pkgMsg",
-    "bulkCsvFile", "bulkCsvText", "bulkDownloadTemplate", "bulkUploadBtn", "bulkMsg",
     "pkgEditForm", "pkgEditId", "pkgEditTracking", "pkgEditStatus", "pkgEditStore", "pkgEditApproved", "pkgEditNotes", "pkgEditMsg",
     "convoList", "adminChatBody", "adminChatForm", "adminChatInput", "adminChatMsg", "convoTitle", "markResolvedBtn",
     "msgSearch", "msgFilter", "refreshMessages",
@@ -166,6 +146,7 @@ function isStaffRole(role) {
 }
 
 async function requireStaffSession() {
+  // Session-first avoids AuthSessionMissingError poisoning the UI
   const { user, error: uErr } = await safeGetUser();
   if (uErr) return { ok: false, error: uErr };
   if (!user) return { ok: false, error: new Error("Not logged in") };
@@ -182,6 +163,7 @@ async function requireStaffSession() {
   currentProfile = prof;
   return { ok: true, user, profile: prof };
 }
+
 
 async function renderAuthState() {
   const loginCard = $("adminLoginCard");
@@ -742,9 +724,6 @@ async function renderChatFor(userId) {
 
     body.scrollTop = body.scrollHeight;
   }
-
-  // Remember latest timestamp so polling doesn't re-render constantly
-  lastChatUpdatedAt = (msgs && msgs.length) ? msgs[msgs.length - 1].created_at : null;
 }
 
 async function sendStaffMessage(text) {
@@ -756,26 +735,20 @@ async function sendStaffMessage(text) {
 
   if (msgEl) msgEl.textContent = "Sending…";
 
-  // Some databases enforce a sender check constraint. We try common staff values.
-  const senderCandidates = ["staff", "admin", "support"];
-  let lastErr = null;
-  for (const sender of senderCandidates) {
-    const { error } = await supabase.from("messages").insert({
-      user_id: selectedConvoUserId,
-      sender,
-      body: text,
-      resolved: false
-    });
-    if (!error) { lastErr = null; break; }
-    lastErr = error;
-    // Only retry if it looks like a sender constraint issue
-    if (!String(error.message || "").toLowerCase().includes("sender") && !String(error.message || "").includes("check constraint")) {
-      break;
-    }
+  const { error } = let ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "staff", body: text, resolved: false });
+
+  // If DB constraint blocks "staff", retry with "admin" then "support"
+  if (ins.error && String(ins.error.message || "").toLowerCase().includes("messages_sender_check")) {
+    ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "admin", body: text, resolved: false });
+  }
+  if (ins.error && String(ins.error.message || "").toLowerCase().includes("messages_sender_check")) {
+    ins = await supabase.from("messages").insert({ user_id: selectedConvoUserId, sender: "support", body: text, resolved: false });
   }
 
-  if (lastErr) {
-    if (msgEl) msgEl.textContent = lastErr.message;
+  const { error } = ins;
+
+  if (error) {
+    if (msgEl) msgEl.textContent = error.message;
     return;
   }
 
@@ -822,7 +795,7 @@ function teardownRealtime() {
 }
 
 function ensureMessageLiveUpdates() {
-  // Fallback poll (lightweight; avoids constant full re-render)
+  // Always keep a fallback poll running (5 sec)
   if (!pollTimer) {
     pollTimer = setInterval(async () => {
       if (!currentUser) return;
@@ -832,31 +805,17 @@ function ensureMessageLiveUpdates() {
       const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
       if (!messagesPanelVisible) return;
 
-      // Update convo list
       await loadConversations();
-
-      // Only re-render chat if a new message arrived
-      if (selectedConvoUserId) {
-        const { data, error } = await supabase
-          .from("messages")
-          .select("created_at")
-          .eq("user_id", selectedConvoUserId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!error) {
-          const latest = data?.created_at || null;
-          if (latest && latest !== lastChatUpdatedAt) {
-            await renderChatFor(selectedConvoUserId);
-          }
-        }
-      }
-    }, 10000);
+      if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
+    }, 5000);
   }
 
   // Realtime subscription for inserts (best case)
   // If Realtime isn't enabled for table "messages", this won't fire, but poll will still work.
-  if (msgChannel) return; // already subscribed
+  if (msgChannel) {
+    supabase.removeChannel(msgChannel);
+    msgChannel = null;
+  }
 
   msgChannel = supabase
     .channel("admin-messages-live")
@@ -868,7 +827,6 @@ function ensureMessageLiveUpdates() {
 
       const m = payload?.new;
       if (selectedConvoUserId && m?.user_id === selectedConvoUserId) {
-        // Append by re-render (simple) but only when something new arrives
         await renderChatFor(selectedConvoUserId);
       }
     })
@@ -987,138 +945,6 @@ async function exportPackagesCSV() {
 }
 
 // ========================
-// BULK UPLOAD PACKAGES (CSV)
-// ========================
-function parseCSV(text) {
-  // Minimal CSV parser with quoted-field support
-  const rows = [];
-  let row = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-    if (inQuotes) {
-      if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
-      if (ch === '"') { inQuotes = false; continue; }
-      cur += ch;
-      continue;
-    }
-    if (ch === '"') { inQuotes = true; continue; }
-    if (ch === ',') { row.push(cur.trim()); cur = ""; continue; }
-    if (ch === '\n') {
-      row.push(cur.trim());
-      const nonEmpty = row.some(c => String(c).trim() !== "");
-      if (nonEmpty) rows.push(row);
-      row = []; cur = "";
-      continue;
-    }
-    if (ch === '\r') continue;
-    cur += ch;
-  }
-  row.push(cur.trim());
-  if (row.some(c => String(c).trim() !== "")) rows.push(row);
-  return rows;
-}
-
-function bulkTemplateCSV() {
-  return [
-    "tracking,customer_email,status,store,approved,notes",
-    "1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile",
-    "9400111899223856920000,customer2@example.com,IN_TRANSIT,Shein,true,"
-  ].join("\n");
-}
-
-async function bulkUploadPackagesFromCSV(csvText) {
-  const msg = $("bulkMsg");
-  if (msg) msg.textContent = "Parsing CSV…";
-
-  const rows = parseCSV(csvText || "");
-  if (!rows.length) {
-    if (msg) msg.textContent = "CSV is empty.";
-    return;
-  }
-
-  const header = rows[0].map(h => String(h || "").trim().toLowerCase());
-  const idx = (name) => header.indexOf(name);
-  const iTracking = idx("tracking");
-  if (iTracking === -1) {
-    if (msg) msg.textContent = "CSV must include a 'tracking' column.";
-    return;
-  }
-  const iEmail = idx("customer_email");
-  const iStatus = idx("status");
-  const iStore = idx("store");
-  const iApproved = idx("approved");
-  const iNotes = idx("notes");
-
-  // Build raw rows
-  const raw = [];
-  for (let r = 1; r < rows.length; r++) {
-    const cols = rows[r];
-    const tracking = String(cols[iTracking] || "").trim();
-    if (!tracking) continue;
-    raw.push({
-      tracking,
-      customer_email: iEmail >= 0 ? String(cols[iEmail] || "").trim().toLowerCase() : "",
-      status: iStatus >= 0 ? String(cols[iStatus] || "").trim() : "RECEIVED",
-      store: iStore >= 0 ? String(cols[iStore] || "").trim() : "",
-      approved: iApproved >= 0 ? String(cols[iApproved] || "").trim().toLowerCase() : "true",
-      notes: iNotes >= 0 ? String(cols[iNotes] || "").trim() : ""
-    });
-  }
-
-  if (!raw.length) {
-    if (msg) msg.textContent = "No data rows found.";
-    return;
-  }
-
-  // Lookup emails -> user_id (profiles)
-  const emailSet = new Set(raw.map(x => x.customer_email).filter(Boolean));
-  const emails = Array.from(emailSet);
-  const emailToId = {};
-  if (emails.length) {
-    if (msg) msg.textContent = `Looking up ${emails.length} customer emails…`;
-    const { data: profs, error: pErr } = await supabase
-      .from("profiles")
-      .select("id,email")
-      .in("email", emails);
-    if (pErr) {
-      if (msg) msg.textContent = `Profile lookup error: ${pErr.message}`;
-      return;
-    }
-    for (const p of (profs || [])) {
-      if (p?.email) emailToId[String(p.email).toLowerCase()] = p.id;
-    }
-  }
-
-  const payload = raw.map(x => ({
-    tracking: x.tracking,
-    status: x.status || "RECEIVED",
-    store: x.store || null,
-    approved: x.approved === "false" ? false : true,
-    notes: x.notes || null,
-    user_id: x.customer_email ? (emailToId[x.customer_email] || null) : null
-  }));
-
-  // Upsert by tracking to avoid duplicate errors if re-uploaded
-  if (msg) msg.textContent = `Uploading ${payload.length} packages…`;
-  const { error: upErr } = await supabase
-    .from("packages")
-    .upsert(payload, { onConflict: "tracking" });
-
-  if (upErr) {
-    if (msg) msg.textContent = `Upload failed: ${upErr.message}`;
-    return;
-  }
-
-  const unassigned = payload.filter(p => !p.user_id).length;
-  if (msg) msg.textContent = `Uploaded ${payload.length} packages. Unassigned (no customer match): ${unassigned}.`;
-  await loadPackages();
-  await refreshStatsOnly();
-}
-
-// ========================
 // REFRESH ALL
 // ========================
 async function refreshAll() {
@@ -1143,44 +969,19 @@ function setupEvents() {
     const email = $("adminEmail").value.trim().toLowerCase();
     const password = $("adminPassword").value;
 
-    try {
-      // If a stale token is present it can poison the next login.
-      // Clean it up if session is missing but token exists.
-      const { session } = await safeGetSession();
-      if (session?.user) {
-        if (msg) msg.textContent = "";
-        await renderAuthState();
-        return;
-      }
-
-      let res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
-      if (res?.error) {
-        console.warn("[admin] signIn error (retry after reset):", res.error);
-        await hardResetAuth("signin retry");
-        res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
-      }
-      if (res?.error) {
-        if (msg) msg.textContent = res.error.message;
-        return;
-      }
-
-      // Ensure a session exists
-      const { session: s2, error: s2e } = await safeGetSession();
-      if (s2e) {
-        if (msg) msg.textContent = "Session error: " + s2e.message;
-        return;
-      }
-      if (!s2) {
-        if (msg) msg.textContent = "No session returned. Check email confirmation settings.";
-        return;
-      }
-
-      if (msg) msg.textContent = "";
-      await renderAuthState();
-    } catch (err) {
-      console.error("[admin] login failed:", err);
-      if (msg) msg.textContent = err?.message || String(err);
+    let __loginRes = await supabase.auth.signInWithPassword({ email, password });
+    if (__loginRes.error) {
+      console.warn("ADMIN LOGIN ERROR:", __loginRes.error);
+      await hardResetAuth("login retry");
+      __loginRes = await supabase.auth.signInWithPassword({ email, password });
     }
+    const { error } = __loginRes;
+if (error) {
+      if (msg) msg.textContent = error.message;
+      return;
+    }
+    if (msg) msg.textContent = "";
+    await renderAuthState();
   });
 
   // Logout
@@ -1188,7 +989,7 @@ function setupEvents() {
     teardownRealtime();
     await hardResetAuth("logout");
     location.reload();
-  });
+});
 
   // Filters
   $("refreshCustomers")?.addEventListener("click", loadCustomers);
@@ -1200,36 +1001,6 @@ function setupEvents() {
 
   // Package edit
   $("pkgEditForm")?.addEventListener("submit", onSavePackage);
-
-  // Bulk upload
-  $("bulkDownloadTemplate")?.addEventListener("click", () => {
-    downloadText("packages_template.csv", bulkTemplateCSV());
-  });
-  $("bulkUploadBtn")?.addEventListener("click", async () => {
-    const msg = $("bulkMsg");
-    const textArea = $("bulkCsvText");
-    const fileInput = $("bulkCsvFile");
-    const pasted = (textArea?.value || "").trim();
-
-    // Prefer pasted text; if empty, use file.
-    if (pasted) {
-      await bulkUploadPackagesFromCSV(pasted);
-      return;
-    }
-    const file = fileInput?.files?.[0];
-    if (!file) {
-      if (msg) msg.textContent = "Paste CSV or choose a CSV file.";
-      return;
-    }
-    if (msg) msg.textContent = "Reading file…";
-    const fileText = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsText(file);
-    });
-    await bulkUploadPackagesFromCSV(fileText);
-  });
 
   // Messages
   $("refreshMessages")?.addEventListener("click", async () => {
@@ -1280,3 +1051,19 @@ async function init() {
 }
 
 window.addEventListener("DOMContentLoaded", init);
+
+
+// Admin boot sanitize: if an auth token exists but session is missing, clear once and reload.
+(async function adminBootSanitize(){
+  try {
+    const ref = getProjectRef();
+    const tokenKey = ref ? `sb-${ref}-auth-token` : "";
+    const hasToken = tokenKey ? !!localStorage.getItem(tokenKey) : false;
+    const { session } = await safeGetSession();
+    if (hasToken && !session) {
+      console.warn("Admin sanitize: token present but no session. Clearing token.");
+      clearSupabaseAuthStorage();
+      location.reload();
+    }
+  } catch (_) {}
+})(); 

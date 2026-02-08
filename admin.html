@@ -6,6 +6,19 @@
   <title>Sueños Shipping — Staff Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
   <meta name="theme-color" content="#ffffff" />
+
+  <style>
+    /* ADMIN CHAT OVERRIDE */
+    body.admin-page #adminChatBody,
+    body.admin-page #adminChatBody * {
+      color: #111 !important;
+    }
+    body.admin-page #adminChatInput {
+      color:#111 !important;
+      background:#fff !important;
+    }
+  </style>
+
 </head>
 <body class="bg admin-page">
   <header class="topbar">
@@ -183,33 +196,6 @@
               </table>
             </div>
             <div id="pkgMsg" class="muted small"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card__head">
-            <h3 class="h3">Bulk upload packages</h3>
-            <p class="muted small">Upload many packages at once using CSV. Supports file upload or pasted CSV.</p>
-          </div>
-          <div class="card__body">
-            <div class="grid2">
-              <label class="field">
-                <span>CSV file</span>
-                <input id="bulkCsvFile" type="file" accept=".csv,text/csv" />
-              </label>
-              <div class="field">
-                <span>Template</span>
-                <div class="row">
-                  <button id="bulkDownloadTemplate" class="btn btn--ghost" type="button">Download CSV template</button>
-                  <button id="bulkUploadBtn" class="btn" type="button">Upload CSV</button>
-                </div>
-              </div>
-            </div>
-            <label class="field">
-              <span>Or paste CSV</span>
-              <textarea id="bulkCsvText" rows="6" placeholder="tracking,customer_email,status,store,approved,notes\n1Z999...,user@email.com,RECEIVED,Amazon,true,Fragile"></textarea>
-            </label>
-            <div id="bulkMsg" class="muted small"></div>
           </div>
         </div>
 
