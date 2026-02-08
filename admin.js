@@ -22,52 +22,64 @@ const CHAT_BUCKET = "chat_files"; // optional (if you later add attachments)
 // Safe singleton (prevents double-load issues)
 window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabase = window.__SB__;
+
 // ========================
-// AUTH SAFE HELPERS (prevents AuthSessionMissingError + "login once" bugs)
+// AUTH HARDENING (fixes “login once” / stuck sign-in)
 // ========================
-function getProjectRef(){
+function getProjectRef() {
   try { return new URL(SUPABASE_URL).hostname.split(".")[0]; } catch { return ""; }
 }
-function clearSupabaseAuthStorage(){
-  try{
-    const ref=getProjectRef();
-    if(ref) localStorage.removeItem(`sb-${ref}-auth-token`);
-  }catch(_){}
-}
-async function safeGetSession(){
-  try{
-    const { data, error } = await supabase.auth.getSession();
-    return { session: data?.session || null, error: error || null };
-  }catch(e){ return { session:null, error:e }; }
-}
-async function safeGetUser(){
-  const { session, error: sErr } = await safeGetSession();
-  if(sErr) return { user:null, session:null, error:sErr };
-  if(!session) return { user:null, session:null, error:null };
-  try{
-    const { data, error } = await supabase.auth.getUser();
-    if(error) return { user: session.user || null, session, error };
-    return { user: data?.user || session.user || null, session, error:null };
-  }catch(e){ return { user: session?.user || null, session, error:e }; }
-}
-(function sanitizeAuthOnBoot(){
-  try{
-    const ref=getProjectRef();
-    const k = ref ? `sb-${ref}-auth-token` : "";
-    const hasToken = k && !!localStorage.getItem(k);
-    if(!hasToken) return;
-    safeGetSession().then(({session})=>{
-      if(!session){
-        localStorage.removeItem(k);
-        if(!sessionStorage.getItem("sb_admin_sanitized_once")){
-          sessionStorage.setItem("sb_admin_sanitized_once","1");
-          location.reload();
-        }
-      }
-    });
-  }catch(_){}
-})();
 
+function clearSupabaseAuthStorage() {
+  try {
+    const ref = getProjectRef();
+    if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch (_) {}
+}
+
+async function hardResetAuth(reason = "") {
+  console.warn("[admin] hardResetAuth:", reason);
+  try { await supabase.auth.signOut(); } catch (_) {}
+  clearSupabaseAuthStorage();
+}
+
+async function safeGetSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { session: null, error };
+    return { session: data?.session || null, error: null };
+  } catch (e) {
+    return { session: null, error: e };
+  }
+}
+
+async function safeGetUser() {
+  // Session-first: avoids AuthSessionMissingError
+  const { session, error: sErr } = await safeGetSession();
+  if (sErr) return { user: null, session: null, error: sErr };
+  if (!session) return { user: null, session: null, error: null };
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { user: session.user || null, session, error };
+    return { user: data?.user || session.user || null, session, error: null };
+  } catch (e) {
+    return { user: session.user || null, session, error: e };
+  }
+}
+
+async function withTimeout(promise, ms = 12000) {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error("Request timed out")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 // ========================
 // HELPERS
@@ -97,18 +109,7 @@ function downloadText(filename, text) {
   a.remove();
 }
 
-function injectAdminChatContrastFix() {
-  // Makes chat text + input readable even if theme is dark.
-  const css = `
-    #adminChatBody { color: #fff !important; }
-    #adminChatInput { color: #fff !important; background: rgba(0,0,0,0.35) !important; border: 1px solid rgba(255,255,255,0.15) !important; }
-    #adminChatInput::placeholder { color: rgba(255,255,255,0.6) !important; }
-  `;
-  const style = document.createElement("style");
-  style.setAttribute("data-admin-fix", "chat-contrast");
-  style.textContent = css;
-  document.head.appendChild(style);
-}
+function injectAdminChatContrastFix(){ /* styles handled in styles.css */ }
 
 // ========================
 // GLOBAL STATE
@@ -122,6 +123,7 @@ let pollTimer = null;       // fallback poll for messages
 let selectedConvoUserId = null;
 
 let selectedPackage = null; // currently selected package object
+let lastChatUpdatedAt = null; // used to avoid constant re-render polling
 
 // ========================
 // DOM VALIDATION (for your debugging)
@@ -134,6 +136,7 @@ function validateDom() {
     "statsRow", "recentPackages", "recentMessages",
     "customersBody", "custSearch", "refreshCustomers", "customerDetail",
     "packagesBody", "pkgSearch", "statusFilter", "refreshPackages", "pkgMsg",
+    "bulkCsvFile", "bulkCsvText", "bulkDownloadTemplate", "bulkUploadBtn", "bulkMsg",
     "pkgEditForm", "pkgEditId", "pkgEditTracking", "pkgEditStatus", "pkgEditStore", "pkgEditApproved", "pkgEditNotes", "pkgEditMsg",
     "convoList", "adminChatBody", "adminChatForm", "adminChatInput", "adminChatMsg", "convoTitle", "markResolvedBtn",
     "msgSearch", "msgFilter", "refreshMessages",
@@ -151,7 +154,9 @@ function validateDom() {
 async function readProfileById(userId) {
   return await supabase
     .from("profiles")
-    .select("id,email,full_name,role,is_active,phone,address")
+    // Keep minimal so the query doesn't fail if optional columns
+    // (phone/address) are not present yet.
+    .select("id,email,full_name,role,is_active")
     .eq("id", userId)
     .maybeSingle();
 }
@@ -161,10 +166,8 @@ function isStaffRole(role) {
 }
 
 async function requireStaffSession() {
-  const { data: userData, error: uErr } = await supabase.auth.getUser();
+  const { user, error: uErr } = await safeGetUser();
   if (uErr) return { ok: false, error: uErr };
-
-  const user = userData?.user;
   if (!user) return { ok: false, error: new Error("Not logged in") };
 
   const profRes = await readProfileById(user.id);
@@ -739,6 +742,9 @@ async function renderChatFor(userId) {
 
     body.scrollTop = body.scrollHeight;
   }
+
+  // Remember latest timestamp so polling doesn't re-render constantly
+  lastChatUpdatedAt = (msgs && msgs.length) ? msgs[msgs.length - 1].created_at : null;
 }
 
 async function sendStaffMessage(text) {
@@ -750,26 +756,26 @@ async function sendStaffMessage(text) {
 
   if (msgEl) msgEl.textContent = "Sending…";
 
-  let { error } = await supabase.from("messages").insert({
-    user_id: selectedConvoUserId,
-    sender: "staff",
-    body: text,
-    resolved: false
-  });
-
-  // If DB constraint does not allow "staff", retry with "admin"
-  if (error && (String(error.message || "").includes("messages_sender_check") || error.code === "23514")) {
-    const retry = await supabase.from("messages").insert({
+  // Some databases enforce a sender check constraint. We try common staff values.
+  const senderCandidates = ["staff", "admin", "support"];
+  let lastErr = null;
+  for (const sender of senderCandidates) {
+    const { error } = await supabase.from("messages").insert({
       user_id: selectedConvoUserId,
-      sender: "admin",
+      sender,
       body: text,
       resolved: false
     });
-    error = retry.error || null;
+    if (!error) { lastErr = null; break; }
+    lastErr = error;
+    // Only retry if it looks like a sender constraint issue
+    if (!String(error.message || "").toLowerCase().includes("sender") && !String(error.message || "").includes("check constraint")) {
+      break;
+    }
   }
 
-  if (error) {
-    if (msgEl) msgEl.textContent = error.message;
+  if (lastErr) {
+    if (msgEl) msgEl.textContent = lastErr.message;
     return;
   }
 
@@ -816,7 +822,7 @@ function teardownRealtime() {
 }
 
 function ensureMessageLiveUpdates() {
-  // Always keep a fallback poll running (5 sec)
+  // Fallback poll (lightweight; avoids constant full re-render)
   if (!pollTimer) {
     pollTimer = setInterval(async () => {
       if (!currentUser) return;
@@ -826,17 +832,31 @@ function ensureMessageLiveUpdates() {
       const messagesPanelVisible = !$("tab-messages")?.classList.contains("hidden");
       if (!messagesPanelVisible) return;
 
+      // Update convo list
       await loadConversations();
-      if (selectedConvoUserId) await renderChatFor(selectedConvoUserId);
-    }, 5000);
+
+      // Only re-render chat if a new message arrived
+      if (selectedConvoUserId) {
+        const { data, error } = await supabase
+          .from("messages")
+          .select("created_at")
+          .eq("user_id", selectedConvoUserId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error) {
+          const latest = data?.created_at || null;
+          if (latest && latest !== lastChatUpdatedAt) {
+            await renderChatFor(selectedConvoUserId);
+          }
+        }
+      }
+    }, 10000);
   }
 
   // Realtime subscription for inserts (best case)
   // If Realtime isn't enabled for table "messages", this won't fire, but poll will still work.
-  if (msgChannel) {
-    supabase.removeChannel(msgChannel);
-    msgChannel = null;
-  }
+  if (msgChannel) return; // already subscribed
 
   msgChannel = supabase
     .channel("admin-messages-live")
@@ -848,6 +868,7 @@ function ensureMessageLiveUpdates() {
 
       const m = payload?.new;
       if (selectedConvoUserId && m?.user_id === selectedConvoUserId) {
+        // Append by re-render (simple) but only when something new arrives
         await renderChatFor(selectedConvoUserId);
       }
     })
@@ -966,6 +987,138 @@ async function exportPackagesCSV() {
 }
 
 // ========================
+// BULK UPLOAD PACKAGES (CSV)
+// ========================
+function parseCSV(text) {
+  // Minimal CSV parser with quoted-field support
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
+      if (ch === '"') { inQuotes = false; continue; }
+      cur += ch;
+      continue;
+    }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === ',') { row.push(cur.trim()); cur = ""; continue; }
+    if (ch === '\n') {
+      row.push(cur.trim());
+      const nonEmpty = row.some(c => String(c).trim() !== "");
+      if (nonEmpty) rows.push(row);
+      row = []; cur = "";
+      continue;
+    }
+    if (ch === '\r') continue;
+    cur += ch;
+  }
+  row.push(cur.trim());
+  if (row.some(c => String(c).trim() !== "")) rows.push(row);
+  return rows;
+}
+
+function bulkTemplateCSV() {
+  return [
+    "tracking,customer_email,status,store,approved,notes",
+    "1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile",
+    "9400111899223856920000,customer2@example.com,IN_TRANSIT,Shein,true,"
+  ].join("\n");
+}
+
+async function bulkUploadPackagesFromCSV(csvText) {
+  const msg = $("bulkMsg");
+  if (msg) msg.textContent = "Parsing CSV…";
+
+  const rows = parseCSV(csvText || "");
+  if (!rows.length) {
+    if (msg) msg.textContent = "CSV is empty.";
+    return;
+  }
+
+  const header = rows[0].map(h => String(h || "").trim().toLowerCase());
+  const idx = (name) => header.indexOf(name);
+  const iTracking = idx("tracking");
+  if (iTracking === -1) {
+    if (msg) msg.textContent = "CSV must include a 'tracking' column.";
+    return;
+  }
+  const iEmail = idx("customer_email");
+  const iStatus = idx("status");
+  const iStore = idx("store");
+  const iApproved = idx("approved");
+  const iNotes = idx("notes");
+
+  // Build raw rows
+  const raw = [];
+  for (let r = 1; r < rows.length; r++) {
+    const cols = rows[r];
+    const tracking = String(cols[iTracking] || "").trim();
+    if (!tracking) continue;
+    raw.push({
+      tracking,
+      customer_email: iEmail >= 0 ? String(cols[iEmail] || "").trim().toLowerCase() : "",
+      status: iStatus >= 0 ? String(cols[iStatus] || "").trim() : "RECEIVED",
+      store: iStore >= 0 ? String(cols[iStore] || "").trim() : "",
+      approved: iApproved >= 0 ? String(cols[iApproved] || "").trim().toLowerCase() : "true",
+      notes: iNotes >= 0 ? String(cols[iNotes] || "").trim() : ""
+    });
+  }
+
+  if (!raw.length) {
+    if (msg) msg.textContent = "No data rows found.";
+    return;
+  }
+
+  // Lookup emails -> user_id (profiles)
+  const emailSet = new Set(raw.map(x => x.customer_email).filter(Boolean));
+  const emails = Array.from(emailSet);
+  const emailToId = {};
+  if (emails.length) {
+    if (msg) msg.textContent = `Looking up ${emails.length} customer emails…`;
+    const { data: profs, error: pErr } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .in("email", emails);
+    if (pErr) {
+      if (msg) msg.textContent = `Profile lookup error: ${pErr.message}`;
+      return;
+    }
+    for (const p of (profs || [])) {
+      if (p?.email) emailToId[String(p.email).toLowerCase()] = p.id;
+    }
+  }
+
+  const payload = raw.map(x => ({
+    tracking: x.tracking,
+    status: x.status || "RECEIVED",
+    store: x.store || null,
+    approved: x.approved === "false" ? false : true,
+    notes: x.notes || null,
+    user_id: x.customer_email ? (emailToId[x.customer_email] || null) : null
+  }));
+
+  // Upsert by tracking to avoid duplicate errors if re-uploaded
+  if (msg) msg.textContent = `Uploading ${payload.length} packages…`;
+  const { error: upErr } = await supabase
+    .from("packages")
+    .upsert(payload, { onConflict: "tracking" });
+
+  if (upErr) {
+    if (msg) msg.textContent = `Upload failed: ${upErr.message}`;
+    return;
+  }
+
+  const unassigned = payload.filter(p => !p.user_id).length;
+  if (msg) msg.textContent = `Uploaded ${payload.length} packages. Unassigned (no customer match): ${unassigned}.`;
+  await loadPackages();
+  await refreshStatsOnly();
+}
+
+// ========================
 // REFRESH ALL
 // ========================
 async function refreshAll() {
@@ -980,207 +1133,7 @@ async function refreshAll() {
 // ========================
 // EVENTS
 // ========================
-
-// ========================
-// BULK UPLOAD PACKAGES (CSV)
-// ========================
-function parseCSV(text) {
-  // Minimal CSV parser: supports quoted values, commas, and newlines.
-  // Returns array of objects using header row.
-  const rows = [];
-  if (!text) return rows;
-
-  const lines = [];
-  let cur = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-
-    if (ch === '"' && inQuotes && next === '"') {
-      cur += '"';
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-    if (!inQuotes && (ch === "\n" || ch === "\r")) {
-      if (ch === "\r" && next === "\n") i++;
-      lines.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  if (cur.length) lines.push(cur);
-
-  const splitLine = (line) => {
-    const out = [];
-    let v = "";
-    let q = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      const next = line[i + 1];
-      if (ch === '"' && q && next === '"') { v += '"'; i++; continue; }
-      if (ch === '"') { q = !q; continue; }
-      if (!q && ch === ",") { out.push(v.trim()); v = ""; continue; }
-      v += ch;
-    }
-    out.push(v.trim());
-    return out;
-  };
-
-  const headerLine = lines.find(l => l.trim().length);
-  if (!headerLine) return rows;
-
-  const headers = splitLine(headerLine).map(h => h.trim().toLowerCase());
-  for (const line of lines.slice(lines.indexOf(headerLine) + 1)) {
-    if (!line.trim()) continue;
-    const cols = splitLine(line);
-    const obj = {};
-    headers.forEach((h, idx) => obj[h] = (cols[idx] ?? "").trim());
-    rows.push(obj);
-  }
-  return rows;
-}
-
-function downloadCSVTemplate() {
-  const template =
-`tracking,status,store,approved,notes,customer_email
-1Z999AA10123456784,RECEIVED,Amazon,true,,customer@example.com
-1Z999AA10123456785,IN_TRANSIT,SHEIN,true,Fragile,
-`;
-  const blob = new Blob([template], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "bulk_packages_template.csv";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function toBool(v, fallback = true) {
-  const s = String(v ?? "").trim().toLowerCase();
-  if (!s) return fallback;
-  if (["true", "1", "yes", "y"].includes(s)) return true;
-  if (["false", "0", "no", "n"].includes(s)) return false;
-  return fallback;
-}
-
-async function lookupUserIdByEmail(email) {
-  if (!email) return null;
-  const e = email.trim().toLowerCase();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,email")
-    .eq("email", e)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.id || null;
-}
-
-async function bulkUploadPackagesFromRows(rows) {
-  const msg = $("bulkPkgMsg");
-  if (!rows?.length) {
-    if (msg) msg.textContent = "No rows found. Upload a CSV or paste content first.";
-    return;
-  }
-
-  // Require staff/admin already signed in
-  const { data: sess } = await supabase.auth.getSession();
-  if (!sess?.session) {
-    if (msg) msg.textContent = "Please sign in first.";
-    return;
-  }
-
-  if (msg) msg.textContent = `Validating ${rows.length} rows…`;
-
-  const prepared = [];
-  let assigned = 0;
-
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i] || {};
-    const tracking = (r.tracking || r.tracking_number || r.trackingno || "").trim();
-    if (!tracking) {
-      throw new Error(`Row ${i + 2}: tracking is required.`);
-    }
-    const status = (r.status || "RECEIVED").trim().toUpperCase();
-    const store = (r.store || "").trim() || null;
-    const notes = (r.notes || r.note || "").trim() || null;
-    const approved = toBool(r.approved, true);
-
-    let user_id = null;
-    const email = (r.customer_email || r.email || "").trim();
-    if (email) {
-      user_id = await lookupUserIdByEmail(email);
-      if (!user_id) {
-        console.warn(`Row ${i + 2}: customer_email not found in profiles: ${email}`);
-      } else {
-        assigned++;
-      }
-    }
-
-    // Only use columns known to exist from the admin dashboard code
-    prepared.push({
-      tracking,
-      status,
-      store,
-      notes,
-      approved,
-      user_id, // can be null (unassigned)
-    });
-  }
-
-  // Insert in batches
-  const batchSize = 200;
-  let inserted = 0;
-
-  for (let i = 0; i < prepared.length; i += batchSize) {
-    const batch = prepared.slice(i, i + batchSize);
-    if (msg) msg.textContent = `Uploading… (${Math.min(i + batch.length, prepared.length)}/${prepared.length})`;
-
-    // If you want upsert by tracking, change to .upsert(batch, { onConflict: "tracking" })
-    const { error } = await supabase.from("packages").insert(batch);
-    if (error) throw error;
-    inserted += batch.length;
-  }
-
-  if (msg) msg.textContent = `✅ Uploaded ${inserted} packages. Assigned to customers: ${assigned}.`;
-  await loadPackages();
-}
-
-function setupBulkUploadUI() {
-  $("bulkPkgTemplateBtn")?.addEventListener("click", downloadCSVTemplate);
-
-  $("bulkPkgUploadBtn")?.addEventListener("click", async () => {
-    const msg = $("bulkPkgMsg");
-    try {
-      if (msg) msg.textContent = "";
-
-      let text = ($("bulkPkgText")?.value || "").trim();
-
-      const file = $("bulkPkgFile")?.files?.[0];
-      if (file) {
-        text = await file.text();
-      }
-
-      const rows = parseCSV(text);
-      await bulkUploadPackagesFromRows(rows);
-    } catch (e) {
-      console.error(e);
-      if (msg) msg.textContent = `❌ ${e?.message || String(e)}`;
-    }
-  });
-}
-
-
 function setupEvents() {
-  setupBulkUploadUI();
   // Login
   $("adminLoginForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1190,20 +1143,51 @@ function setupEvents() {
     const email = $("adminEmail").value.trim().toLowerCase();
     const password = $("adminPassword").value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (msg) msg.textContent = error.message;
-      return;
+    try {
+      // If a stale token is present it can poison the next login.
+      // Clean it up if session is missing but token exists.
+      const { session } = await safeGetSession();
+      if (session?.user) {
+        if (msg) msg.textContent = "";
+        await renderAuthState();
+        return;
+      }
+
+      let res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
+      if (res?.error) {
+        console.warn("[admin] signIn error (retry after reset):", res.error);
+        await hardResetAuth("signin retry");
+        res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
+      }
+      if (res?.error) {
+        if (msg) msg.textContent = res.error.message;
+        return;
+      }
+
+      // Ensure a session exists
+      const { session: s2, error: s2e } = await safeGetSession();
+      if (s2e) {
+        if (msg) msg.textContent = "Session error: " + s2e.message;
+        return;
+      }
+      if (!s2) {
+        if (msg) msg.textContent = "No session returned. Check email confirmation settings.";
+        return;
+      }
+
+      if (msg) msg.textContent = "";
+      await renderAuthState();
+    } catch (err) {
+      console.error("[admin] login failed:", err);
+      if (msg) msg.textContent = err?.message || String(err);
     }
-    if (msg) msg.textContent = "";
-    await renderAuthState();
   });
 
   // Logout
   $("logoutBtn")?.addEventListener("click", async () => {
     teardownRealtime();
-    await supabase.auth.signOut();
-    await renderAuthState();
+    await hardResetAuth("logout");
+    location.reload();
   });
 
   // Filters
@@ -1216,6 +1200,36 @@ function setupEvents() {
 
   // Package edit
   $("pkgEditForm")?.addEventListener("submit", onSavePackage);
+
+  // Bulk upload
+  $("bulkDownloadTemplate")?.addEventListener("click", () => {
+    downloadText("packages_template.csv", bulkTemplateCSV());
+  });
+  $("bulkUploadBtn")?.addEventListener("click", async () => {
+    const msg = $("bulkMsg");
+    const textArea = $("bulkCsvText");
+    const fileInput = $("bulkCsvFile");
+    const pasted = (textArea?.value || "").trim();
+
+    // Prefer pasted text; if empty, use file.
+    if (pasted) {
+      await bulkUploadPackagesFromCSV(pasted);
+      return;
+    }
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      if (msg) msg.textContent = "Paste CSV or choose a CSV file.";
+      return;
+    }
+    if (msg) msg.textContent = "Reading file…";
+    const fileText = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+    await bulkUploadPackagesFromCSV(fileText);
+  });
 
   // Messages
   $("refreshMessages")?.addEventListener("click", async () => {

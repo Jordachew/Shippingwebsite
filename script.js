@@ -20,56 +20,6 @@ window.__SB__ =
   });
 
 const supabase = window.__SB__;
-// ========================
-// AUTH SAFE HELPERS (prevents AuthSessionMissingError + "login once" bugs)
-// ========================
-function getProjectRef(){
-  try { return new URL(SUPABASE_URL).hostname.split(".")[0]; } catch { return ""; }
-}
-function clearSupabaseAuthStorage(){
-  try {
-    const ref = getProjectRef();
-    if(ref) localStorage.removeItem(`sb-${ref}-auth-token`);
-    localStorage.removeItem("pending_profile");
-  } catch (_) {}
-}
-async function safeGetSession(){
-  try{
-    const { data, error } = await supabase.auth.getSession();
-    return { session: data?.session || null, error: error || null };
-  }catch(e){ return { session:null, error:e }; }
-}
-async function safeGetUser(){
-  const { session, error: sErr } = await safeGetSession();
-  if(sErr) return { user:null, session:null, error:sErr };
-  if(!session) return { user:null, session:null, error:null };
-  try{
-    const { data, error } = await safeGetUser();
-    if(error) return { user: session.user || null, session, error };
-    return { user: data?.user || session.user || null, session, error:null };
-  }catch(e){
-    return { user: session.user || null, session, error:e };
-  }
-}
-// If auth token exists but session is missing, clear it once and reload.
-(function sanitizeAuthOnBoot(){
-  try{
-    const ref = getProjectRef();
-    const k = ref ? `sb-${ref}-auth-token` : "";
-    const hasToken = k && !!localStorage.getItem(k);
-    if(!hasToken) return;
-    safeGetSession().then(({session})=>{
-      if(!session){
-        localStorage.removeItem(k);
-        if(!sessionStorage.getItem("sb_sanitized_once")){
-          sessionStorage.setItem("sb_sanitized_once","1");
-          location.reload();
-        }
-      }
-    });
-  }catch(_){}
-})();
-
 
 const INVOICE_BUCKET = "invoices";
 const CHAT_BUCKET = "chat_files";
@@ -117,6 +67,49 @@ function pickupLabel(v) {
 // Business hours note (Mon–Fri 10–5)
 const HOURS_TEXT =
   "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// ========================
+// SHIPPING ADDRESS (U.S. WAREHOUSE)
+// ========================
+const WAREHOUSE_ADDRESS_LINES = [
+  "SNS-JM",
+  "8465 W 44th Ave",
+  "STE119, SNS-JM2 43935 KIN",
+  "Hialeah, FL 33018"
+];
+
+function buildShipToText(customerName){
+  const nameLine = (customerName || "Customer").trim();
+  return [
+    nameLine,
+    ...WAREHOUSE_ADDRESS_LINES
+  ].join("\n");
+}
+
+function renderShipTo(customerName){
+  const el = $("shipToBlock");
+  if(!el) return;
+  const txt = buildShipToText(customerName);
+  // Show as formatted block
+  el.textContent = txt;
+}
+
+function setupShipToCopy(){
+  const btn = $("shipToCopy");
+  const msg = $("shipToMsg");
+  if(!btn) return;
+  btn.addEventListener("click", async () => {
+    try{
+      const customerName = ($("userName")?.textContent || "Customer").trim();
+      const txt = buildShipToText(customerName);
+      await navigator.clipboard.writeText(txt);
+      if(msg) msg.textContent = "Copied.";
+      setTimeout(()=>{ if(msg) msg.textContent=""; }, 2000);
+    }catch(e){
+      if(msg) msg.textContent = "Copy failed. Select and copy manually.";
+    }
+  });
+}
 
 // ========================
 // CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
@@ -260,7 +253,7 @@ function clearPendingProfile() {
 }
 
 async function ensureProfile({ full_name, phone } = {}) {
-  const { data: userData, error: userErr } = await safeGetUser();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr) return { ok: false, error: userErr };
   const user = userData?.user;
   if (!user) return { ok: false, error: new Error("Not logged in") };
@@ -474,7 +467,8 @@ async function renderPackages(filter = "") {
   const body = $("pkgBody");
   if (!body) return;
 
-  const { user } = await safeGetUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   if (!user) {
     body.innerHTML = `<tr><td colspan="4" class="muted">Please log in.</td></tr>`;
     return;
@@ -520,7 +514,8 @@ async function renderUploads() {
   const list = $("uploadsList");
   if (!list) return;
 
-  const { user } = await safeGetUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   if (!user) {
     list.innerHTML = `<li class="muted">Log in to see uploads.</li>`;
     return;
@@ -574,7 +569,8 @@ function setupInvoiceUpload() {
     e.preventDefault();
     if ($("invMsg")) $("invMsg").textContent = "Uploading...";
 
-    const { user } = await safeGetUser();
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
     if (!user) {
       if ($("invMsg")) $("invMsg").textContent = "Please log in.";
       return;
@@ -655,7 +651,8 @@ async function renderChat() {
   const body = $("chatBody");
   if (!body) return;
 
-  const { user } = await safeGetUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   if (!user) {
     body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`;
     return;
@@ -705,7 +702,8 @@ function renderChatDebounced() {
 }
 
 async function setupChatRealtime() {
-  const { user } = await safeGetUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   if (!user) return;
 
   if (chatChannel) {
@@ -724,7 +722,8 @@ async function setupChatRealtime() {
 }
 
 async function sendChatMessage(text, file) {
-  const { user } = await safeGetUser();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
   if (!user) return alert("Please log in to chat.");
 
   const msgRes = await supabase
@@ -815,7 +814,7 @@ async function renderAuth() {
     const loginCard = $("loginCard");
     const dashCard = $("dashCard");
 
-    const { data: userData, error: uErr } = await safeGetUser();
+    const { data: userData, error: uErr } = await supabase.auth.getUser();
     if (uErr) console.error("GET USER ERROR:", uErr);
 
     const user = userData?.user;
@@ -852,6 +851,8 @@ async function renderAuth() {
     const displayName = profile?.full_name || user.email || "Customer";
     if ($("userName")) $("userName").textContent = displayName;
 
+    renderShipTo(displayName);
+
     const role = profile?.role || "customer";
     const isStaff = role === "staff" || role === "admin";
     if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
@@ -875,7 +876,8 @@ if (!window.__AUTH_SUB__) {
 // INIT
 // ========================
 function init() {
-  injectCustomerChatStyles(); // ✅ apply customer chat fix immediately
+  injectCustomerChatStyles(); 
+  setupShipToCopy();// ✅ apply customer chat fix immediately
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();

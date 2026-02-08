@@ -619,34 +619,40 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
 .tag--ok{ border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.08); }
 .tag--warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.10); }
 
-/* Customer chat readability (scoped) */
+/* Customer chat readability (scoped so it does NOT affect admin screens) */
 body.customer-page #chatBody,
 body.customer-page .chat__body {
   color: #fff !important;
 }
+
 body.customer-page #chatBody .bubble,
 body.customer-page .chat__body .bubble {
   color: #fff !important;
 }
+
 body.customer-page #chatBody .meta,
 body.customer-page .chat__body .meta,
 body.customer-page #chatBody .muted,
 body.customer-page .chat__body .muted {
   color: rgba(255,255,255,.75) !important;
 }
-/* Customer chat input */
-body.customer-page #chatInput{
-  color:#fff !important;
-  background: rgba(255,255,255,0.07) !important;
-  border: 1px solid rgba(255,255,255,0.16) !important;
-}
-body.customer-page #chatInput::placeholder{
-  color: rgba(255,255,255,.6) !important;
-}
 
-/* Admin chat: follow theme (no forced white) */
+/* Admin chat: keep readable on light theme */
 body.admin-page #adminChatBody,
-body.admin-page #adminChatBody *{
-  color: inherit !important;
+body.admin-page #adminChatBody * {
+  color: var(--text) !important;
 }
 
+
+
+/* Shipping address block (customer dashboard) */
+.addrBlock{
+  white-space: pre-line;
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(15,23,42,.04);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
