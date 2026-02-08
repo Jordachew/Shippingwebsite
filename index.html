@@ -216,6 +216,19 @@
         </div>
 
         <div class="dashGrid">
+
+          <div class="panel">
+            <div class="panel__head">
+              <div class="panel__title">Your U.S. Shipping Address</div>
+              <div class="panel__sub muted small">Use this address when shopping online. Your name is included so we can match your package.</div>
+            </div>
+
+            <div class="addrBlock" id="shipToBlock" aria-live="polite"></div>
+            <div class="row row--wrap">
+              <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
+              <span class="muted small" id="shipToMsg"></span>
+            </div>
+          </div>
           <div class="panel">
             <div class="panel__head">
               <div class="panel__title">Your Packages</div>

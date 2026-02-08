@@ -51,18 +51,7 @@ function downloadText(filename, text) {
   a.remove();
 }
 
-function injectAdminChatContrastFix() {
-  // Makes chat text + input readable even if theme is dark.
-  const css = `
-    #adminChatBody { color: #fff !important; }
-    #adminChatInput { color: #fff !important; background: rgba(0,0,0,0.35) !important; border: 1px solid rgba(255,255,255,0.15) !important; }
-    #adminChatInput::placeholder { color: rgba(255,255,255,0.6) !important; }
-  `;
-  const style = document.createElement("style");
-  style.setAttribute("data-admin-fix", "chat-contrast");
-  style.textContent = css;
-  document.head.appendChild(style);
-}
+function injectAdminChatContrastFix(){ /* styles handled in styles.css */ }
 
 // ========================
 // GLOBAL STATE

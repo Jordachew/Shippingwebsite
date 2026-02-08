@@ -69,6 +69,49 @@ const HOURS_TEXT =
   "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
 
 // ========================
+// SHIPPING ADDRESS (U.S. WAREHOUSE)
+// ========================
+const WAREHOUSE_ADDRESS_LINES = [
+  "SNS-JM",
+  "8465 W 44th Ave",
+  "STE119, SNS-JM2 43935 KIN",
+  "Hialeah, FL 33018"
+];
+
+function buildShipToText(customerName){
+  const nameLine = (customerName || "Customer").trim();
+  return [
+    nameLine,
+    ...WAREHOUSE_ADDRESS_LINES
+  ].join("\n");
+}
+
+function renderShipTo(customerName){
+  const el = $("shipToBlock");
+  if(!el) return;
+  const txt = buildShipToText(customerName);
+  // Show as formatted block
+  el.textContent = txt;
+}
+
+function setupShipToCopy(){
+  const btn = $("shipToCopy");
+  const msg = $("shipToMsg");
+  if(!btn) return;
+  btn.addEventListener("click", async () => {
+    try{
+      const customerName = ($("userName")?.textContent || "Customer").trim();
+      const txt = buildShipToText(customerName);
+      await navigator.clipboard.writeText(txt);
+      if(msg) msg.textContent = "Copied.";
+      setTimeout(()=>{ if(msg) msg.textContent=""; }, 2000);
+    }catch(e){
+      if(msg) msg.textContent = "Copy failed. Select and copy manually.";
+    }
+  });
+}
+
+// ========================
 // CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
 // ========================
 function injectCustomerChatStyles() {
@@ -808,6 +851,8 @@ async function renderAuth() {
     const displayName = profile?.full_name || user.email || "Customer";
     if ($("userName")) $("userName").textContent = displayName;
 
+    renderShipTo(displayName);
+
     const role = profile?.role || "customer";
     const isStaff = role === "staff" || role === "admin";
     if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
@@ -831,7 +876,8 @@ if (!window.__AUTH_SUB__) {
 // INIT
 // ========================
 function init() {
-  injectCustomerChatStyles(); // ✅ apply customer chat fix immediately
+  injectCustomerChatStyles(); 
+  setupShipToCopy();// ✅ apply customer chat fix immediately
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
