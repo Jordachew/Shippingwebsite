@@ -1,11 +1,11 @@
 /* =========================================================
-   Sueños Shipping — Admin Dashboard (admin.js)
-   - Robust auth (fix "login once"/stuck sign-in)
-   - Safe session-first user checks (no AuthSessionMissingError crash)
-   - Staff/admin role gating
-   - Packages, customers, messages
-   - Sender constraint fallbacks: staff -> admin -> support
-   - Optional Bulk CSV upload if DOM exists
+   Sueños Shipping — Staff Dashboard (admin.js) FIXED
+   Fixes:
+   - Package search/filter glitches (one-time listeners + debounce + stale response guard)
+   - pkgEditApproved is <select> (was treated as checkbox)
+   - Adds real dashboard analytics (counts by status)
+   - Adds approve action + edit action in packages table
+   - Keeps auth/session hardening from prior version
 ========================================================= */
 
 // ========================
@@ -15,9 +15,11 @@ const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// Storage buckets (optional; code handles if missing)
 const INVOICE_BUCKET = "invoices";
 const PKG_PHOTO_BUCKET = "package_photos";
+
+// Status list used in analytics
+const STATUS_LIST = ["RECEIVED", "IN_TRANSIT", "ARRIVED_JA", "READY_FOR_PICKUP", "PICKED_UP", "ON_HOLD"];
 
 // ========================
 // SUPABASE CLIENT (singleton)
@@ -50,6 +52,14 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
+function debounce(fn, ms = 250) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
 function getProjectRef() {
   try {
     return new URL(SUPABASE_URL).hostname.split(".")[0];
@@ -59,7 +69,6 @@ function getProjectRef() {
 }
 
 function clearSupabaseAuthToken() {
-  // Clears the stored session that causes “login works once then stuck”
   try {
     const ref = getProjectRef();
     if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
@@ -80,7 +89,6 @@ async function safeGetSession() {
 }
 
 async function safeGetUser() {
-  // IMPORTANT: session-first to avoid AuthSessionMissingError
   const { session, error: sErr } = await safeGetSession();
   if (sErr) return { user: null, session: null, error: sErr };
   if (!session) return { user: null, session: null, error: null };
@@ -102,7 +110,6 @@ async function hardResetAuth(reason = "") {
   clearSupabaseAuthToken();
 }
 
-// If token exists but session is missing, clear it once to prevent “stuck sign-in”
 async function sanitizeStaleTokenOnce() {
   const onceKey = "admin_sanitize_once";
   if (sessionStorage.getItem(onceKey) === "1") return;
@@ -121,11 +128,10 @@ async function sanitizeStaleTokenOnce() {
   }
 }
 
-// Timeout wrapper so UI doesn’t hang forever
 async function withTimeout(promise, ms = 12000) {
   let t;
   const timeout = new Promise((_, reject) => {
-    t = setTimeout(() => reject(new Error("Request timed out (blocked or not returning).")), ms);
+    t = setTimeout(() => reject(new Error("Request timed out.")), ms);
   });
   try {
     return await Promise.race([promise, timeout]);
@@ -141,7 +147,6 @@ async function getMyProfile() {
   const { user } = await safeGetUser();
   if (!user) return { profile: null, error: null };
 
-  // Minimal columns only (avoid “column not found” crashes)
   const { data, error } = await supabase
     .from("profiles")
     .select("id,email,full_name,role,is_active")
@@ -158,27 +163,39 @@ function isStaffRole(role) {
 // ========================
 // APP STATE
 // ========================
-let currentAdmin = null; // { id, email, role, full_name }
-let currentCustomer = null; // { id, email, full_name }
+let currentAdmin = null;
+let currentCustomer = null;
 let msgChannel = null;
+
+// prevent duplicate UI bindings
+let __tabsBound = false;
+let __overviewBound = false;
+let __customersBound = false;
+let __packagesBound = false;
+let __messagesBound = false;
+let __rolesBound = false;
+
+// packages render sequence guard
+let __pkgRenderSeq = 0;
 
 // ========================
 // TABS
 // ========================
-function setupTabs() {
+function setupTabsOnce() {
+  if (__tabsBound) return;
+  __tabsBound = true;
+
   const buttons = Array.from(document.querySelectorAll(".tab[data-tab]"));
   if (!buttons.length) return;
 
   function showTab(tabName) {
     buttons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
-
     const panels = ["overview", "customers", "packages", "messages", "reports", "roles"];
     panels.forEach((p) => {
       const el = $(`tab-${p}`);
       if (el) el.classList.toggle("hidden", p !== tabName);
     });
 
-    // Lazy refresh on tab switch
     if (tabName === "overview") renderOverview();
     if (tabName === "customers") renderCustomers();
     if (tabName === "packages") renderPackages();
@@ -186,15 +203,17 @@ function setupTabs() {
   }
 
   buttons.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
-
-  // Default
   showTab("overview");
 }
 
 // ========================
 // LOGIN / LOGOUT
 // ========================
-function setupAuthUI() {
+function setupAuthUIOnce() {
+  // safe to bind multiple times, but do once anyway
+  if ($("logoutBtn")?.__bound) return;
+  if ($("logoutBtn")) $("logoutBtn").__bound = true;
+
   $("logoutBtn")?.addEventListener("click", async () => {
     await hardResetAuth("logout");
     location.reload();
@@ -209,7 +228,6 @@ function setupAuthUI() {
     const password = $("adminPassword")?.value || "";
 
     try {
-      // If we already have a session, just render app
       const { session } = await safeGetSession();
       if (session?.user) {
         if (msg) msg.textContent = "";
@@ -217,13 +235,9 @@ function setupAuthUI() {
         return;
       }
 
-      // Sign in (timeout so we don’t hang indefinitely)
       let res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
-
       if (res?.error) {
-        console.warn("Admin login error (first try):", res.error);
-        // Clear possible poisoned token and retry once
-        await hardResetAuth("login retry after error");
+        await hardResetAuth("login retry");
         res = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 12000);
       }
 
@@ -232,10 +246,9 @@ function setupAuthUI() {
         return;
       }
 
-      // Verify session exists
       const check = await safeGetSession();
       if (!check.session) {
-        if (msg) msg.textContent = "Signed in, but no session found (domain/caching issue). Try clearing site data.";
+        if (msg) msg.textContent = "Signed in, but no session found. Clear site data for this domain.";
         return;
       }
 
@@ -249,7 +262,7 @@ function setupAuthUI() {
 }
 
 // ========================
-// APP RENDER (auth gate)
+// APP RENDER
 // ========================
 async function renderApp() {
   const loginCard = $("adminLoginCard");
@@ -261,19 +274,17 @@ async function renderApp() {
   if (error) console.warn("Admin safeGetUser error:", error);
 
   const authed = !!user;
-
-  if (loginCard) loginCard.classList.toggle("hidden", authed);
-  if (app) app.classList.toggle("hidden", !authed);
-  if (logoutBtn) logoutBtn.classList.toggle("hidden", !authed);
+  loginCard?.classList.toggle("hidden", authed);
+  app?.classList.toggle("hidden", !authed);
+  logoutBtn?.classList.toggle("hidden", !authed);
 
   if (!authed) {
     currentAdmin = null;
-    if (who) who.textContent = "";
+    who && (who.textContent = "");
     teardownMessageRealtime();
     return;
   }
 
-  // Profile/role gate
   const { profile, error: pErr } = await getMyProfile();
   if (pErr) console.warn("Profile read error:", pErr);
 
@@ -282,16 +293,17 @@ async function renderApp() {
 
   if (!active) {
     await hardResetAuth("inactive staff");
-    if (who) who.textContent = "";
-    if ($("adminLoginMsg")) $("adminLoginMsg").textContent = "Account deactivated.";
+    who && (who.textContent = "");
+    $("adminLoginMsg") && ($("adminLoginMsg").textContent = "Account deactivated.");
     return;
   }
 
   if (!isStaffRole(role)) {
     await hardResetAuth("not staff");
-    if (who) who.textContent = "";
-    if ($("adminLoginMsg")) $("adminLoginMsg").textContent =
-      "Not authorized (role must be staff/admin). Ask admin to update your profile role.";
+    who && (who.textContent = "");
+    $("adminLoginMsg") &&
+      ($("adminLoginMsg").textContent =
+        "Not authorized (role must be staff/admin). Update your profile role in Supabase.");
     return;
   }
 
@@ -302,12 +314,15 @@ async function renderApp() {
     role,
   };
 
-  if (who) who.textContent = `${currentAdmin.full_name} • ${currentAdmin.role}`;
+  who && (who.textContent = `${currentAdmin.full_name} • ${currentAdmin.role}`);
 
-  setupTabs();
-  setupOverviewButtons();
+  setupTabsOnce();
+  setupOverviewButtonsOnce();
+  setupCustomersUIOnce();
+  setupPackagesUIOnce();
+  setupMessagesUIOnce();
+  setupRolesUIOnce();
 
-  // Initial loads
   await renderOverview();
 }
 
@@ -319,9 +334,12 @@ function setupAuthSubOnce() {
 }
 
 // ========================
-// OVERVIEW
+// OVERVIEW (analytics)
 // ========================
-function setupOverviewButtons() {
+function setupOverviewButtonsOnce() {
+  if (__overviewBound) return;
+  __overviewBound = true;
+
   $("goPackagesBtn")?.addEventListener("click", () => {
     document.querySelector('.tab[data-tab="packages"]')?.click();
   });
@@ -331,44 +349,62 @@ function setupOverviewButtons() {
   $("exportPackagesBtn")?.addEventListener("click", exportPackagesCSV);
 }
 
+async function countPackagesByStatus(status) {
+  const { count, error } = await supabase
+    .from("packages")
+    .select("id", { count: "exact", head: true })
+    .eq("status", status);
+
+  if (error) return 0;
+  return count || 0;
+}
+
+async function countAllPackages() {
+  const { count, error } = await supabase.from("packages").select("id", { count: "exact", head: true });
+  if (error) return 0;
+  return count || 0;
+}
+
+async function countCustomers() {
+  // Best-effort: count all profiles
+  const { count, error } = await supabase.from("profiles").select("id", { count: "exact", head: true });
+  if (error) return 0;
+  return count || 0;
+}
+
+async function countOpenMessages() {
+  // If you use resolved column:
+  const { count, error } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("resolved", false);
+
+  if (error) return 0;
+  return count || 0;
+}
+
 async function renderOverview() {
-  // Stats: packages by status + customers + messages
   const statsRow = $("statsRow");
   if (!statsRow) return;
 
-  // Pull last N packages/messages for “Recent”
-  const [pkgRes, msgRes, custRes] = await Promise.all([
-    supabase
-      .from("packages")
-      .select("id,tracking,status,updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("messages")
-      .select("id,user_id,sender,body,created_at")
-      .order("created_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("profiles")
-      .select("id")
-      .limit(1),
+  // Real analytics
+  const [allPkgs, customers, openMsgs, ...statusCounts] = await Promise.all([
+    countAllPackages(),
+    countCustomers(),
+    countOpenMessages(),
+    ...STATUS_LIST.map((s) => countPackagesByStatus(s)),
   ]);
 
-  // Build quick status counts (lightweight)
-  const statusCounts = {};
-  if (pkgRes.data) {
-    for (const p of pkgRes.data) {
-      statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
-    }
-  }
-
-  const stats = [
-    { label: "Recent packages", value: pkgRes.data?.length || 0 },
-    { label: "Recent messages", value: msgRes.data?.length || 0 },
-    { label: "Statuses shown", value: Object.keys(statusCounts).length },
+  const statCards = [
+    { label: "Total packages", value: allPkgs },
+    { label: "Customers", value: customers },
+    { label: "Open messages", value: openMsgs },
+    { label: "In Transit", value: statusCounts[STATUS_LIST.indexOf("IN_TRANSIT")] || 0 },
+    { label: "Ready for pickup", value: statusCounts[STATUS_LIST.indexOf("READY_FOR_PICKUP")] || 0 },
+    { label: "Picked up", value: statusCounts[STATUS_LIST.indexOf("PICKED_UP")] || 0 },
   ];
 
-  statsRow.innerHTML = stats
+  statsRow.innerHTML = statCards
     .map(
       (s) => `
       <div class="stat">
@@ -379,20 +415,26 @@ async function renderOverview() {
     )
     .join("");
 
+  // Recent lists (match admin.html uses <ul>)
+  const [pkgRes, msgRes] = await Promise.all([
+    supabase.from("packages").select("tracking,status,updated_at").order("updated_at", { ascending: false }).limit(8),
+    supabase.from("messages").select("sender,body,created_at").order("created_at", { ascending: false }).limit(8),
+  ]);
+
   const recentPackages = $("recentPackages");
   if (recentPackages) {
     recentPackages.innerHTML =
       (pkgRes.data || [])
         .map(
           (p) => `
-        <div class="rowline">
+        <li class="rowline">
           <strong>${escapeHTML(p.tracking)}</strong>
           <span class="tag">${escapeHTML(p.status)}</span>
-          <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
-        </div>
+          <span class="muted small">${p.updated_at ? new Date(p.updated_at).toLocaleString() : ""}</span>
+        </li>
       `
         )
-        .join("") || `<div class="muted">No recent packages.</div>`;
+        .join("") || `<li class="muted">No recent packages.</li>`;
   }
 
   const recentMessages = $("recentMessages");
@@ -401,92 +443,123 @@ async function renderOverview() {
       (msgRes.data || [])
         .map(
           (m) => `
-        <div class="rowline">
+        <li class="rowline">
           <span class="tag">${escapeHTML(m.sender)}</span>
-          <span>${escapeHTML((m.body || "").slice(0, 80))}</span>
-          <span class="muted small">${new Date(m.created_at).toLocaleString()}</span>
-        </div>
+          <span>${escapeHTML((m.body || "").slice(0, 70))}</span>
+          <span class="muted small">${m.created_at ? new Date(m.created_at).toLocaleString() : ""}</span>
+        </li>
       `
         )
-        .join("") || `<div class="muted">No recent messages.</div>`;
+        .join("") || `<li class="muted">No recent messages.</li>`;
   }
 }
 
 // ========================
 // CUSTOMERS
 // ========================
-function setupCustomersUI() {
-  $("custSearch")?.addEventListener("input", () => renderCustomers());
+function setupCustomersUIOnce() {
+  if (__customersBound) return;
+  __customersBound = true;
+
+  const run = debounce(() => renderCustomers(), 250);
+  $("custSearch")?.addEventListener("input", run);
   $("refreshCustomers")?.addEventListener("click", () => renderCustomers());
 }
 
 async function renderCustomers() {
-  setupCustomersUI();
-
   const body = $("customersBody");
   if (!body) return;
 
   const q = ($("custSearch")?.value || "").trim().toLowerCase();
 
-  let query = supabase
+  // Try selecting phone, but fall back if your schema doesn't have it.
+  let { data, error } = await supabase
     .from("profiles")
-    .select("id,email,full_name,role,is_active,created_at")
+    .select("id,email,full_name,phone,role,is_active,created_at")
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+  if (error && /column .*phone/i.test(error.message || "")) {
+    const fallback = await supabase
+      .from("profiles")
+      .select("id,email,full_name,role,is_active,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    data = fallback.data;
+    error = fallback.error;
+  }
 
-  const { data, error } = await query;
+  if (q && data) {
+    data = data.filter((x) => {
+      const e = (x.email || "").toLowerCase();
+      const n = (x.full_name || "").toLowerCase();
+      const p = (x.phone || "").toLowerCase();
+      return e.includes(q) || n.includes(q) || p.includes(q);
+    });
+  }
+
   if (error) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">No customers found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="muted">No customers found.</td></tr>`;
     return;
   }
 
   body.innerHTML = data
-    .map(
-      (c) => `
-    <tr data-id="${escapeHTML(c.id)}" class="clickrow">
-      <td><strong>${escapeHTML(c.full_name || "—")}</strong></td>
-      <td>${escapeHTML(c.email || "—")}</td>
-      <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
-      <td class="muted small">${c.is_active === false ? "Inactive" : "Active"}</td>
-    </tr>
-  `
-    )
+    .map((c) => {
+      const isActive = c.is_active !== false;
+      return `
+      <tr data-id="${escapeHTML(c.id)}" class="clickrow">
+        <td><strong>${escapeHTML(c.full_name || "—")}</strong></td>
+        <td>${escapeHTML(c.email || "—")}</td>
+        <td>${escapeHTML(c.phone || "—")}</td>
+        <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
+        <td class="muted small">${isActive ? "Active" : "Inactive"}</td>
+        <td>
+          <button class="btn btn--ghost btn-sm" data-action="view" data-id="${escapeHTML(c.id)}" type="button">View</button>
+        </td>
+      </tr>`;
+    })
     .join("");
 
-  body.querySelectorAll("tr[data-id]").forEach((tr) => {
-    tr.addEventListener("click", async () => {
-      const id = tr.getAttribute("data-id");
-      const customer = data.find((x) => x.id === id);
-      currentCustomer = customer
-        ? { id: customer.id, email: customer.email, full_name: customer.full_name }
-        : null;
+  // event delegation
+  if (!body.__delegated) {
+    body.__delegated = true;
+    body.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      if (!id) return;
 
+      currentCustomer = data.find((x) => x.id === id) || null;
       await renderCustomerDetail();
-      // jump to messages tab with convo
-      document.querySelector('.tab[data-tab="messages"]')?.click();
-      await selectConversationByCustomer(currentCustomer?.id);
     });
-  });
+  }
 }
 
 async function renderCustomerDetail() {
   const card = $("customerDetail");
-  if (!card || !currentCustomer) return;
+  if (!card) return;
 
-  // fetch packages for that customer
-  const { data: pkgs } = await supabase
+  if (!currentCustomer) {
+    card.innerHTML = `<div class="muted">No customer selected.</div>`;
+    return;
+  }
+
+  const { data: pkgs, error } = await supabase
     .from("packages")
-    .select("id,tracking,status,updated_at")
+    .select("tracking,status,updated_at")
     .eq("user_id", currentCustomer.id)
     .order("updated_at", { ascending: false })
     .limit(50);
+
+  if (error) {
+    card.innerHTML = `<div class="muted">${escapeHTML(error.message)}</div>`;
+    return;
+  }
 
   card.innerHTML = `
     <div class="card__head">
@@ -502,9 +575,8 @@ async function renderCustomerDetail() {
           <div class="rowline">
             <strong>${escapeHTML(p.tracking)}</strong>
             <span class="tag">${escapeHTML(p.status)}</span>
-            <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
-          </div>
-        `
+            <span class="muted small">${p.updated_at ? new Date(p.updated_at).toLocaleString() : ""}</span>
+          </div>`
           )
           .join("") || `<div class="muted">No packages assigned.</div>`
       }
@@ -515,8 +587,13 @@ async function renderCustomerDetail() {
 // ========================
 // PACKAGES
 // ========================
-function setupPackagesUI() {
-  $("pkgSearch")?.addEventListener("input", () => renderPackages());
+function setupPackagesUIOnce() {
+  if (__packagesBound) return;
+  __packagesBound = true;
+
+  const run = debounce(() => renderPackages(), 250);
+
+  $("pkgSearch")?.addEventListener("input", run);
   $("statusFilter")?.addEventListener("change", () => renderPackages());
   $("refreshPackages")?.addEventListener("click", () => renderPackages());
 
@@ -524,70 +601,126 @@ function setupPackagesUI() {
     e.preventDefault();
     await savePackageEdits();
   });
+
+  // table action delegation
+  const body = $("packagesBody");
+  if (body && !body.__delegated) {
+    body.__delegated = true;
+    body.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const action = btn.getAttribute("data-action");
+      if (!id || !action) return;
+
+      if (action === "edit") {
+        // load the row data quickly by selecting it
+        const { data, error } = await supabase
+          .from("packages")
+          .select("id,tracking,status,store,approved,notes,user_id,updated_at")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (error || !data) {
+          $("pkgMsg") && ($("pkgMsg").textContent = error?.message || "Could not load package.");
+          return;
+        }
+        fillPackageEditor(data);
+      }
+
+      if (action === "approve") {
+        await approvePackage(id);
+      }
+    });
+  }
 }
 
 async function renderPackages() {
-  setupPackagesUI();
-
   const body = $("packagesBody");
   if (!body) return;
+
+  const seq = ++__pkgRenderSeq;
 
   const q = ($("pkgSearch")?.value || "").trim();
   const status = ($("statusFilter")?.value || "").trim();
 
   let query = supabase
     .from("packages")
-    .select("id,tracking,status,store,approved,notes,user_id,updated_at")
+    .select("id,tracking,status,approved,user_id,store,updated_at")
     .order("updated_at", { ascending: false })
     .limit(200);
 
-  if (q) query = query.ilike("tracking", `%${q}%`);
+  if (q) query = query.or(`tracking.ilike.%${q}%,store.ilike.%${q}%`);
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
+
+  // Ignore stale responses (prevents “glitch/race”)
+  if (seq !== __pkgRenderSeq) return;
+
   if (error) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">No packages.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">No packages.</td></tr>`;
     return;
   }
 
   body.innerHTML = data
-    .map(
-      (p) => `
-    <tr data-id="${escapeHTML(p.id)}" class="clickrow">
-      <td><strong>${escapeHTML(p.tracking)}</strong></td>
-      <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td>${escapeHTML(p.store || "—")}</td>
-      <td class="muted small">${p.approved ? "Yes" : "No"}</td>
-      <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
-      <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
-    </tr>
-  `
-    )
+    .map((p) => {
+      const approved = !!p.approved;
+      return `
+      <tr>
+        <td><strong>${escapeHTML(p.tracking)}</strong></td>
+        <td><span class="tag">${escapeHTML(p.status)}</span></td>
+        <td>${approved ? `<span class="tag">Yes</span>` : `<span class="tag">No</span>`}</td>
+        <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
+        <td>${escapeHTML(p.store || "—")}</td>
+        <td class="muted small">${p.updated_at ? new Date(p.updated_at).toLocaleString() : "—"}</td>
+        <td class="row">
+          <button class="btn btn--ghost btn-sm" type="button" data-action="edit" data-id="${escapeHTML(p.id)}">Edit</button>
+          ${
+            approved
+              ? ""
+              : `<button class="btn btn--ghost btn-sm" type="button" data-action="approve" data-id="${escapeHTML(
+                  p.id
+                )}">Approve</button>`
+          }
+        </td>
+      </tr>`;
+    })
     .join("");
-
-  body.querySelectorAll("tr[data-id]").forEach((tr) => {
-    tr.addEventListener("click", () => {
-      const id = tr.getAttribute("data-id");
-      const pkg = data.find((x) => x.id === id);
-      if (!pkg) return;
-      fillPackageEditor(pkg);
-    });
-  });
 }
 
 function fillPackageEditor(pkg) {
-  if ($("pkgEditId")) $("pkgEditId").value = pkg.id || "";
-  if ($("pkgEditTracking")) $("pkgEditTracking").value = pkg.tracking || "";
-  if ($("pkgEditStatus")) $("pkgEditStatus").value = pkg.status || "";
-  if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
-  if ($("pkgEditApproved")) $("pkgEditApproved").checked = !!pkg.approved;
-  if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
-  if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
+  $("pkgEditId") && ($("pkgEditId").value = pkg.id || "");
+  $("pkgEditTracking") && ($("pkgEditTracking").value = pkg.tracking || "");
+  $("pkgEditStatus") && ($("pkgEditStatus").value = pkg.status || "");
+  $("pkgEditStore") && ($("pkgEditStore").value = pkg.store || "");
+  $("pkgEditNotes") && ($("pkgEditNotes").value = pkg.notes || "");
+
+  // IMPORTANT: pkgEditApproved is a <select> (true/false)
+  if ($("pkgEditApproved")) {
+    $("pkgEditApproved").value = pkg.approved ? "true" : "false";
+  }
+
+  $("pkgEditMsg") && ($("pkgEditMsg").textContent = "");
+}
+
+async function approvePackage(id) {
+  const msg = $("pkgMsg");
+  if (msg) msg.textContent = "Approving...";
+
+  const { error } = await supabase.from("packages").update({ approved: true }).eq("id", id);
+  if (error) {
+    if (msg) msg.textContent = error.message;
+    return;
+  }
+
+  if (msg) msg.textContent = "Approved.";
+  await renderPackages();
 }
 
 async function savePackageEdits() {
@@ -600,11 +733,14 @@ async function savePackageEdits() {
     return;
   }
 
+  const approvedStr = ($("pkgEditApproved")?.value || "false").trim();
+  const approved = approvedStr === "true";
+
   const patch = {
     tracking: ($("pkgEditTracking")?.value || "").trim(),
     status: ($("pkgEditStatus")?.value || "").trim(),
     store: ($("pkgEditStore")?.value || "").trim() || null,
-    approved: !!$("pkgEditApproved")?.checked,
+    approved,
     notes: ($("pkgEditNotes")?.value || "").trim() || null,
   };
 
@@ -614,7 +750,7 @@ async function savePackageEdits() {
     return;
   }
 
-  // Optional uploads (photo/invoice) if bucket exists
+  // Optional uploads
   const photoFile = $("pkgPhotoFile")?.files?.[0] || null;
   const invoiceFile = $("pkgInvoiceFile")?.files?.[0] || null;
 
@@ -626,6 +762,7 @@ async function savePackageEdits() {
 
   if (msg) msg.textContent = "Saved.";
   await renderPackages();
+  await renderOverview(); // keep analytics updated
 }
 
 async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
@@ -646,9 +783,13 @@ async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
 // ========================
 // MESSAGES
 // ========================
-function setupMessagesUI() {
+function setupMessagesUIOnce() {
+  if (__messagesBound) return;
+  __messagesBound = true;
+
+  const run = debounce(() => renderConversations(), 250);
   $("refreshMessages")?.addEventListener("click", () => renderConversations());
-  $("msgSearch")?.addEventListener("input", () => renderConversations());
+  $("msgSearch")?.addEventListener("input", run);
   $("msgFilter")?.addEventListener("change", () => renderConversations());
 
   $("adminChatForm")?.addEventListener("submit", async (e) => {
@@ -667,15 +808,12 @@ function setupMessagesUI() {
 }
 
 async function renderConversations() {
-  setupMessagesUI();
-
   const list = $("convoList");
   if (!list) return;
 
   const q = ($("msgSearch")?.value || "").trim().toLowerCase();
-  const filter = ($("msgFilter")?.value || "").trim();
+  const filter = ($("msgFilter")?.value || "open").trim();
 
-  // Fetch recent messages and group in JS (simple + reliable)
   const { data, error } = await supabase
     .from("messages")
     .select("id,user_id,sender,body,created_at,resolved")
@@ -683,59 +821,56 @@ async function renderConversations() {
     .limit(400);
 
   if (error) {
-    list.innerHTML = `<div class="muted">${escapeHTML(error.message)}</div>`;
+    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
     return;
   }
 
   const grouped = new Map();
-  for (const m of data || []) {
-    if (!grouped.has(m.user_id)) grouped.set(m.user_id, m);
-  }
+  for (const m of data || []) if (!grouped.has(m.user_id)) grouped.set(m.user_id, m);
 
   let convos = Array.from(grouped.values());
 
   if (filter === "open") convos = convos.filter((m) => !m.resolved);
-  if (filter === "resolved") convos = convos.filter((m) => !!m.resolved);
-
-  if (q) {
-    convos = convos.filter((m) => (m.body || "").toLowerCase().includes(q));
-  }
+  if (q) convos = convos.filter((m) => (m.body || "").toLowerCase().includes(q));
 
   if (!convos.length) {
-    list.innerHTML = `<div class="muted">No conversations.</div>`;
+    list.innerHTML = `<li class="muted">No conversations.</li>`;
     return;
   }
 
-  // Show list
   list.innerHTML = convos
     .map(
       (m) => `
-    <button class="convo ${m.user_id === currentCustomer?.id ? "active" : ""}" type="button" data-uid="${escapeHTML(
+    <li>
+      <button class="convo ${m.user_id === currentCustomer?.id ? "active" : ""}" type="button" data-uid="${escapeHTML(
         m.user_id
       )}">
-      <div class="row">
-        <strong>${escapeHTML(m.user_id)}</strong>
-        ${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}
-      </div>
-      <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
-      <div class="muted small">${new Date(m.created_at).toLocaleString()}</div>
-    </button>
+        <div class="row">
+          <strong>${escapeHTML(m.user_id)}</strong>
+          ${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}
+        </div>
+        <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
+        <div class="muted small">${new Date(m.created_at).toLocaleString()}</div>
+      </button>
+    </li>
   `
     )
     .join("");
 
-  list.querySelectorAll("button[data-uid]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+  if (!list.__delegated) {
+    list.__delegated = true;
+    list.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-uid]");
+      if (!btn) return;
       const uid = btn.getAttribute("data-uid");
       await selectConversationByCustomer(uid);
     });
-  });
+  }
 }
 
 async function selectConversationByCustomer(userId) {
   if (!userId) return;
 
-  // Load minimal profile for header
   const prof = await supabase
     .from("profiles")
     .select("id,email,full_name")
@@ -746,10 +881,9 @@ async function selectConversationByCustomer(userId) {
     ? { id: prof.data.id, email: prof.data.email, full_name: prof.data.full_name }
     : { id: userId, email: "", full_name: "" };
 
-  if ($("convoTitle")) {
-    $("convoTitle").textContent =
-      currentCustomer.full_name || currentCustomer.email || `Customer ${currentCustomer.id}`;
-  }
+  $("convoTitle") &&
+    ($("convoTitle").textContent =
+      currentCustomer.full_name || currentCustomer.email || `Customer ${currentCustomer.id}`);
 
   await renderChat();
   await setupMessageRealtime(userId);
@@ -786,8 +920,7 @@ async function renderChat() {
           <span>${escapeHTML(m.sender)}</span>
           <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
         </div>
-      </div>
-    `
+      </div>`
       )
       .join("") || `<div class="muted small">No messages yet.</div>`;
 
@@ -803,14 +936,13 @@ async function sendStaffMessage(text) {
     return;
   }
 
-  const trySend = async (sender) => {
-    return await supabase.from("messages").insert({
+  const trySend = async (sender) =>
+    supabase.from("messages").insert({
       user_id: currentCustomer.id,
       sender,
       body: text,
       resolved: false,
     });
-  };
 
   let res = await trySend("staff");
   if (res.error) res = await trySend("admin");
@@ -823,18 +955,16 @@ async function sendStaffMessage(text) {
 
   if (msg) msg.textContent = "";
   await renderChat();
-  setTimeout(() => renderChat(), 800); // helps if realtime is off/slow
+  setTimeout(() => renderChat(), 800);
   await renderConversations();
+  await renderOverview();
 }
 
 async function markConversationResolved(userId) {
   const msg = $("adminChatMsg");
   if (msg) msg.textContent = "Marking resolved...";
 
-  const { error } = await supabase
-    .from("messages")
-    .update({ resolved: true })
-    .eq("user_id", userId);
+  const { error } = await supabase.from("messages").update({ resolved: true }).eq("user_id", userId);
 
   if (error) {
     if (msg) msg.textContent = error.message;
@@ -844,9 +974,9 @@ async function markConversationResolved(userId) {
   if (msg) msg.textContent = "Resolved.";
   await renderConversations();
   await renderChat();
+  await renderOverview();
 }
 
-// Realtime subscription for new messages (if enabled on Supabase)
 function teardownMessageRealtime() {
   if (msgChannel) {
     supabase.removeChannel(msgChannel);
@@ -865,15 +995,19 @@ async function setupMessageRealtime(userId) {
       async () => {
         await renderChat();
         await renderConversations();
+        await renderOverview();
       }
     )
     .subscribe();
 }
 
 // ========================
-// ROLES TAB (admin-only action)
+// ROLES
 // ========================
-function setupRolesUI() {
+function setupRolesUIOnce() {
+  if (__rolesBound) return;
+  __rolesBound = true;
+
   $("roleForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = $("roleMsg");
@@ -894,6 +1028,7 @@ function setupRolesUI() {
     }
 
     if (msg) msg.textContent = "Role updated.";
+    await renderCustomers();
   });
 }
 
@@ -937,146 +1072,12 @@ async function exportPackagesCSV() {
 }
 
 // ========================
-// OPTIONAL: BULK CSV UPLOAD (only runs if DOM exists)
-// Expected DOM ids (add these to admin.html if you want):
-// bulkCsvFile, bulkCsvText, bulkUploadBtn, bulkTemplateBtn, bulkMsg
-// ========================
-function setupBulkUploadIfPresent() {
-  const file = $("bulkCsvFile");
-  const text = $("bulkCsvText");
-  const uploadBtn = $("bulkUploadBtn");
-  const tplBtn = $("bulkTemplateBtn");
-  const msg = $("bulkMsg");
-
-  if (!uploadBtn) return; // feature not on this admin.html yet
-
-  const template = `tracking,customer_email,status,store,approved,notes
-1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile
-`;
-
-  tplBtn?.addEventListener("click", () => {
-    const blob = new Blob([template], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "bulk_packages_template.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  });
-
-  uploadBtn.addEventListener("click", async () => {
-    if (msg) msg.textContent = "Reading CSV...";
-
-    let csv = (text?.value || "").trim();
-    if (!csv && file?.files?.[0]) {
-      csv = await file.files[0].text();
-    }
-
-    if (!csv) {
-      if (msg) msg.textContent = "Paste CSV or choose a file.";
-      return;
-    }
-
-    try {
-      const rows = parseCsv(csv);
-      if (!rows.length) throw new Error("No rows found.");
-
-      if (msg) msg.textContent = `Uploading ${rows.length}...`;
-
-      // Map emails -> ids
-      const emails = Array.from(
-        new Set(rows.map((r) => (r.customer_email || "").trim().toLowerCase()).filter(Boolean))
-      );
-
-      let emailToId = new Map();
-      if (emails.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id,email")
-          .in("email", emails);
-
-        for (const p of profs || []) emailToId.set((p.email || "").toLowerCase(), p.id);
-      }
-
-      // Build insert payload
-      const payload = rows.map((r) => ({
-        tracking: (r.tracking || "").trim(),
-        status: (r.status || "RECEIVED").trim(),
-        store: (r.store || "").trim() || null,
-        approved: String(r.approved || "true").toLowerCase() !== "false",
-        notes: (r.notes || "").trim() || null,
-        user_id: emailToId.get((r.customer_email || "").trim().toLowerCase()) || null,
-      })).filter((p) => p.tracking);
-
-      // Upsert by tracking (requires unique index on tracking; if not, it’ll just insert)
-      const { error } = await supabase.from("packages").upsert(payload, { onConflict: "tracking" });
-      if (error) throw error;
-
-      if (msg) msg.textContent = "Bulk upload complete.";
-      if (file) file.value = "";
-      if (text) text.value = "";
-      await renderPackages();
-    } catch (e) {
-      console.error(e);
-      if (msg) msg.textContent = e?.message || String(e);
-    }
-  });
-}
-
-function parseCsv(csvText) {
-  // basic CSV parser supporting quoted values
-  const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length);
-  if (lines.length < 2) return [];
-
-  const headers = splitCsvLine(lines[0]).map((h) => h.trim());
-  const out = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i]);
-    const row = {};
-    headers.forEach((h, idx) => (row[h] = cols[idx] ?? ""));
-    out.push(row);
-  }
-  return out;
-}
-
-function splitCsvLine(line) {
-  const res = [];
-  let cur = "";
-  let inQ = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-
-    if (ch === '"' && line[i + 1] === '"') {
-      cur += '"';
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQ = !inQ;
-      continue;
-    }
-    if (ch === "," && !inQ) {
-      res.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  res.push(cur);
-  return res.map((s) => s.trim());
-}
-
-// ========================
 // INIT
 // ========================
 async function init() {
   await sanitizeStaleTokenOnce();
-  setupAuthUI();
+  setupAuthUIOnce();
   setupAuthSubOnce();
-  setupRolesUI();
-  setupBulkUploadIfPresent();
   await renderApp();
 }
 
