@@ -1,535 +1,474 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sueños Shipping & Variety Store---TEST</title>
-  <meta name="description" content="Sueños Shipping: track packages, upload invoices, and chat with support." />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Sueños Shipping &amp; Variety Store---TEST</title>
+<meta content="Sueños Shipping: track packages, upload invoices, and chat with support." name="description"/>
+<link href="styles.css" rel="stylesheet"/>
 </head>
-
 <body>
-  <!-- Top Nav -->
-  <header class="header">
-    <div class="container header__inner">
-      <a class="brand" href="#home" aria-label="Sueños Shipping & Variety Store">
-        <div class="brand__mark" aria-hidden="true">S</div>
-        <div class="brand__text">
-          <div class="brand__name">Sueños Shipping</div>
-          <div class="brand__tag">Shipping & Variety Store</div>
-        </div>
-      </a>
-
-      <button class="nav__toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">☰</button>
-
-      <nav class="nav" id="nav">
-        <a href="#services">Services</a>
-        <a href="#how">How it works</a>
-        <a href="#rates">Rates</a>
-        <a href="#calculator">Calculator</a>
-        <a href="#contact">Contact</a>
-        <a href="#portal" class="nav__pill">Customer Portal</a>
-      </nav>
-
-      <div class="header__actions">
-        <a class="btn btn--ghost" href="#portal">Portal</a>
-        <button class="btn btn--primary" id="openChatTop" type="button">Chat</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Hero -->
-  <main id="home" class="hero">
-    <div class="container hero__grid">
-      <div class="hero__copy">
-        <div class="pill">
-          <span class="dot"></span>
+<!-- Top Nav -->
+<header class="header">
+<div class="container header__inner">
+<a aria-label="Sueños Shipping &amp; Variety Store" class="brand" href="#home">
+<div aria-hidden="true" class="brand__mark">S</div>
+<div class="brand__text">
+<div class="brand__name">Sueños Shipping</div>
+<div class="brand__tag">Shipping &amp; Variety Store</div>
+</div>
+</a>
+<button aria-expanded="false" aria-label="Open menu" class="nav__toggle" id="navToggle">☰</button>
+<nav class="nav" id="nav">
+<a href="#services">Services</a>
+<a href="#how">How it works</a>
+<a href="#rates">Rates</a>
+<a href="#calculator">Calculator</a>
+<a href="#contact">Contact</a>
+<a class="nav__pill" href="#portal">Customer Portal</a>
+</nav>
+<div class="header__actions">
+<a class="btn btn--ghost" href="#portal">Portal</a>
+<button class="btn btn--primary" id="openChatTop" type="button">Chat</button>
+</div>
+</div>
+</header>
+<!-- Hero -->
+<main class="hero" id="home">
+<div class="container hero__grid">
+<div class="hero__copy">
+<div class="pill">
+<span class="dot"></span>
           Track packages • Upload invoices • Chat support
         </div>
-
-        <h1>Shipping you can trust — with a dashboard built for clarity.</h1>
-
-        <p>
+<h1>Shipping you can trust — with a dashboard built for clarity.</h1>
+<p>
           Sueños Shipping makes it simple: transparent rates, consistent shipping days,
           and a customer portal where you can track every package in one place.
         </p>
-
-        <div class="hero__cta">
-          <a class="btn btn--primary" href="#calculator">Get a Quote</a>
-          <a class="btn btn--ghost" href="#portal">Customer Portal</a>
-        </div>
-
-        <div class="hero__stats">
-          <div class="stat">
-            <div class="stat__k">Shipping</div>
-            <div class="stat__v">Fast & reliable</div>
-          </div>
-          <div class="stat">
-            <div class="stat__k">Support</div>
-            <div class="stat__v">Chat anytime</div>
-          </div>
-          <div class="stat">
-            <div class="stat__k">Savings</div>
-            <div class="stat__v">Consolidation</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="hero__visual" aria-hidden="true">
-        <div class="glassCard">
-          <div class="glassCard__head">
-            <div class="glassCard__title">Live Status Preview</div>
-            <div class="badge">Portal</div>
-          </div>
-
-          <div class="timeline">
-            <div class="tl">
-              <div class="tl__dot ok"></div>
-              <div class="tl__content">
-                <div class="tl__top">
-                  <div class="tl__title">Received at warehouse</div>
-                  <div class="tl__time">Today</div>
-                </div>
-                <div class="tl__sub">We’ve received your package and assigned a tracking ID.</div>
-              </div>
-            </div>
-
-            <div class="tl">
-              <div class="tl__dot"></div>
-              <div class="tl__content">
-                <div class="tl__top">
-                  <div class="tl__title">In transit</div>
-                  <div class="tl__time">Next</div>
-                </div>
-                <div class="tl__sub">Moving through processing and shipping.</div>
-              </div>
-            </div>
-
-            <div class="tl">
-              <div class="tl__dot"></div>
-              <div class="tl__content">
-                <div class="tl__top">
-                  <div class="tl__title">Ready for pickup</div>
-                  <div class="tl__time">Soon</div>
-                </div>
-                <div class="tl__sub">We’ll message you when it’s ready.</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="glassCard__foot">
-            <div class="mini">
-              <div class="mini__k">Simple</div>
-              <div class="mini__v">One dashboard</div>
-            </div>
-            <div class="mini">
-              <div class="mini__k">Secure</div>
-              <div class="mini__v">Invoice uploads</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="container hero__strip">
-      <div class="strip">
-        <div class="strip__item">Express shipping</div>
-        <div class="strip__sep"></div>
-        <div class="strip__item">Package consolidation</div>
-        <div class="strip__sep"></div>
-        <div class="strip__item">Clear rates</div>
-        <div class="strip__sep"></div>
-        <div class="strip__item">Variety store essentials</div>
-      </div>
-    </div>
-  </main>
-
-  <!-- Services -->
-  <section id="services" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Services</h2>
-        <p>Everything you need for smooth shipping—from purchase to pickup.</p>
-      </div>
-
-      <div class="cards cards--3">
-        <article class="card feature">
-          <div class="icon">✈️</div>
-          <h3>Air Freight</h3>
-          <p>Reliable shipping with consistent schedules and clear tracking milestones.</p>
-        </article>
-
-        <article class="card feature">
-          <div class="icon">📦</div>
-          <h3>Consolidation</h3>
-          <p>Save by combining packages—one pickup, fewer surprises.</p>
-        </article>
-
-        <article class="card feature">
-          <div class="icon">🧾</div>
-          <h3>Invoice Upload</h3>
-          <p>Upload invoices in your portal to speed up processing.</p>
-        </article>
-
-        <article class="card feature">
-          <div class="icon">💬</div>
-          <h3>Support Chat</h3>
-          <p>Ask questions anytime. Messages stay linked to your account.</p>
-        </article>
-
-        <article class="card feature">
-          <div class="icon">🏪</div>
-          <h3>Variety Store</h3>
-          <p>Pickup essentials in-store when you collect your packages.</p>
-        </article>
-
-        <article class="card feature">
-          <div class="icon">🔒</div>
-          <h3>Secure Handling</h3>
-          <p>Careful processing with clear status updates so you always know what’s next.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- How it works -->
-  <section id="how" class="section section--alt">
-    <div class="container">
-      <div class="section__head">
-        <h2>How it works</h2>
-        <p>3 steps. No confusion.</p>
-      </div>
-
-      <div class="steps">
-        <div class="step">
-          <div class="step__num">1</div>
-          <div class="step__body">
-            <div class="step__title">Send your packages</div>
-            <div class="step__sub">We receive and assign a tracking ID in your portal.</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__num">2</div>
-          <div class="step__body">
-            <div class="step__title">Upload invoices</div>
-            <div class="step__sub">Attach invoices to speed up approvals and processing.</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__num">3</div>
-          <div class="step__body">
-            <div class="step__title">Track + pickup</div>
-            <div class="step__sub">Watch status updates and get notified when ready.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Rates -->
-  <section id="rates" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Rates</h2>
-        <p>Update your real rates inside <code>script.js</code>.</p>
-      </div>
-
-      <div class="tableWrap">
-        <table class="table" aria-label="Air Freight Rates">
-          <thead>
-            <tr>
-              <th>Weight (lbs)</th>
-              <th>Rate (JMD)</th>
-            </tr>
-          </thead>
-          <tbody id="ratesTableBody"></tbody>
-        </table>
-      </div>
-
-      <div class="fineprint">
+<div class="hero__cta">
+<a class="btn btn--primary" href="#calculator">Get a Quote</a>
+<a class="btn btn--ghost" href="#portal">Customer Portal</a>
+</div>
+<div class="hero__stats">
+<div class="stat">
+<div class="stat__k">Shipping</div>
+<div class="stat__v">Fast &amp; reliable</div>
+</div>
+<div class="stat">
+<div class="stat__k">Support</div>
+<div class="stat__v">Chat anytime</div>
+</div>
+<div class="stat">
+<div class="stat__k">Savings</div>
+<div class="stat__v">Consolidation</div>
+</div>
+</div>
+</div>
+<div aria-hidden="true" class="hero__visual">
+<div class="glassCard">
+<div class="glassCard__head">
+<div class="glassCard__title">Live Status Preview</div>
+<div class="badge">Portal</div>
+</div>
+<div class="timeline">
+<div class="tl">
+<div class="tl__dot ok"></div>
+<div class="tl__content">
+<div class="tl__top">
+<div class="tl__title">Received at warehouse</div>
+<div class="tl__time">Today</div>
+</div>
+<div class="tl__sub">We’ve received your package and assigned a tracking ID.</div>
+</div>
+</div>
+<div class="tl">
+<div class="tl__dot"></div>
+<div class="tl__content">
+<div class="tl__top">
+<div class="tl__title">In transit</div>
+<div class="tl__time">Next</div>
+</div>
+<div class="tl__sub">Moving through processing and shipping.</div>
+</div>
+</div>
+<div class="tl">
+<div class="tl__dot"></div>
+<div class="tl__content">
+<div class="tl__top">
+<div class="tl__title">Ready for pickup</div>
+<div class="tl__time">Soon</div>
+</div>
+<div class="tl__sub">We’ll message you when it’s ready.</div>
+</div>
+</div>
+</div>
+<div class="glassCard__foot">
+<div class="mini">
+<div class="mini__k">Simple</div>
+<div class="mini__v">One dashboard</div>
+</div>
+<div class="mini">
+<div class="mini__k">Secure</div>
+<div class="mini__v">Invoice uploads</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="container hero__strip">
+<div class="strip">
+<div class="strip__item">Express shipping</div>
+<div class="strip__sep"></div>
+<div class="strip__item">Package consolidation</div>
+<div class="strip__sep"></div>
+<div class="strip__item">Clear rates</div>
+<div class="strip__sep"></div>
+<div class="strip__item">Variety store essentials</div>
+</div>
+</div>
+</main>
+<!-- Services -->
+<section class="section" id="services">
+<div class="container">
+<div class="section__head">
+<h2>Services</h2>
+<p>Everything you need for smooth shipping—from purchase to pickup.</p>
+</div>
+<div class="cards cards--3">
+<article class="card feature">
+<div class="icon">✈️</div>
+<h3>Air Freight</h3>
+<p>Reliable shipping with consistent schedules and clear tracking milestones.</p>
+</article>
+<article class="card feature">
+<div class="icon">📦</div>
+<h3>Consolidation</h3>
+<p>Save by combining packages—one pickup, fewer surprises.</p>
+</article>
+<article class="card feature">
+<div class="icon">🧾</div>
+<h3>Invoice Upload</h3>
+<p>Upload invoices in your portal to speed up processing.</p>
+</article>
+<article class="card feature">
+<div class="icon">💬</div>
+<h3>Support Chat</h3>
+<p>Ask questions anytime. Messages stay linked to your account.</p>
+</article>
+<article class="card feature">
+<div class="icon">🏪</div>
+<h3>Variety Store</h3>
+<p>Pickup essentials in-store when you collect your packages.</p>
+</article>
+<article class="card feature">
+<div class="icon">🔒</div>
+<h3>Secure Handling</h3>
+<p>Careful processing with clear status updates so you always know what’s next.</p>
+</article>
+</div>
+</div>
+</section>
+<!-- How it works -->
+<section class="section section--alt" id="how">
+<div class="container">
+<div class="section__head">
+<h2>How it works</h2>
+<p>3 steps. No confusion.</p>
+</div>
+<div class="steps">
+<div class="step">
+<div class="step__num">1</div>
+<div class="step__body">
+<div class="step__title">Send your packages</div>
+<div class="step__sub">We receive and assign a tracking ID in your portal.</div>
+</div>
+</div>
+<div class="step">
+<div class="step__num">2</div>
+<div class="step__body">
+<div class="step__title">Upload invoices</div>
+<div class="step__sub">Attach invoices to speed up approvals and processing.</div>
+</div>
+</div>
+<div class="step">
+<div class="step__num">3</div>
+<div class="step__body">
+<div class="step__title">Track + pickup</div>
+<div class="step__sub">Watch status updates and get notified when ready.</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Rates -->
+<section class="section" id="rates">
+<div class="container">
+<div class="section__head">
+<h2>Rates</h2>
+<p>Update your real rates inside <code>script.js</code>.</p>
+</div>
+<div class="tableWrap">
+<table aria-label="Air Freight Rates" class="table">
+<thead>
+<tr>
+<th>Weight (lbs)</th>
+<th>Rate (JMD)</th>
+</tr>
+</thead>
+<tbody id="ratesTableBody"></tbody>
+</table>
+</div>
+<div class="fineprint">
         Estimates only. Duties/taxes may apply depending on item category.
       </div>
-    </div>
-  </section>
-
-  <!-- Calculator -->
-  <section id="calculator" class="section section--alt">
-    <div class="container">
-      <div class="section__head">
-        <h2>Instant Quote</h2>
-        <p>Get a quick estimate by weight.</p>
-      </div>
-
-      <div class="grid2">
-        <form class="form card card--pad" id="calcForm">
-          <label>
+</div>
+</section>
+<!-- Calculator -->
+<section class="section section--alt" id="calculator">
+<div class="container">
+<div class="section__head">
+<h2>Instant Quote</h2>
+<p>Get a quick estimate by weight.</p>
+</div>
+<div class="grid2">
+<form class="form card card--pad" id="calcForm">
+<label>
             Package Weight (lbs) <span class="req">*</span>
-            <input id="weight" type="number" inputmode="decimal" step="0.1" min="0.1" placeholder="e.g. 3.5" required />
-          </label>
-
-          <label>
+<input id="weight" inputmode="decimal" min="0.1" placeholder="e.g. 3.5" required="" step="0.1" type="number"/>
+</label>
+<label>
             Package Value (USD) <span class="req">*</span>
-            <input id="value" type="number" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 120" required />
-          </label>
-
-          <label>
+<input id="value" inputmode="decimal" min="0" placeholder="e.g. 120" required="" step="0.01" type="number"/>
+</label>
+<label>
             Tariff Code (optional)
-            <input id="tariff" type="text" placeholder="e.g. 8517.12" />
-          </label>
+            <input id="tariff" placeholder="e.g. 8517.12" type="text"/>
+</label>
+<button class="btn btn--primary" type="submit">Calculate</button>
+<p class="small muted">Estimate only. Final charges may change based on duties/fees.</p>
+</form>
+<div class="card card--pad">
+<h3>Estimate</h3>
+<div class="result" id="result">
+<div class="result__big">—</div>
+<div class="result__sub">Enter details and calculate.</div>
+</div>
+<div class="divider"></div>
+<h4>Need help?</h4>
+<p class="muted small">Use chat to ask about duties, restricted items, or timelines.</p>
+<button class="btn btn--ghost" id="openChatCalc" type="button">Open Chat</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Portal -->
+<section class="section" id="portal">
+<div class="container">
+<div class="section__head">
+<h2>Customer Portal</h2>
+<p>Register or log in to track packages, upload invoices, and message support.</p>
+</div>
+<div class="portal">
+<!-- Login / Register -->
+<div class="card card--pad" id="loginCard">
+<h3>Account</h3>
+<div class="tabs">
+<button class="tab active" id="tabLogin" type="button">Login</button>
+<button class="tab" id="tabRegister" type="button">Register</button>
+</div>
+<div id="loginPane">
+<form class="form" id="loginForm">
+<label>Email <input id="loginEmail" required="" type="email"/></label>
+<label>Password <input id="loginPassword" required="" type="password"/></label>
+<button class="btn btn--primary" type="submit">Sign In</button>
+<div class="alert muted small" id="loginMsg" role="status"></div>
+</form>
+</div>
+<div class="hidden" id="registerPane">
+<form class="form" id="registerForm">
+<label>Full name <input id="regName" required="" type="text"/></label>
+<label>Email <input id="regEmail" required="" type="email"/></label>
+<label>Password <input id="regPassword" minlength="8" required="" type="password"/></label>
+<button class="btn btn--primary" type="submit">Create Account</button>
+<div class="alert muted small" id="regMsg" role="status"></div>
+</form>
+</div>
+<div class="divider"></div>
+<p class="muted small">Staff users can access <code>/admin.html</code> once their role is set to <strong>staff</strong>.</p>
+</div>
+<!-- Dashboard -->
+<div class="card card--pad hidden" id="dashCard">
+<div class="dashHead">
+<div>
+<h3 class="m0">Dashboard</h3>
+<div class="muted small">Welcome, <span id="userName">Customer</span></div>
+</div>
+<div class="dashHead__actions">
+<button class="btn btn--ghost" id="openChatDash" type="button">Chat</button>
+<a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
+<button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
+</div>
+</div>
+<div class="card shiptoCard">
+<div class="card__head">
+<h3 class="h3">U.S. Shipping Address</h3>
+<p class="muted small">Use this address when shipping your packages. Your account number is included on the first line.</p>
+</div>
+<pre class="shiptoBlock" id="shipToBlock">Loading...</pre>
+<div class="row">
+<button class="btn btn--ghost btn-sm" id="copyShipTo" type="button">Copy address</button>
+<span class="muted small" id="accountBadge"></span>
+</div>
+</div>
 
-          <button class="btn btn--primary" type="submit">Calculate</button>
-          <p class="small muted">Estimate only. Final charges may change based on duties/fees.</p>
-        </form>
-
-        <div class="card card--pad">
-          <h3>Estimate</h3>
-          <div class="result" id="result">
-            <div class="result__big">—</div>
-            <div class="result__sub">Enter details and calculate.</div>
-          </div>
-
-          <div class="divider"></div>
-
-          <h4>Need help?</h4>
-          <p class="muted small">Use chat to ask about duties, restricted items, or timelines.</p>
-          <button class="btn btn--ghost" id="openChatCalc" type="button">Open Chat</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Portal -->
-  <section id="portal" class="section">
-    <div class="container">
-      <div class="section__head">
-        <h2>Customer Portal</h2>
-        <p>Register or log in to track packages, upload invoices, and message support.</p>
-      </div>
-
-      <div class="portal">
-        <!-- Login / Register -->
-        <div class="card card--pad" id="loginCard">
-          <h3>Account</h3>
-
-          <div class="tabs">
-            <button class="tab active" id="tabLogin" type="button">Login</button>
-            <button class="tab" id="tabRegister" type="button">Register</button>
-          </div>
-
-          <div id="loginPane">
-            <form class="form" id="loginForm">
-              <label>Email <input id="loginEmail" type="email" required /></label>
-              <label>Password <input id="loginPassword" type="password" required /></label>
-              <button class="btn btn--primary" type="submit">Sign In</button>
-              <div class="alert muted small" id="loginMsg" role="status"></div>
-            </form>
-          </div>
-
-          <div id="registerPane" class="hidden">
-            <form class="form" id="registerForm">
-              <label>Full name <input id="regName" type="text" required /></label>
-              <label>Email <input id="regEmail" type="email" required /></label>
-              <label>Password <input id="regPassword" type="password" minlength="8" required /></label>
-              <button class="btn btn--primary" type="submit">Create Account</button>
-              <div class="alert muted small" id="regMsg" role="status"></div>
-            </form>
-          </div>
-
-          <div class="divider"></div>
-          <p class="muted small">Staff users can access <code>/admin.html</code> once their role is set to <strong>staff</strong>.</p>
-        </div>
-
-        <!-- Dashboard -->
-        <div class="card card--pad hidden" id="dashCard">
-          <div class="dashHead">
-            <div>
-              <h3 class="m0">Dashboard</h3>
-              <div class="muted small">Welcome, <span id="userName">Customer</span></div>
-            </div>
-            <div class="dashHead__actions">
-              <button class="btn btn--ghost" id="openChatDash" type="button">Chat</button>
-              <a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
-              <button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
-            </div>
-          </div>
-
-          <div class="dashGrid">
-            <div class="panel">
-              <div class="panel__head">
-                <div class="panel__title">Your U.S. Shipping Address</div>
-                <div class="panel__sub muted small">Use this address when ordering online. Copy and paste it into the store checkout.</div>
-              </div>
-
-              <pre class="addrBlock" id="shipToBlock">Loading…</pre>
-              <div class="row">
-                <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
-                <div class="muted small" id="shipToMsg" role="status"></div>
-              </div>
-            </div>
-
-            <div class="panel">
-              <div class="panel__head">
-                <div class="panel__title">Packages</div>
-                <div class="panel__sub muted small">Click a package row to view details.</div>
-              </div>
-
-              <div class="searchRow">
-                <input id="pkgSearch" type="text" placeholder="Search by Tracking ID (e.g., SSX-1002)" />
-                <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
-              </div>
-
-              <div class="tableWrap tableWrap--soft">
-                <table class="table table--mini">
-                  <thead>
-                    <tr>
-                      <th>Tracking</th>
-                      <th>Status</th>
-                      <th>Updated</th>
-                    </tr>
-                  </thead>
-                  <tbody id="pkgBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="panel">
-              <div class="panel__head">
-                <div class="panel__title">Upload Invoice</div>
-                <div class="panel__sub muted small">Attach invoice to a tracking ID.</div>
-              </div>
-
-              <form class="form" id="invoiceForm">
-                <label>
+<div class="dashGrid">
+<div class="panel">
+<div class="panel__head">
+<div class="panel__title">Packages</div>
+<div class="panel__sub muted small">Click a package row to view details.</div>
+</div>
+<div class="searchRow">
+<input id="pkgSearch" placeholder="Search by Tracking ID (e.g., SSX-1002)" type="text"/>
+<button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
+</div>
+<div class="tableWrap tableWrap--soft">
+<table class="table table--mini">
+<thead>
+<tr>
+<th>Tracking</th>
+<th>Status</th>
+<th>Updated</th>
+</tr>
+</thead>
+<tbody id="pkgBody"></tbody>
+</table>
+</div>
+</div>
+<div class="panel">
+<div class="panel__head">
+<div class="panel__title">Upload Invoice</div>
+<div class="panel__sub muted small">Attach invoice to a tracking ID.</div>
+</div>
+<form class="form" id="invoiceForm">
+<label>
                   Tracking ID <span class="req">*</span>
-                  <input id="invTracking" type="text" placeholder="SSX-1002" required />
-                </label>
-
-                <label>
+<input id="invTracking" placeholder="SSX-1002" required="" type="text"/>
+</label>
+<label>
                   Invoice file <span class="req">*</span>
-                  <input id="invFile" type="file" accept=".pdf,.jpg,.jpeg,.png" required />
-                </label>
-
-                <label>
+<input accept=".pdf,.jpg,.jpeg,.png" id="invFile" required="" type="file"/>
+</label>
+<label>
                   Notes (optional)
-                  <input id="invNote" type="text" placeholder="e.g., includes 2 items" />
-                </label>
-
-                <button class="btn btn--primary" type="submit">Upload</button>
-                <div class="alert muted small" id="invMsg" role="status"></div>
-              </form>
-
-              <div class="divider"></div>
-              <div class="panel__title">Recent uploads</div>
-              <ul class="list" id="uploadsList"></ul>
-            </div>
-          </div>
-
-          <!-- Package details modal -->
-          <div class="modal hidden" id="pkgModal" aria-hidden="true">
-            <div class="modal__backdrop" data-close="1"></div>
-            <div class="modal__card" role="dialog" aria-modal="true" aria-label="Package Details">
-              <div class="modal__head">
-                <div>
-                  <div class="modal__title" id="modalTitle">Package</div>
-                  <div class="muted small" id="modalSub">Details</div>
-                </div>
-                <button class="btn btn--ghost" data-close="1" type="button">Close</button>
-              </div>
-              <div class="modal__body" id="modalBody"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+                  <input id="invNote" placeholder="e.g., includes 2 items" type="text"/>
+</label>
+<button class="btn btn--primary" type="submit">Upload</button>
+<div class="alert muted small" id="invMsg" role="status"></div>
+</form>
+<div class="divider"></div>
+<div class="panel__title">Recent uploads</div>
+<ul class="list" id="uploadsList"></ul>
+</div>
+</div>
+<!-- Package details modal -->
+<div aria-hidden="true" class="modal hidden" id="pkgModal">
+<div class="modal__backdrop" data-close="1"></div>
+<div aria-label="Package Details" aria-modal="true" class="modal__card" role="dialog">
+<div class="modal__head">
+<div>
+<div class="modal__title" id="modalTitle">Package</div>
+<div class="muted small" id="modalSub">Details</div>
+</div>
+<button class="btn btn--ghost" data-close="1" type="button">Close</button>
+</div>
+<div class="modal__body" id="modalBody"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Contact -->
+<section class="section section--alt" id="contact">
+<div class="container">
+<div class="section__head">
+<h2>Contact</h2>
+<p>Update your real phone/email/address in this section.</p>
+</div>
+<div class="grid2">
+<div class="card card--pad">
+<h3>Business Info</h3>
+<div class="contactList">
+<div>
+<div class="muted small">Address</div>
+<div><strong>Kingston, Jamaica</strong></div>
+<div class="muted small">Update with your exact location</div>
+</div>
+<div>
+<div class="muted small">Phone</div>
+<div><strong>+1 (876) 000-0000</strong></div>
+</div>
+<div>
+<div class="muted small">Email</div>
+<div><strong>support@suenosshipping.com</strong></div>
+</div>
+</div>
+<div class="divider"></div>
+<button class="btn btn--primary" id="openChatContact" type="button">Message Us</button>
+</div>
+<div class="card card--pad">
+<h3>Hours</h3>
+<p class="muted small">Add your real business hours here.</p>
+<div class="divider"></div>
+<h4>Shipping schedule</h4>
+<p class="muted small">Add cutoff times and shipping days here.</p>
+</div>
+</div>
+</div>
+</section>
+<footer class="footer">
+<div class="container footer__grid">
+<div>
+<div class="footer__brand">Sueños Shipping &amp; Variety Store</div>
+<p class="muted small">Fast shipping. Clear tracking. Friendly support.</p>
+</div>
+<div>
+<div class="footer__head">Quick Links</div>
+<div class="footer__links">
+<a href="#services">Services</a>
+<a href="#calculator">Calculator</a>
+<a href="#portal">Portal</a>
+<a href="#contact">Contact</a>
+</div>
+</div>
+<div>
+<div class="footer__head">Need help?</div>
+<button class="btn btn--ghost" id="openChatFooter" type="button">Open Chat</button>
+</div>
+</div>
+<div class="container footer__bottom muted small">
+      © <span id="year"></span> Sueños Shipping &amp; Variety Store • suenosshipping.com
     </div>
-  </section>
-
-  <!-- Contact -->
-  <section id="contact" class="section section--alt">
-    <div class="container">
-      <div class="section__head">
-        <h2>Contact</h2>
-        <p>Update your real phone/email/address in this section.</p>
-      </div>
-
-      <div class="grid2">
-        <div class="card card--pad">
-          <h3>Business Info</h3>
-          <div class="contactList">
-            <div>
-              <div class="muted small">Address</div>
-              <div><strong>Kingston, Jamaica</strong></div>
-              <div class="muted small">Update with your exact location</div>
-            </div>
-            <div>
-              <div class="muted small">Phone</div>
-              <div><strong>+1 (876) 000-0000</strong></div>
-            </div>
-            <div>
-              <div class="muted small">Email</div>
-              <div><strong>support@suenosshipping.com</strong></div>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-          <button class="btn btn--primary" id="openChatContact" type="button">Message Us</button>
-        </div>
-
-        <div class="card card--pad">
-          <h3>Hours</h3>
-          <p class="muted small">Add your real business hours here.</p>
-          <div class="divider"></div>
-          <h4>Shipping schedule</h4>
-          <p class="muted small">Add cutoff times and shipping days here.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <footer class="footer">
-    <div class="container footer__grid">
-      <div>
-        <div class="footer__brand">Sueños Shipping & Variety Store</div>
-        <p class="muted small">Fast shipping. Clear tracking. Friendly support.</p>
-      </div>
-      <div>
-        <div class="footer__head">Quick Links</div>
-        <div class="footer__links">
-          <a href="#services">Services</a>
-          <a href="#calculator">Calculator</a>
-          <a href="#portal">Portal</a>
-          <a href="#contact">Contact</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer__head">Need help?</div>
-        <button class="btn btn--ghost" id="openChatFooter" type="button">Open Chat</button>
-      </div>
-    </div>
-    <div class="container footer__bottom muted small">
-      © <span id="year"></span> Sueños Shipping & Variety Store • suenosshipping.com
-    </div>
-  </footer>
-
-  <!-- Chat Widget -->
-  <div class="chat hidden" id="chatWidget" aria-hidden="true">
-    <div class="chat__head">
-      <div>
-        <div class="chat__title">Sueños Support</div>
-        <div class="chat__sub">Ask a question anytime</div>
-      </div>
-      <button class="chat__close" id="closeChat" aria-label="Close chat" type="button">✕</button>
-    </div>
-    <div class="chat__body" id="chatBody"></div>
-    <form class="chat__form" id="chatForm">
-      <input id="chatInput" type="text" placeholder="Type your message..." autocomplete="off" />
-      <button class="btn btn--primary" type="submit">Send</button>
-    </form>
-  </div>
-
-  <button class="chatFab" id="chatFab" aria-label="Open chat" type="button">💬</button>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js"></script>
+</footer>
+<!-- Chat Widget -->
+<div aria-hidden="true" class="chat hidden" id="chatWidget">
+<div class="chat__head">
+<div>
+<div class="chat__title">Sueños Support</div>
+<div class="chat__sub">Ask a question anytime</div>
+</div>
+<button aria-label="Close chat" class="chat__close" id="closeChat" type="button">✕</button>
+</div>
+<div class="chat__body" id="chatBody"></div>
+<form class="chat__form" id="chatForm">
+<input autocomplete="off" id="chatInput" placeholder="Type your message..." type="text"/>
+<button class="btn btn--primary" type="submit">Send</button>
+</form>
+</div>
+<button aria-label="Open chat" class="chatFab" id="chatFab" type="button">💬</button>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
 </body>
 </html>
