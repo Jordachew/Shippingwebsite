@@ -1,133 +1,131 @@
-
-
 // ========================
 // CONFIG (PASTE YOUR VALUES)
 // ========================
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
-// Safe singleton (prevents double-load issues + fixes "login once" edge cases)
-window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
+
+// Safe singleton (prevents double-load issues)
+window.__SB__ =
+  window.__SB__ ||
+  window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+    },
+  });
 const supabase = window.__SB__;
+
 const INVOICE_BUCKET = "invoices";
-// Warehouse address (US) shown to customers
 const WAREHOUSE_ADDRESS_LINES = [
   "3706 NW 16th Street",
-  "Lauderhill, Florida 33311",
+  "Lauderhill, Florida 33311"
 ];
 
+const CHAT_BUCKET = "chat_files";
 
-// ========================
-// RATES (EDIT)
-// ========================
-const rates = [
-  { lbs: 1, jmd: 400 },
-  { lbs: 2, jmd: 750 },
-  { lbs: 3, jmd: 1050 },
-  { lbs: 4, jmd: 1350 },
-  { lbs: 5, jmd: 1600 },
-  { lbs: 6, jmd: 1950 },
-  { lbs: 7, jmd: 2150 },
-  { lbs: 8, jmd: 2350 },
-  { lbs: 9, jmd: 2600 },
-  { lbs: 10, jmd: 2950 },
-];
+
+function logSB(label, obj) {
+  console.log("🟣", label, JSON.parse(JSON.stringify(obj || {})));
+}
+// Business hours note (Mon–Fri 10–5)
+const HOURS_TEXT =
+  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// Calculator base pricing (edit anytime)
 const fixedFeeJMD = 500;
+const rates = [
+  { lbs: 1, jmd: 500 },
+  { lbs: 2, jmd: 850 },
+  { lbs: 3, jmd: 1250 },
+  { lbs: 4, jmd: 1550 },
+  { lbs: 5, jmd: 1900 },
+  { lbs: 6, jmd: 2250 },
+  { lbs: 7, jmd: 2600 },
+  { lbs: 8, jmd: 2950 },
+  { lbs: 9, jmd: 3300 },
+  { lbs: 10, jmd: 3650 },
+];
 
-// ========================
-// HELPERS
-// ========================
-function $(id){ return document.getElementById(id); }
-function escapeHTML(s){
+function $(id) {
+  return document.getElementById(id);
+}
+function escapeHTML(s) {
   return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
-function formatJMD(n){
-  return new Intl.NumberFormat("en-JM", { style: "currency", currency: "JMD", maximumFractionDigits: 0 }).format(n);
+function formatJMD(n) {
+  return new Intl.NumberFormat("en-JM", {
+    style: "currency",
+    currency: "JMD",
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0));
 }
-function setYear(){ const y = $("year"); if(y) y.textContent = new Date().getFullYear(); }
+function pickupLabel(v) {
 
-// ========================
-// RATES + CALCULATOR
-// ========================
-function buildRatesTable(){
-  const body = $("ratesTableBody");
-  if(!body) return;
-  body.innerHTML = rates.map(r => `<tr><td>${r.lbs}</td><td>${formatJMD(r.jmd)}</td></tr>`).join("");
+// --------------------
+// Shipping address block (Customer Name + Account #)
+// --------------------
+function firstNameFromProfile(p){
+  const full = (p?.full_name || "").trim();
+  if(full) return full.split(/\s+/)[0];
+  const email = (p?.email || "").trim();
+  return email ? email.split("@")[0] : "Customer";
 }
-function findRateForWeight(weightLbs){
+function buildShipToText(profile){
+  const first = firstNameFromProfile(profile);
+  const acct = profile?.customer_no || "SNS-JMXXXX";
+  return [
+    `${first} — ${acct}`,
+    ...WAREHOUSE_ADDRESS_LINES
+  ].join("\n");
+}
+function renderShipTo(profile){
+  const el = $("shipToBlock");
+  if(!el) return;
+  el.textContent = buildShipToText(profile);
+}
+  return v === "RHODEN_HALL_CLARENDON"
+    ? "Rhoden Hall District, Clarendon"
+    : "UWI, Kingston";
+}
+
+// --------------------
+// Small helpers
+// --------------------
+function findRateForWeight(weightLbs) {
   const rounded = Math.ceil(weightLbs);
-  const match = rates.find(r => r.lbs === rounded);
-  if(match) return { rounded, rate: match.jmd };
+  const match = rates.find((r) => r.lbs === rounded);
+  if (match) return { rounded, rate: match.jmd };
+
   const last = rates[rates.length - 1];
   const prev = rates[rates.length - 2] || last;
   const step = Math.max(0, last.jmd - prev.jmd);
-  const extraLbs = Math.max(0, rounded - last.lbs);
-  return { rounded, rate: last.jmd + (extraLbs * step) };
-}
-function setupCalculator(){
-  const form = $("calcForm");
-  const result = $("result");
-  if(!form || !result) return;
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const weight = parseFloat($("weight")?.value);
-    const valueUSD = parseFloat($("value")?.value);
-    const tariff = ($("tariff")?.value || "").trim();
-
-    if(!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(valueUSD) || valueUSD < 0){
-      result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Please enter valid numbers.</div>`;
-      return;
-    }
-
-    const { rounded, rate } = findRateForWeight(weight);
-    const total = rate + fixedFeeJMD;
-
-    result.innerHTML = `
-      <div class="result__big">${formatJMD(total)}</div>
-      <div class="result__sub">
-        Weight used: <strong>${rounded} lb</strong>. Base: <strong>${formatJMD(rate)}</strong> + Fee: <strong>${formatJMD(fixedFeeJMD)}</strong>.
-        <br/>Declared value: <strong>$${valueUSD.toFixed(2)} USD</strong>${tariff ? ` • Tariff: <strong>${escapeHTML(tariff)}</strong>` : ""}.
-      </div>
-    `;
-  });
+  return { rounded, rate: last.jmd + (rounded - last.lbs) * step };
 }
 
-// ========================
-// NAV (mobile)
-// ========================
-function setupMobileNav(){
+function setupMobileNav() {
   const toggle = $("navToggle");
   const nav = $("nav");
-  if(!toggle || !nav) return;
-
+  if (!toggle || !nav) return;
   toggle.addEventListener("click", () => {
-    const isOpen = nav.style.display === "flex";
-    nav.style.display = isOpen ? "none" : "flex";
-    toggle.setAttribute("aria-expanded", String(!isOpen));
+    const open = nav.style.display === "flex";
+    nav.style.display = open ? "none" : "flex";
   });
-
-  nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
-    if(window.matchMedia("(max-width: 720px)").matches){
-      nav.style.display = "none";
-      toggle.setAttribute("aria-expanded", "false");
-    }
-  }));
 }
 
-// ========================
-// AUTH TABS (REGISTER FIX)
-// ========================
-function setupAuthTabs(){
+function setupAuthTabs() {
   const tabLogin = $("tabLogin");
   const tabRegister = $("tabRegister");
   const loginPane = $("loginPane");
   const registerPane = $("registerPane");
-  if(!tabLogin || !tabRegister || !loginPane || !registerPane) return;
+  if (!tabLogin || !tabRegister || !loginPane || !registerPane) return;
 
   const setTab = (which) => {
     const isLogin = which === "login";
@@ -141,409 +139,630 @@ function setupAuthTabs(){
   tabRegister.addEventListener("click", () => setTab("register"));
 }
 
-// ========================
-// LOGIN / REGISTER
-// ========================
-function setupLogin(){
-  const form = $("loginForm");
-  const msg = $("loginMsg");
-  const logoutBtn = $("logoutBtn");
+function setupCalculator() {
+  const form = $("calcForm");
+  const result = $("result");
+  if (!form || !result) return;
 
-  if(form){
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if(msg) msg.textContent = "Signing in...";
-      const email = ($("loginEmail")?.value || "").trim().toLowerCase();
-      const password = $("loginPassword")?.value || "";
-
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if(error){ if(msg) msg.textContent = error.message; return; }
-      if(msg) msg.textContent = "";
-      await renderAuth();
-    });
-  }
-
-  if(logoutBtn){
-    logoutBtn.addEventListener("click", async () => {
-      await supabase.auth.signOut();
-      await renderAuth();
-    });
-  }
-}
-
-function setupRegister(){
-  const form = $("registerForm");
-  const msg = $("regMsg");
-  if(!form) return;
-
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
-    if(msg) msg.textContent = "Creating account...";
+    const w = parseFloat($("weight").value);
+    const v = parseFloat($("value").value);
 
-    const full_name = ($("regName")?.value || "").trim();
-    const email = ($("regEmail")?.value || "").trim().toLowerCase();
-    const password = $("regPassword")?.value || "";
+    if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
+      result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>`;
+      return;
+    }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name } }
-    });
-
-    if(error){ if(msg) msg.textContent = error.message; return; }
-    if(msg) msg.textContent = "Account created. Check email for confirmation (if enabled), then log in.";
-    form.reset();
+    const { rounded, rate } = findRateForWeight(w);
+    const total = rate + fixedFeeJMD;
+    result.innerHTML = `
+      <div class="result__big">${formatJMD(total)}</div>
+      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(
+      rate
+    )} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
+    `;
   });
 }
 
-// ========================
-// PACKAGES
-// ========================
-async function renderPackages(filter=""){
-  const body = $("pkgBody");
-  if(!body) return;
+// --------------------
+// PROFILE creation (NO TRIGGER REQUIRED)
+// --------------------
+function stashPendingProfile(full_name, phone, email) {
+  try {
+    localStorage.setItem(
+      "pending_profile",
+      JSON.stringify({ full_name, phone, email, at: Date.now() })
+    );
+  } catch (_) {}
+}
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){
-    body.innerHTML = `<tr><td colspan="3" class="muted">Please log in.</td></tr>`;
+function readPendingProfile() {
+  try {
+    const raw = localStorage.getItem("pending_profile");
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearPendingProfile() {
+  try {
+    localStorage.removeItem("pending_profile");
+  } catch (_) {}
+}
+
+async function ensureProfile({ full_name, phone } = {}) {
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) return { ok: false, error: userErr };
+  const user = userData?.user;
+  if (!user) return { ok: false, error: new Error("Not logged in") };
+
+  // Try to read profile
+  const { data: profile, error: pReadErr } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // If it exists, optionally update missing values
+  if (profile && !pReadErr) {
+    const patch = {};
+    if (full_name && !profile.full_name) patch.full_name = full_name;
+    if (phone && !profile.phone) patch.phone = phone;
+    if (Object.keys(patch).length) {
+      await supabase.from("profiles").update(patch).eq("id", user.id);
+    }
+    return { ok: true, profile };
+  }
+
+  // If not found or blocked, attempt upsert
+  const { error: upErr } = await supabase.from("profiles").upsert({
+    id: user.id,
+    email: user.email,
+    full_name: full_name || "",
+    phone: phone || "",
+  });
+
+  if (upErr) return { ok: false, error: upErr };
+
+  const { data: profile2 } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return { ok: true, profile: profile2 || null };
+}
+
+// --------------------
+// Login / Register
+// --------------------
+function setupLoginRegister() {
+  const loginForm = $("loginForm");
+  const regForm = $("registerForm");
+
+  // --------
+  // LOGIN
+  // --------
+  loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const msg = $("loginMsg");
+    if (msg) msg.textContent = "Signing in...";
+
+    try {
+      const email = $("loginEmail").value.trim().toLowerCase();
+      const password = $("loginPassword").value;
+
+      const res = await supabase.auth.signInWithPassword({ email, password });
+      console.log("LOGIN RES:", res);
+      if (res.error) {
+        if (msg) msg.textContent = `Login error: ${res.error.message}`;
+        return;
+      }
+
+      // Confirm we actually have a session (prevents "logged in once" confusion)
+      const sess = await supabase.auth.getSession();
+      console.log("SESSION:", sess);
+      if (sess.error) {
+        if (msg) msg.textContent = `Session error: ${sess.error.message}`;
+        return;
+      }
+      if (!sess.data?.session) {
+        if (msg) msg.textContent = "No session returned. Check Supabase Auth URL settings + email confirmation.";
+        return;
+      }
+
+      // If they registered earlier while confirm-email was ON,
+      // apply saved name/phone after login.
+      const pending = readPendingProfile();
+      if (pending) {
+        const ensured = await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
+        if (ensured.ok) clearPendingProfile();
+      } else {
+        await ensureProfile();
+      }
+
+      if (msg) msg.textContent = "";
+      await renderAuth();
+    } catch (err) {
+      console.error(err);
+      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    }
+  });
+
+  // --------
+  // REGISTER
+  // --------
+  regForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const msg = $("regMsg");
+    if (msg) msg.textContent = "Creating account...";
+
+    try {
+      const full_name = $("regName").value.trim();
+      const phone = $("regPhone").value.trim();
+      const email = $("regEmail").value.trim().toLowerCase();
+      const password = $("regPassword").value;
+
+      // Save name/phone in case confirm-email is ON (no session yet)
+      stashPendingProfile(full_name, phone, email);
+
+      const res = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name, phone } },
+      });
+
+      console.log("SIGNUP RES:", res);
+
+      if (res.error) {
+        if (msg) msg.textContent = `Signup error: ${res.error.message}`;
+        return;
+      }
+
+      // If confirm-email is OFF, user may already be signed in; create profile now.
+      const ensured = await ensureProfile({ full_name, phone });
+      console.log("ENSURE PROFILE:", ensured);
+
+      if (msg) {
+        msg.textContent = ensured.ok
+          ? "Account created. You can now log in."
+          : "Account created. If email confirmation is ON, confirm email then log in.";
+      }
+
+      regForm.reset();
+    } catch (err) {
+      console.error(err);
+      if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    }
+  });
+
+  // --------
+  // LOGOUT
+  // --------
+function clearSupabaseAuthStorage() {
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
+    localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch {}
+}
+
+$("logoutBtn")?.addEventListener("click", async () => {
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    clearSupabaseAuthStorage();
+    location.reload();
+  }
+});
+
+}
+
+// --------------------
+// Packages + invoices
+// --------------------
+async function renderPackages(filter = "") {
+  const body = $("pkgBody");
+  if (!body) return;
+
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
+    body.innerHTML = `<tr><td colspan="4" class="muted">Please log in.</td></tr>`;
     return;
   }
 
-  let query = supabase
+  let q = supabase
     .from("packages")
-    .select("tracking,status,updated_at,notes")
+    .select("tracking,status,pickup,pickup_confirmed,updated_at")
     .order("updated_at", { ascending: false });
 
-  if(filter.trim()){
-    query = query.ilike("tracking", `%${filter.trim()}%`);
+  if (filter.trim()) {
+    q = q.ilike("tracking", `%${filter.trim()}%`);
   }
 
-  const { data, error } = await query;
-  if(error){
-    body.innerHTML = `<tr><td colspan="3" class="muted">Error: ${escapeHTML(error.message)}</td></tr>`;
+  const { data, error } = await q;
+  if (error) {
+    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(
+      error.message
+    )}</td></tr>`;
     return;
   }
 
-  if(!data || data.length === 0){
-    body.innerHTML = `<tr><td colspan="3" class="muted">No packages found.</td></tr>`;
+  if (!data?.length) {
+    body.innerHTML = `<tr><td colspan="4" class="muted">No packages yet. Upload invoices and message us if needed.</td></tr>`;
     return;
   }
 
-  body.innerHTML = data.map(p => {
-    const updated = new Date(p.updated_at).toLocaleString();
-    return `
-      <tr data-track="${escapeHTML(p.tracking)}" data-status="${escapeHTML(p.status)}" data-notes="${escapeHTML(p.notes || "")}" data-updated="${escapeHTML(updated)}">
-        <td><strong>${escapeHTML(p.tracking)}</strong></td>
-        <td><span class="tag">${escapeHTML(p.status)}</span></td>
-        <td class="muted">${escapeHTML(updated)}</td>
-      </tr>
-    `;
-  }).join("");
-
-  body.querySelectorAll("tr[data-track]").forEach(row => {
-    row.addEventListener("click", () => openPackageModal(row.dataset));
-  });
+  body.innerHTML = data
+    .map(
+      (p) => `
+    <tr>
+      <td><strong>${escapeHTML(p.tracking)}</strong></td>
+      <td><span class="tag">${escapeHTML(p.status)}</span></td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}${
+        p.pickup_confirmed
+          ? ` <span class="tag">Confirmed</span>`
+          : ` <span class="tag">Pending</span>`
+      }</td>
+      <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
+    </tr>
+  `
+    )
+    .join("");
 }
 
-function openPackageModal(ds){
-  const modal = $("pkgModal");
-  const title = $("modalTitle");
-  const sub = $("modalSub");
-  const body = $("modalBody");
-  if(!modal || !title || !sub || !body) return;
+async function renderUploads() {
+  const list = $("uploadsList");
+  if (!list) return;
 
-  title.textContent = ds.track || "Package";
-  sub.textContent = ds.status || "";
-
-  body.innerHTML = `
-    <div><strong>Status:</strong> ${escapeHTML(ds.status || "—")}</div>
-    <div><strong>Last updated:</strong> ${escapeHTML(ds.updated || "—")}</div>
-    <div style="margin-top:10px;"><strong>Notes:</strong> ${escapeHTML(ds.notes || "—")}</div>
-  `;
-
-  modal.classList.remove("hidden");
-  modal.setAttribute("aria-hidden", "false");
-
-  modal.querySelectorAll("[data-close='1']").forEach(el => {
-    el.addEventListener("click", closePackageModal, { once:true });
-  });
-  document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePackageModal(); }, { once:true });
-}
-
-function closePackageModal(){
-  const modal = $("pkgModal");
-  if(!modal) return;
-  modal.classList.add("hidden");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-function setupPackageSearch(){
-  const search = $("pkgSearch");
-  const reset = $("resetSearch");
-  if(search) search.addEventListener("input", () => renderPackages(search.value));
-  if(reset) reset.addEventListener("click", () => { search.value=""; renderPackages(""); });
-}
-
-// ========================
-// INVOICES
-// ========================
-async function renderUploads(){
-  const ul = $("uploadsList");
-  if(!ul) return;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){ ul.innerHTML = `<li class="muted">Log in to see uploads.</li>`; return; }
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
+    list.innerHTML = `<li class="muted">Log in to see uploads.</li>`;
+    return;
+  }
 
   const { data, error } = await supabase
     .from("invoices")
-    .select("tracking,file_name,created_at,note")
-    .order("created_at", { ascending:false })
+    .select(
+      "tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note"
+    )
+    .order("created_at", { ascending: false })
     .limit(10);
 
-  if(error){ ul.innerHTML = `<li class="muted">Error: ${escapeHTML(error.message)}</li>`; return; }
-  if(!data || data.length === 0){ ul.innerHTML = `<li class="muted">No uploads yet.</li>`; return; }
+  if (error) {
+    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
+    return;
+  }
+  if (!data?.length) {
+    list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
+    return;
+  }
 
-  ul.innerHTML = data.map(u => `
+  list.innerHTML = data
+    .map(
+      (i) => `
     <li>
-      <div><strong>${escapeHTML(u.tracking)}</strong> • ${escapeHTML(u.file_name)}</div>
-      <div class="muted small">${new Date(u.created_at).toLocaleString()}${u.note ? ` • ${escapeHTML(u.note)}` : ""}</div>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
+        i.file_name
+      )} (${escapeHTML(i.file_type)})</div>
+      <div class="muted small">
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
+        i.pickup_confirmed ? "Confirmed" : "Pending confirmation"
+      } • ${new Date(i.created_at).toLocaleString()}
+        ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
+      </div>
     </li>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-function setupInvoiceUpload(){
+function setupPackageSearch() {
+  $("pkgSearch")?.addEventListener("input", (e) =>
+    renderPackages(e.target.value)
+  );
+  $("resetSearch")?.addEventListener("click", () => {
+    if ($("pkgSearch")) $("pkgSearch").value = "";
+    renderPackages("");
+  });
+}
+
+function setupInvoiceUpload() {
   const form = $("invoiceForm");
-  const msg = $("invMsg");
-  if(!form) return;
+  if (!form) return;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if(msg) msg.textContent = "Uploading...";
+    if ($("invMsg")) $("invMsg").textContent = "Uploading...";
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if(!user){ if(msg) msg.textContent = "Please log in first."; return; }
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) {
+      if ($("invMsg")) $("invMsg").textContent = "Please log in.";
+      return;
+    }
 
-    const tracking = ($("invTracking")?.value || "").trim();
+    const tracking = $("invTracking").value.trim();
+    const pickup = $("invPickup").value;
+    const note = $("invNote").value.trim();
     const fileInput = $("invFile");
-    const note = ($("invNote")?.value || "").trim();
 
-    if(!tracking){ if(msg) msg.textContent = "Tracking ID required."; return; }
-    if(!fileInput?.files?.length){ if(msg) msg.textContent = "Please choose a file."; return; }
+    if (!tracking) {
+      if ($("invMsg")) $("invMsg").textContent = "Tracking ID required.";
+      return;
+    }
+    if (!fileInput?.files?.length) {
+      if ($("invMsg")) $("invMsg").textContent = "Choose a file.";
+      return;
+    }
 
     const file = fileInput.files[0];
+
+    // client-side file type rule (pdf, jpeg/jpg, docx, excel)
+    const allowed =
+      /(\.pdf|\.jpe?g|\.docx|\.xlsx|\.xls)$/i.test(file.name) ||
+      ["application/pdf",
+       "image/jpeg",
+       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+       "application/vnd.ms-excel"].includes(file.type);
+
+    if (!allowed) {
+      if ($("invMsg")) $("invMsg").textContent = "Allowed: PDF, JPEG, DOCX, XLS/XLSX.";
+      return;
+    }
+
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { cacheControl:"3600", upsert:false });
-    if(up.error){ if(msg) msg.textContent = up.error.message; return; }
+    const up = await supabase.storage
+      .from(INVOICE_BUCKET)
+      .upload(path, file, { upsert: false });
+    if (up.error) {
+      if ($("invMsg")) $("invMsg").textContent = up.error.message;
+      return;
+    }
 
     const ins = await supabase.from("invoices").insert({
       user_id: user.id,
       tracking,
+      pickup,
+      pickup_confirmed: false,
       file_path: path,
       file_name: safeName,
-      note: note || null
+      file_type: file.type || "unknown",
+      note: note || null,
     });
 
-    if(ins.error){ if(msg) msg.textContent = ins.error.message; return; }
+    if (ins.error) {
+      if ($("invMsg")) $("invMsg").textContent = ins.error.message;
+      return;
+    }
 
     form.reset();
-    if(msg) msg.textContent = "Invoice uploaded successfully.";
+    if ($("invMsg"))
+      $("invMsg").textContent =
+        "Uploaded. Pickup location will be confirmed by staff.";
     await renderUploads();
   });
 }
 
-// ========================
-// CHAT (REALTIME)
-// ========================
+// --------------------
+// Chat (messages + optional attachment)
+// --------------------
 let chatChannel = null;
 
-async function renderChat(){
+async function renderChat() {
   const body = $("chatBody");
-  if(!body) return;
+  if (!body) return;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){ body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`; return; }
-
-  const { data, error } = await supabase
-    .from("messages")
-    .select("sender,body,created_at")
-    .order("created_at", { ascending:true })
-    .limit(200);
-
-  if(error){ body.innerHTML = `<div class="muted small">Error: ${escapeHTML(error.message)}</div>`; return; }
-  if(!data || data.length === 0){
-    body.innerHTML = `<div class="muted small">Start the conversation. We typically reply during business hours.</div>`;
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) {
+    body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`;
     return;
   }
 
-  body.innerHTML = data.map(m => `
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id,sender,body,created_at")
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(
+      error.message
+    )}</div>`;
+    return;
+  }
+
+  body.innerHTML =
+    (data?.length ? data : [])
+      .map(
+        (m) => `
     <div class="bubble ${m.sender === "customer" ? "me" : ""}">
       <div>${escapeHTML(m.body)}</div>
       <div class="meta">
         <span>${m.sender === "customer" ? "You" : "Support"}</span>
-        <span>${new Date(m.created_at).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}</span>
       </div>
     </div>
-  `).join("");
+  `
+      )
+      .join("") ||
+    `<div class="muted small">Start the conversation. ${escapeHTML(
+      HOURS_TEXT
+    )}</div>`;
 
   body.scrollTop = body.scrollHeight;
 }
 
-async function setupChatRealtime(){
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user) return;
+async function setupChatRealtime() {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) return;
 
-  if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel = null; }
+  if (chatChannel) {
+    supabase.removeChannel(chatChannel);
+    chatChannel = null;
+  }
 
   chatChannel = supabase
     .channel(`messages:${user.id}`)
-    .on("postgres_changes",
-      { event:"INSERT", schema:"public", table:"messages", filter:`user_id=eq.${user.id}` },
-      async () => { await renderChat(); }
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `user_id=eq.${user.id}`,
+      },
+      async () => {
+        await renderChat();
+      }
     )
     .subscribe();
 }
 
-function openChat(){
-  const w = $("chatWidget");
-  if(!w) return;
-  w.classList.remove("hidden");
-  w.setAttribute("aria-hidden","false");
+async function sendChatMessage(text, file) {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) return alert("Please log in to chat.");
+
+  const { data: msg, error: mErr } = await supabase
+    .from("messages")
+    .insert({ user_id: user.id, sender: "customer", body: text })
+    .select("id")
+    .single();
+
+  if (mErr) return alert(mErr.message);
+
+  if (file) {
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${user.id}/messages/${Date.now()}_${safeName}`;
+
+    const up = await supabase.storage
+      .from(CHAT_BUCKET)
+      .upload(path, file, { upsert: false });
+    if (up.error) return alert(up.error.message);
+
+    const ins = await supabase.from("message_attachments").insert({
+      message_id: msg.id,
+      user_id: user.id,
+      file_path: path,
+      file_name: safeName,
+      file_type: file.type || "unknown",
+    });
+
+    if (ins.error) return alert(ins.error.message);
+  }
+}
+
+function openChat() {
+  $("chatWidget")?.classList.remove("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "false");
+  if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
   renderChat().then(setupChatRealtime);
-  $("chatInput")?.focus();
 }
-function closeChat(){
-  const w = $("chatWidget");
-  if(!w) return;
-  w.classList.add("hidden");
-  w.setAttribute("aria-hidden","true");
+function closeChat() {
+  $("chatWidget")?.classList.add("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "true");
 }
 
-function setupChatUI(){
-  const fab = $("chatFab");
-  const close = $("closeChat");
-  const form = $("chatForm");
-  const input = $("chatInput");
+function setupChatUI() {
+  $("chatFab")?.addEventListener("click", openChat);
+  $("openChatTop")?.addEventListener("click", openChat);
+  $("openChatCalc")?.addEventListener("click", openChat);
+  $("openChatDash")?.addEventListener("click", openChat);
+  $("openChatContact")?.addEventListener("click", openChat);
+  $("closeChat")?.addEventListener("click", closeChat);
 
-  const openButtons = ["openChatTop","openChatCalc","openChatDash","openChatContact","openChatFooter"]
-    .map(id => $(id)).filter(Boolean);
-
-  openButtons.forEach(btn => btn.addEventListener("click", openChat));
-  fab?.addEventListener("click", openChat);
-  close?.addEventListener("click", closeChat);
-
-  form?.addEventListener("submit", async (e) => {
+  $("chatForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const input = $("chatInput");
+    const file = $("chatFile")?.files?.[0] || null;
+    const msgEl = $("chatMsg");
+
     const text = (input?.value || "").trim();
-    if(!text) return;
+    if (!text && !file) {
+      if (msgEl) msgEl.textContent = "Type a message or attach a file.";
+      return;
+    }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if(!user){ alert("Please log in to send messages."); return; }
+    if (msgEl) msgEl.textContent = "Sending...";
+    if (input) input.value = "";
+    if ($("chatFile")) $("chatFile").value = "";
 
-    input.value = "";
-    const { error } = await supabase.from("messages").insert({ user_id:user.id, sender:"customer", body:text });
-    if(error) alert(error.message);
+    await sendChatMessage(text || "(Attachment)", file);
+    if (msgEl) msgEl.textContent = "";
   });
 }
 
-// ========================
-// AUTH RENDER + ADMIN LINK
-// ========================
-async function renderAuth(){
+// --------------------
+// Auth render
+// --------------------
+async function renderAuth() {
   const loginCard = $("loginCard");
   const dashCard = $("dashCard");
-  const userName = $("userName");
-  const adminLink = $("adminLink");
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const isAuthed = !!user;
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  const authed = !!user;
 
-  loginCard?.classList.toggle("hidden", isAuthed);
-  dashCard?.classList.toggle("hidden", !isAuthed);
+  if (loginCard) loginCard.classList.toggle("hidden", authed);
+  if (dashCard) dashCard.classList.toggle("hidden", !authed);
 
-  if(!isAuthed){
-    if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel = null; }
-    if(adminLink) adminLink.style.display = "none";
+  if (!authed) {
+    if ($("adminLink")) $("adminLink").style.display = "none";
+    if (chatChannel) {
+      supabase.removeChannel(chatChannel);
+      chatChannel = null;
+    }
     return;
   }
 
-  const { data: profile } = await supabase.from("profiles").select("full_name,email,role,customer_no").eq("id", user.id).maybeSingle();
-  if(userName) userName.textContent = profile?.full_name || user.email || "Customer";
+  // Ensure profile exists; if signup used email-confirm flow, this happens after login
+  await ensureProfile();
 
-  
-  // Display name + account number + shipping address (if these elements exist in your HTML)
-  const firstName = (profile?.full_name || "").trim().split(" ")[0] || (user.email || "Customer").split("@")[0];
-  const accountNo = profile?.customer_no || "";
-  const labelEl = document.getElementById("accountNo");
-  const labelEl2 = document.getElementById("accountNoInline");
-  if(labelEl) labelEl.textContent = accountNo || "—";
-  if(labelEl2) labelEl2.textContent = accountNo || "—";
+  const { data: profile, error: profErr } = await supabase
+    .from("profiles")
+    .select("full_name,role,customer_no")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  const ship = document.getElementById("shipToBlock");
-  if(ship){
-    const acct = accountNo ? ` — ${accountNo}` : "";
-    ship.textContent = [
-      `${firstName}${acct}`,
-      ...WAREHOUSE_ADDRESS_LINES
-    ].join("\n");
-  }
+  const displayName =
+    !profErr && profile?.full_name ? profile.full_name : user.email || "Customer";
+  if ($("userName")) $("userName").textContent = `${firstNameFromProfile({full_name: profile?.full_name, email: user.email})} — ${user.email}`;
 
-  // Send welcome email once (requires /api/welcome-email on Vercel)
-  try{
-    if(accountNo){
-      const key = `welcome_sent:${user.id}`;
-      if(!localStorage.getItem(key)){
-        fetch("/api/welcome-email",{
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ user_id: user.id })
-        }).then(()=>localStorage.setItem(key,"1")).catch(()=>{});
-      }
-    }
-  }catch(_){}
-
-if(adminLink){
-    adminLink.style.display = (profile?.role === "staff") ? "inline-flex" : "none";
-  }
+  const isStaff = !profErr && profile?.role === "staff";
+  if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
   await renderPackages("");
   await renderUploads();
-  await renderChat();
-  await setupChatRealtime();
 }
 
-supabase.auth.onAuthStateChange(async () => { await renderAuth(); });
+supabase.auth.onAuthStateChange(async () => {
+  await renderAuth();
+});
 
-// ========================
-// INIT (DOMContentLoaded FIX)
-// ========================
-function init(){
-  setYear();
-  buildRatesTable();
-  setupCalculator();
+function init() {
   setupMobileNav();
   setupAuthTabs();
-  setupLogin();
-  setupRegister();
+  setupCalculator();
+  setupLoginRegister();
   setupPackageSearch();
   setupInvoiceUpload();
   setupChatUI();
-  // Copy shipping address
-  const copyBtn = $("copyShipTo");
-  copyBtn?.addEventListener("click", async () => {
-    const txt = document.getElementById("shipToBlock")?.textContent || "";
-    if(!txt.trim()) return;
-    try{
-      await navigator.clipboard.writeText(txt);
-      copyBtn.textContent = "Copied";
-      setTimeout(()=>{ copyBtn.textContent = "Copy address"; }, 1200);
-    }catch(_){}
-  });
-
   renderAuth();
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  init();
-});
+window.addEventListener("DOMContentLoaded", init);

@@ -2,229 +2,378 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sueños Shipping — Admin</title>
-  <meta name="description" content="Sueños Shipping staff dashboard." />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sueños Shipping — Staff Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
+  <meta name="theme-color" content="#ffffff" />
+
+  <style>
+    /* ADMIN CHAT OVERRIDE */
+    body.admin-page #adminChatBody,
+    body.admin-page #adminChatBody * {
+      color: #111 !important;
+    }
+    body.admin-page #adminChatInput {
+      color:#111 !important;
+      background:#fff !important;
+    }
+  </style>
+
 </head>
-<body>
-  <header class="header">
-    <div class="header__inner container">
-      <a class="brand" href="/" aria-label="Sueños Shipping">
-        <div class="brand__mark" aria-hidden="true">S</div>
-        <div>Sueños Shipping <span class="muted small">Admin</span></div>
+<body class="bg admin-page">
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="index.html">
+        <span class="brand__mark">Sueños</span>
+        <span class="brand__sub">Shipping • Staff</span>
       </a>
-      <div class="row">
-        <a class="btn btn--ghost btn-sm" href="/">Customer Site</a>
-        <button class="btn btn--danger btn-sm hidden" id="logoutBtn" type="button">Log out</button>
+      <div class="topbar__actions">
+        <span id="whoami" class="muted small"></span>
+        <a class="btn btn--ghost" href="index.html">Customer Site</a>
+        <button id="logoutBtn" class="btn btn--ghost hidden" type="button">Log out</button>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <!-- Auth -->
-    <section class="card card--pad" id="authCard">
-      <h2 class="h2">Staff sign in</h2>
-      <p class="muted small">Use your staff email and password.</p>
-      <form id="loginForm" class="stack" autocomplete="on">
-        <div class="stack">
-          <label class="small muted" for="loginEmail">Email</label>
-          <input class="input" id="loginEmail" type="email" required />
-        </div>
-        <div class="stack">
-          <label class="small muted" for="loginPassword">Password</label>
-          <input class="input" id="loginPassword" type="password" required />
+    <!-- LOGIN -->
+    <section id="adminLoginCard" class="card card--tight">
+      <div class="card__head">
+        <h1 class="h2">Staff sign in</h1>
+        <p class="muted">Use your staff email and password.</p>
+      </div>
+      <form id="adminLoginForm" class="form">
+        <div class="grid2">
+          <label class="field">
+            <span>Email</span>
+            <input id="adminEmail" type="email" autocomplete="email" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="adminPassword" type="password" autocomplete="current-password" required />
+          </label>
         </div>
         <div class="row">
-          <button class="btn" id="loginBtn" type="submit">Sign in</button>
-          <div class="muted small" id="authMsg" role="status"></div>
+          <button class="btn" type="submit">Sign in</button>
+          <span id="adminLoginMsg" class="muted"></span>
+        </div>
+        <div class="muted small">
+          Not staff yet? Log in on the customer site once so your profile row exists, then set your role to <code>staff</code> or <code>admin</code> in Supabase.
         </div>
       </form>
     </section>
 
-    <!-- App -->
-    <section class="hidden" id="app">
-      <div class="card">
-        <div class="between">
-          <div>
-            <h2 class="h2 m0">Dashboard</h2>
-            <div class="muted small">Signed in as <span id="staffLabel">—</span></div>
-          </div>
-          <button class="btn btn--ghost" id="refreshAll" type="button">Refresh</button>
-        </div>
+    <!-- DASHBOARD -->
+    <section id="adminApp" class="hidden">
+      <div class="dash__hero">
+        <h1 class="h2">Dashboard</h1>
+        <p class="muted">Manage customers, packages, invoices, and support.</p>
       </div>
 
-      <div class="card">
-        <div class="statsRow" id="statsRow">
-          <div class="stat"><div class="stat__value" id="statCustomers">—</div><div class="stat__label">Customers</div></div>
-          <div class="stat"><div class="stat__value" id="statPackages">—</div><div class="stat__label">Packages</div></div>
-          <div class="stat"><div class="stat__value" id="statInTransit">—</div><div class="stat__label">In Transit</div></div>
-          <div class="stat"><div class="stat__value" id="statReady">—</div><div class="stat__label">Ready for Pickup</div></div>
-          <div class="stat"><div class="stat__value" id="statMessagesOpen">—</div><div class="stat__label">Open Messages</div></div>
-        </div>
-        <div class="muted small" id="statsNote" style="margin-top:.6rem"></div>
+      <div class="stats" id="statsRow">
+        <!-- populated by JS -->
       </div>
 
-      <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="customers" type="button">Customers</button>
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab active" data-tab="overview" type="button">Overview</button>
+        <button class="tab" data-tab="customers" type="button">Customers</button>
         <button class="tab" data-tab="packages" type="button">Packages</button>
-        <button class="tab" data-tab="invoices" type="button">Invoices</button>
         <button class="tab" data-tab="messages" type="button">Messages</button>
-        <button class="tab" data-tab="bulk" type="button">Bulk Upload</button>
-      </div>
+        <button class="tab" data-tab="reports" type="button">Reports</button>
+        <button class="tab" data-tab="roles" type="button">Roles</button>
+      </nav>
 
-      <!-- Customers -->
-      <section class="card tabPanel" id="tab-customers">
-        <div class="between">
-          <h3 class="h3 m0">Customer search</h3>
-          <div class="row">
-            <input class="input" id="custSearch" placeholder="Search email or account # (SNS-JMXXXX)" style="max-width:420px" />
-            <button class="btn btn--ghost btn-sm" id="custSearchBtn" type="button">Search</button>
+      <!-- OVERVIEW -->
+      <section class="panel" id="tab-overview">
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head">
+              <h2 class="h3">Recent activity</h2>
+              <p class="muted small">Latest packages updated and newest messages.</p>
+            </div>
+            <div class="card__body">
+              <div class="split">
+                <div>
+                  <div class="muted small">Recent packages</div>
+                  <ul id="recentPackages" class="list"></ul>
+                </div>
+                <div>
+                  <div class="muted small">Newest messages</div>
+                  <ul id="recentMessages" class="list"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <h2 class="h3">Quick actions</h2>
+              <p class="muted small">Common admin tasks.</p>
+            </div>
+            <div class="card__body">
+              <div class="stack">
+                <button id="goPackagesBtn" class="btn btn--ghost" type="button">Update a package status</button>
+                <button id="goMessagesBtn" class="btn btn--ghost" type="button">Reply to a customer message</button>
+                <button id="exportPackagesBtn" class="btn btn--ghost" type="button">Export packages (CSV)</button>
+              </div>
+              <div id="quickMsg" class="muted small"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CUSTOMERS -->
+      <section class="panel hidden" id="tab-customers">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Customers</h2>
+            <p class="muted small">View profiles, deactivate accounts, and review history.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="custSearch" class="input" placeholder="Search name / email / phone" />
+            <button id="refreshCustomers" class="btn btn--ghost" type="button">Refresh</button>
           </div>
         </div>
 
-        <div class="divider"></div>
-
-        <div id="custResult" class="muted small">Search to view a customer profile.</div>
-      </section>
-
-      <!-- Packages -->
-      <section class="card tabPanel hidden" id="tab-packages">
-        <div class="between">
-          <h3 class="h3 m0">Packages</h3>
-          <div class="row">
-            <input class="input" id="pkgSearch" placeholder="Search tracking, email, status" style="max-width:420px" />
-            <button class="btn btn--ghost btn-sm" id="pkgRefresh" type="button">Refresh</button>
+        <div class="card">
+          <div class="card__body">
+            <div class="tableWrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="customersBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="divider"></div>
-
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Tracking</th>
-              <th>Status</th>
-              <th>Customer</th>
-              <th>Pickup</th>
-              <th>Updated</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="pkgBody"></tbody>
-        </table>
-
-        <div class="divider"></div>
-
-        <h3 class="h3">Create / Assign package</h3>
-        <form id="pkgForm" class="stack">
-          <div class="row">
-            <input class="input" id="pkgTracking" placeholder="Tracking #" required />
-            <select class="input" id="pkgStatus" required>
-              <option value="In Transit">In Transit</option>
-              <option value="Arrived">Arrived</option>
-              <option value="Ready for Pickup">Ready for Pickup</option>
-              <option value="Delivered">Delivered</option>
-            </select>
+        <div class="card">
+          <div class="card__head">
+            <h3 class="h3">Customer details</h3>
+            <p class="muted small">Select a customer from the list above.</p>
           </div>
-          <div class="row">
-            <input class="input" id="pkgCustomerEmail" placeholder="Customer email (assign)" />
-            <select class="input" id="pkgPickup">
-              <option value="UWI_KINGSTON">UWI, Kingston</option>
-              <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
-            </select>
+          <div class="card__body">
+            <div id="customerDetail" class="muted">No customer selected.</div>
           </div>
-          <div class="row">
-            <input class="input" id="pkgWeight" placeholder="Weight (lbs)" />
-            <input class="input" id="pkgCost" placeholder="Cost (JMD)" />
-          </div>
-          <button class="btn" type="submit">Save package</button>
-          <div class="muted small" id="pkgMsg" role="status"></div>
-        </form>
+        </div>
       </section>
 
-      <!-- Invoices -->
-      <section class="card tabPanel hidden" id="tab-invoices">
-        <div class="between">
-          <h3 class="h3 m0">Invoice approval</h3>
-          <div class="row">
-            <input class="input" id="invSearch" placeholder="Search tracking or email" style="max-width:420px" />
-            <select class="input" id="invFilter" style="max-width:160px">
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
+      <!-- PACKAGES -->
+      <section class="panel hidden" id="tab-packages">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Packages</h2>
+            <p class="muted small">Approve, edit, assign, update status, and attach photos/invoices.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="pkgSearch" class="input" placeholder="Search tracking / status / customer" />
+            <select id="statusFilter" class="input">
+              <option value="">All statuses</option>
+              <option>RECEIVED</option>
+              <option>IN_TRANSIT</option>
+              <option>ARRIVED_JA</option>
+              <option>READY_FOR_PICKUP</option>
+              <option>PICKED_UP</option>
+              <option>ON_HOLD</option>
+            </select>
+            <button id="refreshPackages" class="btn btn--ghost" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__body">
+            <div class="tableWrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Tracking</th><th>Status</th><th>Approved</th><th>Customer</th><th>Store</th><th>Updated</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="packagesBody"></tbody>
+              </table>
+            </div>
+            <div id="pkgMsg" class="muted small"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h3 class="h3">Edit package</h3>
+            <p class="muted small">Select a package to edit.</p>
+          </div>
+          <div class="card__body">
+            <form id="pkgEditForm" class="form">
+              <input type="hidden" id="pkgEditId" />
+              <div class="grid2">
+                <label class="field"><span>Tracking</span><input id="pkgEditTracking" required /></label>
+                <label class="field">
+                  <span>Status</span>
+                  <select id="pkgEditStatus" class="input">
+                    <option>RECEIVED</option>
+                    <option>IN_TRANSIT</option>
+                    <option>ARRIVED_JA</option>
+                    <option>READY_FOR_PICKUP</option>
+                    <option>PICKED_UP</option>
+                    <option>ON_HOLD</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="grid2">
+                <label class="field"><span>Store</span><input id="pkgEditStore" placeholder="Amazon / Shein / Temu" /></label>
+                <label class="field"><span>Approved</span>
+                  <select id="pkgEditApproved" class="input">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Notes</span>
+                <textarea id="pkgEditNotes" rows="3" placeholder="Internal notes (optional)"></textarea>
+              </label>
+
+              <div class="grid2">
+                <label class="field">
+                  <span>Upload package photo (optional)</span>
+                  <input id="pkgPhotoFile" type="file" accept="image/*" />
+                </label>
+                <label class="field">
+                  <span>Upload invoice (optional)</span>
+                  <input id="pkgInvoiceFile" type="file" accept=".pdf,.jpg,.jpeg,.docx,.xls,.xlsx" />
+                </label>
+              </div>
+
+              <div class="row">
+                <button class="btn" type="submit">Save changes</button>
+                <span id="pkgEditMsg" class="muted"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- MESSAGES -->
+      <section class="panel hidden" id="tab-messages">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Messages</h2>
+            <p class="muted small">Reply to customers and mark issues resolved.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="msgSearch" class="input" placeholder="Search customer / message text" />
+            <select id="msgFilter" class="input">
+              <option value="open">Open only</option>
               <option value="all">All</option>
             </select>
-            <button class="btn btn--ghost btn-sm" id="invRefresh" type="button">Refresh</button>
+            <button id="refreshMessages" class="btn btn--ghost" type="button">Refresh</button>
           </div>
         </div>
 
-        <div class="divider"></div>
-
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Tracking</th>
-              <th>Customer</th>
-              <th>File</th>
-              <th>Pickup</th>
-              <th>Approved</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="invBody"></tbody>
-        </table>
-        <div class="muted small" id="invMsg" role="status"></div>
-      </section>
-
-      <!-- Messages -->
-      <section class="card tabPanel hidden" id="tab-messages">
-        <div class="between">
-          <h3 class="h3 m0">Support messages</h3>
-          <div class="row">
-            <input class="input" id="msgSearch" placeholder="Search email or account # or text" style="max-width:420px" />
-            <button class="btn btn--ghost btn-sm" id="msgRefresh" type="button">Refresh</button>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row" style="align-items:flex-start; gap:1rem; flex-wrap:wrap">
-          <div style="flex:1; min-width:280px">
-            <div class="muted small">Conversations</div>
-            <div id="convList" class="stack" style="margin-top:.5rem"></div>
-          </div>
-
-          <div style="flex:2; min-width:320px">
-            <div class="between">
-              <div class="muted small">Chat</div>
-              <div class="muted small" id="convLabel">—</div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head">
+              <h3 class="h3">Conversations</h3>
+              <p class="muted small">Select a customer.</p>
             </div>
-            <div id="adminChatBody" style="margin-top:.5rem"></div>
+            <div class="card__body">
+              <ul id="convoList" class="list"></ul>
+            </div>
+          </div>
 
-            <form id="adminChatForm" class="row" style="margin-top:.6rem">
-              <input class="input" id="adminChatInput" placeholder="Type a reply..." />
-              <button class="btn btn-sm" type="submit">Send</button>
-            </form>
-            <div class="muted small" id="msgMsg" role="status"></div>
+          <div class="card">
+            <div class="card__head">
+              <h3 class="h3">Chat</h3>
+              <p id="convoTitle" class="muted small">No conversation selected.</p>
+            </div>
+            <div class="card__body">
+              <div id="adminChatBody" class="chatBody"></div>
+
+              <form id="adminChatForm" class="row">
+                <input id="adminChatInput" class="input" placeholder="Type a reply…" />
+                <button class="btn" type="submit">Send</button>
+              </form>
+
+              <div class="row">
+                <button id="markResolvedBtn" class="btn btn--ghost" type="button">Mark resolved</button>
+                <span id="adminChatMsg" class="muted small"></span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Bulk -->
-      <section class="card tabPanel hidden" id="tab-bulk">
-        <h3 class="h3 m0">Bulk upload packages (CSV)</h3>
-        <p class="muted small">Columns: <code>tracking,status,email,pickup,weight,cost</code></p>
-        <textarea class="input" id="bulkCsv" rows="8" placeholder="tracking,status,email,pickup,weight,cost&#10;ABC123,In Transit,customer@email.com,UWI_KINGSTON,2,750"></textarea>
-        <div class="row" style="margin-top:.6rem">
-          <button class="btn" id="bulkRun" type="button">Upload</button>
-          <div class="muted small" id="bulkMsg" role="status"></div>
+      <!-- REPORTS -->
+      <section class="panel hidden" id="tab-reports">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Reports</h2>
+            <p class="muted small">Shipments by week/month and popular stores. Export CSV.</p>
+          </div>
+          <div class="panel__actions">
+            <select id="reportRange" class="input">
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">Last 12 months</option>
+            </select>
+            <button id="runReports" class="btn btn--ghost" type="button">Run</button>
+            <button id="exportReports" class="btn btn--ghost" type="button">Export CSV</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head"><h3 class="h3">Shipments over time</h3></div>
+            <div class="card__body"><div id="shipmentsChart" class="muted small">Run reports to view.</div></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><h3 class="h3">Popular stores</h3></div>
+            <div class="card__body"><div id="storesChart" class="muted small">Run reports to view.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROLES -->
+      <section class="panel hidden" id="tab-roles">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Roles & security</h2>
+            <p class="muted small">Admin can add staff, set permissions, and deactivate accounts.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head"><h3 class="h3">Promote user to staff/admin</h3></div>
+          <div class="card__body">
+            <form id="roleForm" class="form">
+              <div class="grid2">
+                <label class="field"><span>User email</span><input id="roleEmail" type="email" required /></label>
+                <label class="field">
+                  <span>Role</span>
+                  <select id="roleValue" class="input">
+                    <option value="staff">staff</option>
+                    <option value="admin">admin</option>
+                    <option value="customer">customer</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row">
+                <button class="btn" type="submit">Update role</button>
+                <span id="roleMsg" class="muted"></span>
+              </div>
+              <div class="muted small">Only admins can change roles.</div>
+            </form>
+          </div>
         </div>
       </section>
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>
