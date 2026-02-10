@@ -13,42 +13,31 @@ window.__SB__ =
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // NOTE: you can remove storage override if you want,
+      // but keeping it is fine on same-origin deployments.
       storage: window.localStorage,
     },
   });
+
 const supabase = window.__SB__;
 
 const INVOICE_BUCKET = "invoices";
-const WAREHOUSE_ADDRESS_LINES = [
-  "3706 NW 16th Street",
-  "Lauderhill, Florida 33311"
-];
-
 const CHAT_BUCKET = "chat_files";
 
-
+// ========================
+// DEBUG HELPERS
+// ========================
 function logSB(label, obj) {
-  console.log("🟣", label, JSON.parse(JSON.stringify(obj || {})));
+  try {
+    console.log("🟣", label, JSON.parse(JSON.stringify(obj || {})));
+  } catch {
+    console.log("🟣", label, obj);
+  }
 }
-// Business hours note (Mon–Fri 10–5)
-const HOURS_TEXT =
-  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
 
-// Calculator base pricing (edit anytime)
-const fixedFeeJMD = 500;
-const rates = [
-  { lbs: 1, jmd: 500 },
-  { lbs: 2, jmd: 850 },
-  { lbs: 3, jmd: 1250 },
-  { lbs: 4, jmd: 1550 },
-  { lbs: 5, jmd: 1900 },
-  { lbs: 6, jmd: 2250 },
-  { lbs: 7, jmd: 2600 },
-  { lbs: 8, jmd: 2950 },
-  { lbs: 9, jmd: 3300 },
-  { lbs: 10, jmd: 3650 },
-];
-
+// ========================
+// UI HELPERS
+// ========================
 function $(id) {
   return document.getElementById(id);
 }
@@ -67,38 +56,107 @@ function formatJMD(n) {
     maximumFractionDigits: 0,
   }).format(Number(n || 0));
 }
-function pickupLabel(v) {
 
-// --------------------
-// Shipping address block (Customer Name + Account #)
-// --------------------
-function firstNameFromProfile(p){
-  const full = (p?.full_name || "").trim();
-  if(full) return full.split(/\s+/)[0];
-  const email = (p?.email || "").trim();
-  return email ? email.split("@")[0] : "Customer";
-}
-function buildShipToText(profile){
-  const first = firstNameFromProfile(profile);
-  const acct = profile?.customer_no || "SNS-JMXXXX";
-  return [
-    `${first} — ${acct}`,
-    ...WAREHOUSE_ADDRESS_LINES
-  ].join("\n");
-}
-function renderShipTo(profile){
-  const el = $("shipToBlock");
-  if(!el) return;
-  el.textContent = buildShipToText(profile);
-}
+// Your DB values appear to be: UWI_KINGSTON and RHODEN_HALL_CLARENDON
+function pickupLabel(v) {
   return v === "RHODEN_HALL_CLARENDON"
     ? "Rhoden Hall District, Clarendon"
     : "UWI, Kingston";
 }
 
-// --------------------
-// Small helpers
-// --------------------
+// Business hours note (Mon–Fri 10–5)
+const HOURS_TEXT =
+  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// ========================
+// SHIPPING ADDRESS (U.S. WAREHOUSE)
+// ========================
+const WAREHOUSE_ADDRESS_LINES = [
+  "SNS-JM",
+  "8465 W 44th Ave",
+  "STE119, SNS-JM2 43935 KIN",
+  "Hialeah, FL 33018"
+];
+
+function buildShipToText(customerName){
+  const nameLine = (customerName || "Customer").trim();
+  return [
+    nameLine,
+    ...WAREHOUSE_ADDRESS_LINES
+  ].join("\n");
+}
+
+function renderShipTo(customerName){
+  const el = $("shipToBlock");
+  if(!el) return;
+  const txt = buildShipToText(customerName);
+  // Show as formatted block
+  el.textContent = txt;
+}
+
+function setupShipToCopy(){
+  const btn = $("shipToCopy");
+  const msg = $("shipToMsg");
+  if(!btn) return;
+  btn.addEventListener("click", async () => {
+    try{
+      const customerName = ($("userName")?.textContent || "Customer").trim();
+      const txt = buildShipToText(customerName);
+      await navigator.clipboard.writeText(txt);
+      if(msg) msg.textContent = "Copied.";
+      setTimeout(()=>{ if(msg) msg.textContent=""; }, 2000);
+    }catch(e){
+      if(msg) msg.textContent = "Copy failed. Select and copy manually.";
+    }
+  });
+}
+
+// ========================
+// CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
+// ========================
+function injectCustomerChatStyles() {
+  if (document.getElementById("customerChatStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "customerChatStyles";
+  style.textContent = `
+    /* Chat messages */
+    #chatBody { color:#fff !important; }
+    #chatBody * { color:#fff !important; }
+    #chatBody .meta { color: rgba(255,255,255,.75) !important; }
+
+    /* Chat input */
+    #chatInput {
+      color:#fff !important;
+      background: rgba(255,255,255,0.07) !important;
+      border: 1px solid rgba(255,255,255,0.16) !important;
+    }
+    #chatInput::placeholder { color: rgba(255,255,255,.6) !important; }
+
+    /* Optional: make bubbles readable if your theme is dark */
+    .bubble { background: rgba(255,255,255,0.06) !important; }
+    .bubble.me { background: rgba(255,255,255,0.10) !important; }
+  `;
+  document.head.appendChild(style);
+}
+
+// ========================
+// CALCULATOR
+// ========================
+const fixedFeeJMD = 500;
+const rates = [
+  { lbs: 1, jmd: 500 },
+  { lbs: 2, jmd: 850 },
+  { lbs: 3, jmd: 1250 },
+  { lbs: 4, jmd: 1550 },
+  { lbs: 5, jmd: 1900 },
+  { lbs: 6, jmd: 2250 },
+  { lbs: 7, jmd: 2600 },
+  { lbs: 8, jmd: 2950 },
+  { lbs: 9, jmd: 3300 },
+  { lbs: 10, jmd: 3650 },
+];
+
 function findRateForWeight(weightLbs) {
   const rounded = Math.ceil(weightLbs);
   const match = rates.find((r) => r.lbs === rounded);
@@ -110,6 +168,34 @@ function findRateForWeight(weightLbs) {
   return { rounded, rate: last.jmd + (rounded - last.lbs) * step };
 }
 
+function setupCalculator() {
+  const form = $("calcForm");
+  const result = $("result");
+  if (!form || !result) return;
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const w = parseFloat($("weight")?.value);
+    const v = parseFloat($("value")?.value);
+
+    if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
+      result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>`;
+      return;
+    }
+
+    const { rounded, rate } = findRateForWeight(w);
+    const total = rate + fixedFeeJMD;
+
+    result.innerHTML = `
+      <div class="result__big">${formatJMD(total)}</div>
+      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(rate)} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
+    `;
+  });
+}
+
+// ========================
+// NAV + TABS
+// ========================
 function setupMobileNav() {
   const toggle = $("navToggle");
   const nav = $("nav");
@@ -139,35 +225,9 @@ function setupAuthTabs() {
   tabRegister.addEventListener("click", () => setTab("register"));
 }
 
-function setupCalculator() {
-  const form = $("calcForm");
-  const result = $("result");
-  if (!form || !result) return;
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const w = parseFloat($("weight").value);
-    const v = parseFloat($("value").value);
-
-    if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
-      result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>`;
-      return;
-    }
-
-    const { rounded, rate } = findRateForWeight(w);
-    const total = rate + fixedFeeJMD;
-    result.innerHTML = `
-      <div class="result__big">${formatJMD(total)}</div>
-      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(
-      rate
-    )} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
-    `;
-  });
-}
-
-// --------------------
+// ========================
 // PROFILE creation (NO TRIGGER REQUIRED)
-// --------------------
+// ========================
 function stashPendingProfile(full_name, phone, email) {
   try {
     localStorage.setItem(
@@ -198,103 +258,159 @@ async function ensureProfile({ full_name, phone } = {}) {
   const user = userData?.user;
   if (!user) return { ok: false, error: new Error("Not logged in") };
 
-  // Try to read profile
-  const { data: profile, error: pReadErr } = await supabase
+  const readRes = await supabase
     .from("profiles")
-    .select("id, full_name, phone, role")
+    .select("id, email, full_name, phone, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  // If it exists, optionally update missing values
-  if (profile && !pReadErr) {
+  if (readRes.error) console.error("PROFILE READ ERROR:", readRes.error);
+
+  if (readRes.data && !readRes.error) {
+    const profile = readRes.data;
     const patch = {};
     if (full_name && !profile.full_name) patch.full_name = full_name;
     if (phone && !profile.phone) patch.phone = phone;
     if (Object.keys(patch).length) {
-      await supabase.from("profiles").update(patch).eq("id", user.id);
+      const up = await supabase.from("profiles").update(patch).eq("id", user.id);
+      if (up.error) console.error("PROFILE UPDATE ERROR:", up.error);
     }
     return { ok: true, profile };
   }
 
-  // If not found or blocked, attempt upsert
-  const { error: upErr } = await supabase.from("profiles").upsert({
+  const upsertRes = await supabase.from("profiles").upsert({
     id: user.id,
     email: user.email,
     full_name: full_name || "",
     phone: phone || "",
   });
 
-  if (upErr) return { ok: false, error: upErr };
+  if (upsertRes.error) {
+    console.error("PROFILE UPSERT ERROR:", upsertRes.error);
+    return { ok: false, error: upsertRes.error };
+  }
 
-  const { data: profile2 } = await supabase
+  const read2 = await supabase
     .from("profiles")
-    .select("id, full_name, phone, role")
+    .select("id, email, full_name, phone, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  return { ok: true, profile: profile2 || null };
+  if (read2.error) console.error("PROFILE READ2 ERROR:", read2.error);
+
+  return { ok: true, profile: read2.data || null };
 }
 
-// --------------------
-// Login / Register
-// --------------------
+// ========================
+// AUTH: STOP RECURSION / MULTI-LISTENERS
+// ========================
+let __renderAuthBusy = false;
+let __renderAuthQueued = false;
+
+function renderAuthDebounced() {
+  if (__renderAuthQueued) return;
+  __renderAuthQueued = true;
+  setTimeout(async () => {
+    __renderAuthQueued = false;
+    await renderAuth();
+  }, 0);
+}
+
+function getProjectRef() {
+  try {
+    return new URL(SUPABASE_URL).hostname.split(".")[0];
+  } catch {
+    return "unknown";
+  }
+}
+
+function clearSupabaseAuthStorage() {
+  try {
+    const ref = getProjectRef();
+    localStorage.removeItem(`sb-${ref}-auth-token`);
+    localStorage.removeItem("pending_profile");
+  } catch {}
+}
+
+// ✅ If login gets stuck, this resets local auth state without wiping your whole browser storage.
+async function hardResetAuthState() {
+  try { await supabase.auth.signOut(); } catch {}
+  clearSupabaseAuthStorage();
+}
+
+// ========================
+// Login / Register / Logout
+// ========================
 function setupLoginRegister() {
   const loginForm = $("loginForm");
   const regForm = $("registerForm");
 
-  // --------
   // LOGIN
-  // --------
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const msg = $("loginMsg");
     if (msg) msg.textContent = "Signing in...";
 
+    // Safety timeout so it never hangs forever
+    let timeoutHit = false;
+    const t = setTimeout(() => {
+      timeoutHit = true;
+      if (msg) msg.textContent = "Still signing in… (If this keeps happening, we’ll reset auth and try again.)";
+    }, 9000);
+
     try {
-      const email = $("loginEmail").value.trim().toLowerCase();
-      const password = $("loginPassword").value;
+      const email = $("loginEmail")?.value?.trim()?.toLowerCase();
+      const password = $("loginPassword")?.value;
 
+      // If a broken token is in storage, sign-in can behave weirdly.
+      // Reset stale storage first if we already have a junk session.
+      const sess0 = await supabase.auth.getSession();
+      logSB("PRE LOGIN SESSION", sess0);
+
+      // Attempt login
       const res = await supabase.auth.signInWithPassword({ email, password });
-      console.log("LOGIN RES:", res);
+      logSB("LOGIN RES", res);
+
       if (res.error) {
-        if (msg) msg.textContent = `Login error: ${res.error.message}`;
-        return;
+        // If auth storage is corrupted, retry once after clearing
+        const m = res.error.message || "";
+        if (m.toLowerCase().includes("refresh") || m.toLowerCase().includes("token") || timeoutHit) {
+          await hardResetAuthState();
+          const res2 = await supabase.auth.signInWithPassword({ email, password });
+          logSB("LOGIN RES (RETRY)", res2);
+          if (res2.error) {
+            if (msg) msg.textContent = `Login error: ${res2.error.message}`;
+            return;
+          }
+        } else {
+          if (msg) msg.textContent = `Login error: ${res.error.message}`;
+          return;
+        }
       }
 
-      // Confirm we actually have a session (prevents "logged in once" confusion)
+      // ✅ Force UI update immediately (don’t rely only on onAuthStateChange)
       const sess = await supabase.auth.getSession();
-      console.log("SESSION:", sess);
-      if (sess.error) {
-        if (msg) msg.textContent = `Session error: ${sess.error.message}`;
-        return;
-      }
-      if (!sess.data?.session) {
-        if (msg) msg.textContent = "No session returned. Check Supabase Auth URL settings + email confirmation.";
-        return;
-      }
+      logSB("POST LOGIN SESSION", sess);
 
-      // If they registered earlier while confirm-email was ON,
-      // apply saved name/phone after login.
-      const pending = readPendingProfile();
-      if (pending) {
-        const ensured = await ensureProfile({ full_name: pending.full_name, phone: pending.phone });
-        if (ensured.ok) clearPendingProfile();
-      } else {
-        await ensureProfile();
+      if (!sess?.data?.session) {
+        if (msg) msg.textContent = "Logged in but no session returned. Check Supabase Auth settings (email confirmation?).";
+        // Still try to rerender UI
+        renderAuthDebounced();
+        return;
       }
 
       if (msg) msg.textContent = "";
-      await renderAuth();
+      renderAuthDebounced();
     } catch (err) {
       console.error(err);
       if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+    } finally {
+      clearTimeout(t);
     }
   });
 
-  // --------
   // REGISTER
-  // --------
   regForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -302,12 +418,11 @@ function setupLoginRegister() {
     if (msg) msg.textContent = "Creating account...";
 
     try {
-      const full_name = $("regName").value.trim();
-      const phone = $("regPhone").value.trim();
-      const email = $("regEmail").value.trim().toLowerCase();
-      const password = $("regPassword").value;
+      const full_name = $("regName")?.value?.trim() || "";
+      const phone = $("regPhone")?.value?.trim() || "";
+      const email = $("regEmail")?.value?.trim()?.toLowerCase();
+      const password = $("regPassword")?.value;
 
-      // Save name/phone in case confirm-email is ON (no session yet)
       stashPendingProfile(full_name, phone, email);
 
       const res = await supabase.auth.signUp({
@@ -316,23 +431,14 @@ function setupLoginRegister() {
         options: { data: { full_name, phone } },
       });
 
-      console.log("SIGNUP RES:", res);
+      logSB("SIGNUP RES", res);
 
       if (res.error) {
         if (msg) msg.textContent = `Signup error: ${res.error.message}`;
         return;
       }
 
-      // If confirm-email is OFF, user may already be signed in; create profile now.
-      const ensured = await ensureProfile({ full_name, phone });
-      console.log("ENSURE PROFILE:", ensured);
-
-      if (msg) {
-        msg.textContent = ensured.ok
-          ? "Account created. You can now log in."
-          : "Account created. If email confirmation is ON, confirm email then log in.";
-      }
-
+      if (msg) msg.textContent = "Account created. If email confirmation is ON, confirm email then sign in.";
       regForm.reset();
     } catch (err) {
       console.error(err);
@@ -340,31 +446,23 @@ function setupLoginRegister() {
     }
   });
 
-  // --------
-  // LOGOUT
-  // --------
-function clearSupabaseAuthStorage() {
-  try {
-    const ref = new URL(SUPABASE_URL).hostname.split(".")[0]; // ykpcgcjudotzakaxgnxh
-    localStorage.removeItem(`sb-${ref}-auth-token`);
-    localStorage.removeItem("pending_profile");
-  } catch {}
-}
-
-$("logoutBtn")?.addEventListener("click", async () => {
-  try {
-    await supabase.auth.signOut();
-  } finally {
-    clearSupabaseAuthStorage();
-    location.reload();
+  // LOGOUT (bind once)
+  if (!window.__LOGOUT_BOUND__) {
+    window.__LOGOUT_BOUND__ = true;
+    $("logoutBtn")?.addEventListener("click", async () => {
+      try {
+        await supabase.auth.signOut();
+      } finally {
+        clearSupabaseAuthStorage();
+        location.reload();
+      }
+    });
   }
-});
-
 }
 
-// --------------------
+// ========================
 // Packages + invoices
-// --------------------
+// ========================
 async function renderPackages(filter = "") {
   const body = $("pkgBody");
   if (!body) return;
@@ -381,15 +479,11 @@ async function renderPackages(filter = "") {
     .select("tracking,status,pickup,pickup_confirmed,updated_at")
     .order("updated_at", { ascending: false });
 
-  if (filter.trim()) {
-    q = q.ilike("tracking", `%${filter.trim()}%`);
-  }
+  if (filter.trim()) q = q.ilike("tracking", `%${filter.trim()}%`);
 
   const { data, error } = await q;
   if (error) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(
-      error.message
-    )}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
@@ -427,34 +521,30 @@ async function renderUploads() {
     return;
   }
 
-  const { data, error } = await supabase
+  const res = await supabase
     .from("invoices")
-    .select(
-      "tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note"
-    )
+    .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
     .order("created_at", { ascending: false })
     .limit(10);
 
-  if (error) {
-    list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
+  logSB("INVOICES SELECT", res);
+
+  if (res.error) {
+    list.innerHTML = `<li class="muted">${escapeHTML(res.error.message)}</li>`;
     return;
   }
-  if (!data?.length) {
+  if (!res.data?.length) {
     list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
     return;
   }
 
-  list.innerHTML = data
+  list.innerHTML = res.data
     .map(
       (i) => `
     <li>
-      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
-        i.file_name
-      )} (${escapeHTML(i.file_type)})</div>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name)} (${escapeHTML(i.file_type)})</div>
       <div class="muted small">
-        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
-        i.pickup_confirmed ? "Confirmed" : "Pending confirmation"
-      } • ${new Date(i.created_at).toLocaleString()}
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${i.pickup_confirmed ? "Confirmed" : "Pending confirmation"} • ${new Date(i.created_at).toLocaleString()}
         ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
       </div>
     </li>
@@ -464,9 +554,7 @@ async function renderUploads() {
 }
 
 function setupPackageSearch() {
-  $("pkgSearch")?.addEventListener("input", (e) =>
-    renderPackages(e.target.value)
-  );
+  $("pkgSearch")?.addEventListener("input", (e) => renderPackages(e.target.value));
   $("resetSearch")?.addEventListener("click", () => {
     if ($("pkgSearch")) $("pkgSearch").value = "";
     renderPackages("");
@@ -488,9 +576,9 @@ function setupInvoiceUpload() {
       return;
     }
 
-    const tracking = $("invTracking").value.trim();
-    const pickup = $("invPickup").value;
-    const note = $("invNote").value.trim();
+    const tracking = $("invTracking")?.value?.trim();
+    const pickup = $("invPickup")?.value;
+    const note = $("invNote")?.value?.trim();
     const fileInput = $("invFile");
 
     if (!tracking) {
@@ -504,14 +592,15 @@ function setupInvoiceUpload() {
 
     const file = fileInput.files[0];
 
-    // client-side file type rule (pdf, jpeg/jpg, docx, excel)
     const allowed =
       /(\.pdf|\.jpe?g|\.docx|\.xlsx|\.xls)$/i.test(file.name) ||
-      ["application/pdf",
-       "image/jpeg",
-       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-       "application/vnd.ms-excel"].includes(file.type);
+      [
+        "application/pdf",
+        "image/jpeg",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+      ].includes(file.type);
 
     if (!allowed) {
       if ($("invMsg")) $("invMsg").textContent = "Allowed: PDF, JPEG, DOCX, XLS/XLSX.";
@@ -521,9 +610,9 @@ function setupInvoiceUpload() {
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage
-      .from(INVOICE_BUCKET)
-      .upload(path, file, { upsert: false });
+    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { upsert: false });
+    logSB("INVOICE UPLOAD", up);
+
     if (up.error) {
       if ($("invMsg")) $("invMsg").textContent = up.error.message;
       return;
@@ -540,22 +629,22 @@ function setupInvoiceUpload() {
       note: note || null,
     });
 
+    logSB("INVOICE INSERT", ins);
+
     if (ins.error) {
       if ($("invMsg")) $("invMsg").textContent = ins.error.message;
       return;
     }
 
     form.reset();
-    if ($("invMsg"))
-      $("invMsg").textContent =
-        "Uploaded. Pickup location will be confirmed by staff.";
+    if ($("invMsg")) $("invMsg").textContent = "Uploaded. Pickup location will be confirmed by staff.";
     await renderUploads();
   });
 }
 
-// --------------------
+// ========================
 // Chat (messages + optional attachment)
-// --------------------
+// ========================
 let chatChannel = null;
 
 async function renderChat() {
@@ -569,41 +658,47 @@ async function renderChat() {
     return;
   }
 
-  const { data, error } = await supabase
+  const res = await supabase
     .from("messages")
     .select("id,sender,body,created_at")
     .order("created_at", { ascending: true })
     .limit(200);
 
-  if (error) {
-    body.innerHTML = `<div class="muted small">${escapeHTML(
-      error.message
-    )}</div>`;
+  logSB("MESSAGES SELECT", res);
+
+  if (res.error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(res.error.message)}</div>`;
     return;
   }
 
+  const data = res.data || [];
+
   body.innerHTML =
-    (data?.length ? data : [])
+    (data.length ? data : [])
       .map(
         (m) => `
     <div class="bubble ${m.sender === "customer" ? "me" : ""}">
       <div>${escapeHTML(m.body)}</div>
       <div class="meta">
         <span>${m.sender === "customer" ? "You" : "Support"}</span>
-        <span>${new Date(m.created_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}</span>
+        <span>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
     </div>
   `
       )
-      .join("") ||
-    `<div class="muted small">Start the conversation. ${escapeHTML(
-      HOURS_TEXT
-    )}</div>`;
+      .join("") || `<div class="muted small">Start the conversation. ${escapeHTML(HOURS_TEXT)}</div>`;
 
   body.scrollTop = body.scrollHeight;
+}
+
+let __chatQueued = false;
+function renderChatDebounced() {
+  if (__chatQueued) return;
+  __chatQueued = true;
+  setTimeout(async () => {
+    __chatQueued = false;
+    await renderChat();
+  }, 0);
 }
 
 async function setupChatRealtime() {
@@ -620,15 +715,8 @@ async function setupChatRealtime() {
     .channel(`messages:${user.id}`)
     .on(
       "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "messages",
-        filter: `user_id=eq.${user.id}`,
-      },
-      async () => {
-        await renderChat();
-      }
+      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
+      () => renderChatDebounced()
     )
     .subscribe();
 }
@@ -638,41 +726,48 @@ async function sendChatMessage(text, file) {
   const user = userData?.user;
   if (!user) return alert("Please log in to chat.");
 
-  const { data: msg, error: mErr } = await supabase
+  const msgRes = await supabase
     .from("messages")
     .insert({ user_id: user.id, sender: "customer", body: text })
     .select("id")
     .single();
 
-  if (mErr) return alert(mErr.message);
+  logSB("MESSAGE INSERT", msgRes);
+
+  if (msgRes.error) return alert(msgRes.error.message);
 
   if (file) {
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/messages/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage
-      .from(CHAT_BUCKET)
-      .upload(path, file, { upsert: false });
+    const up = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
+    logSB("CHAT FILE UPLOAD", up);
+
     if (up.error) return alert(up.error.message);
 
-    const ins = await supabase.from("message_attachments").insert({
-      message_id: msg.id,
+    const attRes = await supabase.from("message_attachments").insert({
+      message_id: msgRes.data.id,
       user_id: user.id,
       file_path: path,
       file_name: safeName,
       file_type: file.type || "unknown",
     });
 
-    if (ins.error) return alert(ins.error.message);
+    logSB("ATTACHMENT INSERT", attRes);
+
+    if (attRes.error) return alert(attRes.error.message);
   }
 }
 
 function openChat() {
+  injectCustomerChatStyles(); // ✅ ensure styles apply even if widget loads later
   $("chatWidget")?.classList.remove("hidden");
   $("chatWidget")?.setAttribute("aria-hidden", "false");
   if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
-  renderChat().then(setupChatRealtime);
+  renderChatDebounced();
+  setupChatRealtime();
 }
+
 function closeChat() {
   $("chatWidget")?.classList.add("hidden");
   $("chatWidget")?.setAttribute("aria-hidden", "true");
@@ -704,57 +799,85 @@ function setupChatUI() {
 
     await sendChatMessage(text || "(Attachment)", file);
     if (msgEl) msgEl.textContent = "";
+    renderChatDebounced(); // ✅ immediate refresh
   });
 }
 
-// --------------------
-// Auth render
-// --------------------
+// ========================
+// Auth render (GUARDED)
+// ========================
 async function renderAuth() {
-  const loginCard = $("loginCard");
-  const dashCard = $("dashCard");
+  if (__renderAuthBusy) return;
+  __renderAuthBusy = true;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  const authed = !!user;
+  try {
+    const loginCard = $("loginCard");
+    const dashCard = $("dashCard");
 
-  if (loginCard) loginCard.classList.toggle("hidden", authed);
-  if (dashCard) dashCard.classList.toggle("hidden", !authed);
+    const { data: userData, error: uErr } = await supabase.auth.getUser();
+    if (uErr) console.error("GET USER ERROR:", uErr);
 
-  if (!authed) {
-    if ($("adminLink")) $("adminLink").style.display = "none";
-    if (chatChannel) {
-      supabase.removeChannel(chatChannel);
-      chatChannel = null;
+    const user = userData?.user;
+    const authed = !!user;
+
+    if (loginCard) loginCard.classList.toggle("hidden", authed);
+    if (dashCard) dashCard.classList.toggle("hidden", !authed);
+
+    if (!authed) {
+      if ($("adminLink")) $("adminLink").style.display = "none";
+      if (chatChannel) {
+        supabase.removeChannel(chatChannel);
+        chatChannel = null;
+      }
+      return;
     }
-    return;
+
+    const pending = readPendingProfile();
+    const ensured = pending
+      ? await ensureProfile({ full_name: pending.full_name, phone: pending.phone })
+      : await ensureProfile();
+
+    if (ensured?.ok && pending) clearPendingProfile();
+
+    const profRes = await supabase
+      .from("profiles")
+      .select("full_name,role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profRes.error) console.error("PROFILE READ (renderAuth) ERROR:", profRes.error);
+
+    const profile = profRes.data;
+    const displayName = profile?.full_name || user.email || "Customer";
+    if ($("userName")) $("userName").textContent = displayName;
+
+    renderShipTo(displayName);
+
+    const role = profile?.role || "customer";
+    const isStaff = role === "staff" || role === "admin";
+    if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
+
+    await renderPackages("");
+    await renderUploads();
+  } finally {
+    __renderAuthBusy = false;
   }
-
-  // Ensure profile exists; if signup used email-confirm flow, this happens after login
-  await ensureProfile();
-
-  const { data: profile, error: profErr } = await supabase
-    .from("profiles")
-    .select("full_name,role,customer_no")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const displayName =
-    !profErr && profile?.full_name ? profile.full_name : user.email || "Customer";
-  if ($("userName")) $("userName").textContent = `${firstNameFromProfile({full_name: profile?.full_name, email: user.email})} — ${user.email}`;
-
-  const isStaff = !profErr && profile?.role === "staff";
-  if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
-
-  await renderPackages("");
-  await renderUploads();
 }
 
-supabase.auth.onAuthStateChange(async () => {
-  await renderAuth();
-});
+// Subscribe ONCE
+if (!window.__AUTH_SUB__) {
+  window.__AUTH_SUB__ = supabase.auth.onAuthStateChange((event, session) => {
+    console.log("AUTH EVENT:", event, !!session);
+    renderAuthDebounced();
+  });
+}
 
+// ========================
+// INIT
+// ========================
 function init() {
+  injectCustomerChatStyles(); 
+  setupShipToCopy();// ✅ apply customer chat fix immediately
   setupMobileNav();
   setupAuthTabs();
   setupCalculator();
@@ -762,7 +885,7 @@ function init() {
   setupPackageSearch();
   setupInvoiceUpload();
   setupChatUI();
-  renderAuth();
+  renderAuthDebounced();
 }
 
 window.addEventListener("DOMContentLoaded", init);
