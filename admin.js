@@ -50,26 +50,6 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
-function firstNameFromFullName(full_name, email="") {
-  const n = (full_name || "").trim();
-  if (n) return n.split(/\s+/)[0];
-  const local = (email || "").split("@")[0] || "Customer";
-  // Title-case first segment
-  return local.split(/[._-]+/)[0].replace(/^./, c => c.toUpperCase());
-}
-
-function customerLabel(profile, fallbackUserId="") {
-  const email = profile?.email || "";
-  const acct = (profile?.customer_no || "").trim();
-  const first = firstNameFromFullName(profile?.full_name, email);
-  // Format: FirstName — email — SNS-JMXXXX
-  if (email && acct) return `${first} — ${email} — ${acct}`;
-  if (email) return `${first} — ${email}`;
-  if (acct) return `${first || "Customer"} — ${acct}`;
-  return first || fallbackUserId || "Customer";
-}
-
-
 function getProjectRef() {
   try {
     return new URL(SUPABASE_URL).hostname.split(".")[0];
@@ -182,13 +162,6 @@ let currentAdmin = null; // { id, email, role, full_name }
 let currentCustomer = null; // { id, email, full_name }
 let msgChannel = null;
 
-// One-time UI bindings + render guards
-let __pkgUiBound = false;
-let __pkgRenderSeq = 0;
-let __invUiBound = false;
-let __invRenderSeq = 0;
-
-
 // ========================
 // TABS
 // ========================
@@ -199,7 +172,7 @@ function setupTabs() {
   function showTab(tabName) {
     buttons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
 
-    const panels = ["overview", "customers", "packages", "invoices", "messages", "reports", "roles"];
+    const panels = ["overview", "customers", "packages", "messages", "reports", "roles"];
     panels.forEach((p) => {
       const el = $(`tab-${p}`);
       if (el) el.classList.toggle("hidden", p !== tabName);
@@ -209,7 +182,6 @@ function setupTabs() {
     if (tabName === "overview") renderOverview();
     if (tabName === "customers") renderCustomers();
     if (tabName === "packages") renderPackages();
-    if (tabName === "invoices") renderInvoices();
     if (tabName === "messages") renderConversations();
   }
 
@@ -458,7 +430,7 @@ async function renderCustomers() {
 
   let query = supabase
     .from("profiles")
-    .select("id,email,full_name,customer_no,role,is_active,created_at")
+    .select("id,email,full_name,role,is_active,created_at")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -479,7 +451,7 @@ async function renderCustomers() {
     .map(
       (c) => `
     <tr data-id="${escapeHTML(c.id)}" class="clickrow">
-      <td><div><strong>${escapeHTML(c.full_name || "—")}</strong></div><div class="muted small">${escapeHTML(c.customer_no || "")}</div></td>
+      <td><strong>${escapeHTML(c.full_name || "—")}</strong></td>
       <td>${escapeHTML(c.email || "—")}</td>
       <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
       <td class="muted small">${c.is_active === false ? "Inactive" : "Active"}</td>
@@ -520,12 +492,6 @@ async function renderCustomerDetail() {
     <div class="card__head">
       <h3 class="h3">${escapeHTML(currentCustomer.full_name || "Customer")}</h3>
       <p class="muted small">${escapeHTML(currentCustomer.email || "")}</p>
-      <p class="muted small"><strong>Account #:</strong> ${escapeHTML(currentCustomer.customer_no || "—")}</p>
-      <div class="card mini">
-        <div class="muted small"><strong>US Warehouse Shipping Address</strong></div>
-        <div>${escapeHTML((currentCustomer.full_name || "Customer") + ", " + (currentCustomer.customer_no || ""))}</div>
-        <div>${escapeHTML(WAREHOUSE_ADDRESS)}</div>
-      </div>
     </div>
     <div class="muted small">Recent packages</div>
     <div class="stack">
@@ -549,14 +515,8 @@ async function renderCustomerDetail() {
 // ========================
 // PACKAGES
 // ========================
-
 function setupPackagesUI() {
-  if (__pkgUiBound) return;
-  __pkgUiBound = true;
-
-  const run = debounce(() => renderPackages(), 250);
-
-  $("pkgSearch")?.addEventListener("input", run);
+  $("pkgSearch")?.addEventListener("input", () => renderPackages());
   $("statusFilter")?.addEventListener("change", () => renderPackages());
   $("refreshPackages")?.addEventListener("click", () => renderPackages());
 
@@ -564,33 +524,6 @@ function setupPackagesUI() {
     e.preventDefault();
     await savePackageEdits();
   });
-
-  // Row actions (edit)
-  const body = $("packagesBody");
-  if (body && !body.__delegated) {
-    body.__delegated = true;
-    body.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button[data-action]");
-      if (!btn) return;
-      const id = btn.getAttribute("data-id");
-      const action = btn.getAttribute("data-action");
-      if (!id || !action) return;
-
-      if (action === "edit") {
-        const { data, error } = await supabase
-          .from("packages")
-          .select("id,tracking,status,store,notes,user_id,updated_at, profiles!packages_user_id_fkey(email,full_name,customer_no)")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (error || !data) {
-          $("pkgMsg") && ($("pkgMsg").textContent = error?.message || "Could not load package.");
-          return;
-        }
-        fillPackageEditor(data);
-      }
-    });
-  }
 }
 
 async function renderPackages() {
@@ -599,98 +532,62 @@ async function renderPackages() {
   const body = $("packagesBody");
   if (!body) return;
 
-  const seq = ++__pkgRenderSeq;
-
-  const q = ($("pkgSearch")?.value || "").trim().toLowerCase();
+  const q = ($("pkgSearch")?.value || "").trim();
   const status = ($("statusFilter")?.value || "").trim();
 
   let query = supabase
     .from("packages")
-    .select("id,tracking,status,store,notes,user_id,updated_at, profiles!packages_user_id_fkey(email,full_name,customer_no)")
+    .select("id,tracking,status,store,approved,notes,user_id,updated_at")
     .order("updated_at", { ascending: false })
     .limit(200);
 
-  // Server-side filtering where possible
-  if (q) {
-    // tracking/store server-side
-    query = query.or(`tracking.ilike.%${q}%,store.ilike.%${q}%`);
-  }
+  if (q) query = query.ilike("tracking", `%${q}%`);
   if (status) query = query.eq("status", status);
 
-  let { data, error } = await query;
-
-  // Ignore stale responses (prevents “glitching” while typing)
-  if (seq !== __pkgRenderSeq) return;
-
-  // If join fails (missing FK), fall back without join and map emails
-  if (error && /profiles/i.test(error.message || "")) {
-    const fallback = await supabase
-      .from("packages")
-      .select("id,tracking,status,store,notes,user_id,updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(200);
-
-    data = fallback.data;
-    error = fallback.error;
-
-    if (!error && data?.length) {
-      const ids = [...new Set(data.map((p) => p.user_id).filter(Boolean))];
-      if (ids.length) {
-        const prof = await supabase.from("profiles").select("id,email,full_name,customer_no").in("id", ids);
-        const map = new Map((prof.data || []).map((r) => [r.id, r]));
-        data = data.map((p) => ({ ...p, profiles: map.get(p.user_id) || null }));
-      }
-    }
-  }
-
+  const { data, error } = await query;
   if (error) {
     body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
-  let rows = data || [];
-
-  // Client-side email filtering (since email comes from joined profile)
-  if (q) {
-    rows = rows.filter((p) => {
-      const email = (p.profiles?.email || "").toLowerCase();
-      const name = (p.profiles?.full_name || "").toLowerCase();
-      const tracking = (p.tracking || "").toLowerCase();
-      const store = (p.store || "").toLowerCase();
-      return tracking.includes(q) || store.includes(q) || email.includes(q) || name.includes(q);
-    });
-  }
-
-  if (!rows.length) {
+  if (!data?.length) {
     body.innerHTML = `<tr><td colspan="6" class="muted">No packages.</td></tr>`;
     return;
   }
 
-  body.innerHTML = rows
+  body.innerHTML = data
     .map(
       (p) => `
-    <tr>
+    <tr data-id="${escapeHTML(p.id)}" class="clickrow">
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
-      <td>${escapeHTML(customerLabel(p.profiles, p.user_id))}</td>
       <td>${escapeHTML(p.store || "—")}</td>
-      <td class="muted small">${p.updated_at ? new Date(p.updated_at).toLocaleString() : "—"}</td>
-      <td>
-        <button class="btn btn--ghost btn-sm" type="button" data-action="edit" data-id="${escapeHTML(p.id)}">Edit</button>
-      </td>
+      <td class="muted small">${p.approved ? "Yes" : "No"}</td>
+      <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
+      <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
   `
     )
     .join("");
+
+  body.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      const id = tr.getAttribute("data-id");
+      const pkg = data.find((x) => x.id === id);
+      if (!pkg) return;
+      fillPackageEditor(pkg);
+    });
+  });
 }
 
 function fillPackageEditor(pkg) {
-  $("pkgEditId") && ($("pkgEditId").value = pkg.id || "");
-  $("pkgEditTracking") && ($("pkgEditTracking").value = pkg.tracking || "");
-  $("pkgEditStatus") && ($("pkgEditStatus").value = pkg.status || "");
-  $("pkgEditStore") && ($("pkgEditStore").value = pkg.store || "");
-  $("pkgEditNotes") && ($("pkgEditNotes").value = pkg.notes || "");
-  $("pkgEditMsg") && ($("pkgEditMsg").textContent = "");
+  if ($("pkgEditId")) $("pkgEditId").value = pkg.id || "";
+  if ($("pkgEditTracking")) $("pkgEditTracking").value = pkg.tracking || "";
+  if ($("pkgEditStatus")) $("pkgEditStatus").value = pkg.status || "";
+  if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
+  if ($("pkgEditApproved")) $("pkgEditApproved").checked = !!pkg.approved;
+  if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
+  if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
 }
 
 async function savePackageEdits() {
@@ -707,6 +604,7 @@ async function savePackageEdits() {
     tracking: ($("pkgEditTracking")?.value || "").trim(),
     status: ($("pkgEditStatus")?.value || "").trim(),
     store: ($("pkgEditStore")?.value || "").trim() || null,
+    approved: !!$("pkgEditApproved")?.checked,
     notes: ($("pkgEditNotes")?.value || "").trim() || null,
   };
 
@@ -716,7 +614,7 @@ async function savePackageEdits() {
     return;
   }
 
-  // Optional uploads
+  // Optional uploads (photo/invoice) if bucket exists
   const photoFile = $("pkgPhotoFile")?.files?.[0] || null;
   const invoiceFile = $("pkgInvoiceFile")?.files?.[0] || null;
 
@@ -728,7 +626,6 @@ async function savePackageEdits() {
 
   if (msg) msg.textContent = "Saved.";
   await renderPackages();
-  await renderOverview();
 }
 
 async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
@@ -744,181 +641,6 @@ async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
     console.warn(`Upload ${kind} exception:`, e);
     if (msgEl) msgEl.textContent = `Saved, but ${kind} upload failed.`;
   }
-}
-
-
-// ========================
-// INVOICES (approval)
-// ========================
-function setupInvoicesUI() {
-  if (__invUiBound) return;
-  __invUiBound = true;
-
-  const run = debounce(() => renderInvoices(), 250);
-
-  $("invSearch")?.addEventListener("input", run);
-  $("invFilter")?.addEventListener("change", () => renderInvoices());
-  $("refreshInvoices")?.addEventListener("click", () => renderInvoices());
-
-  const body = $("invoicesBody");
-  if (body && !body.__delegated) {
-    body.__delegated = true;
-    body.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button[data-action]");
-      const tr = e.target.closest("tr[data-id]");
-      const id = btn?.getAttribute("data-id") || tr?.getAttribute("data-id");
-      if (!id) return;
-
-      // Row click = preview
-      if (!btn && tr) {
-        const path = tr.getAttribute("data-path") || "";
-        if (path) openInvoicePreview(path);
-        return;
-      }
-
-      const action = btn.getAttribute("data-action");
-      if (action === "approve") await setInvoiceApproval(id, true);
-      if (action === "reject") await setInvoiceApproval(id, false);
-      if (action === "open") {
-        const path = btn.getAttribute("data-path") || "";
-        if (path) openInvoicePreview(path);
-      }
-    });
-  }
-}
-
-async function renderInvoices() {
-  setupInvoicesUI();
-
-  const body = $("invoicesBody");
-  if (!body) return;
-
-  const seq = ++__invRenderSeq;
-
-  const q = ($("invSearch")?.value || "").trim().toLowerCase();
-  const filter = ($("invFilter")?.value || "pending").trim();
-
-  let query = supabase
-    .from("invoices")
-    .select("id,tracking,file_name,file_path,file_type,pickup,created_at,approved,user_id, profiles!invoices_user_id_fkey(email,full_name,customer_no)")
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (filter === "pending") query = query.eq("approved", false);
-  if (filter === "approved") query = query.eq("approved", true);
-
-  let { data, error } = await query;
-
-  if (seq !== __invRenderSeq) return;
-
-  // Fallback if join fails
-  if (error && /profiles/i.test(error.message || "")) {
-    const fallback = await supabase
-      .from("invoices")
-      .select("id,tracking,file_name,file_path,file_type,pickup,created_at,approved,user_id")
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    data = fallback.data;
-    error = fallback.error;
-
-    if (!error && data?.length) {
-      const ids = [...new Set(data.map((i) => i.user_id).filter(Boolean))];
-      if (ids.length) {
-        const prof = await supabase.from("profiles").select("id,email,full_name,customer_no").in("id", ids);
-        const map = new Map((prof.data || []).map((r) => [r.id, r]));
-        data = data.map((i) => ({ ...i, profiles: map.get(i.user_id) || null }));
-      }
-    }
-  }
-
-  if (error) {
-    body.innerHTML = `<tr><td colspan="7" class="muted">${escapeHTML(error.message)}</td></tr>`;
-    return;
-  }
-
-  let rows = data || [];
-
-  if (q) {
-    rows = rows.filter((i) => {
-      const tracking = (i.tracking || "").toLowerCase();
-      const email = (i.profiles?.email || "").toLowerCase();
-      const name = (i.profiles?.full_name || "").toLowerCase();
-      const file = (i.file_name || "").toLowerCase();
-      return tracking.includes(q) || email.includes(q) || name.includes(q) || file.includes(q);
-    });
-  }
-
-  if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="7" class="muted">No invoices.</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = rows
-    .map((i) => {
-      const cust = customerLabel(i.profiles, i.user_id);
-      const status = i.approved ? "Approved" : "Pending";
-      return `
-        <tr data-id="${escapeHTML(i.id)}" data-path="${escapeHTML(i.file_path || "")}">
-          <td><strong>${escapeHTML(i.tracking)}</strong></td>
-          <td>${escapeHTML(cust)}</td>
-          <td>${escapeHTML(i.file_name || "file")}</td>
-          <td>${escapeHTML(i.pickup || "—")}</td>
-          <td><span class="tag">${escapeHTML(status)}</span></td>
-          <td class="muted small">${i.created_at ? new Date(i.created_at).toLocaleString() : "—"}</td>
-          <td class="row">
-            <button class="btn btn--ghost btn-sm" type="button" data-action="open" data-id="${escapeHTML(i.id)}" data-path="${escapeHTML(i.file_path || "")}">Open</button>
-            ${
-              i.approved
-                ? ""
-                : `<button class="btn btn--ghost btn-sm" type="button" data-action="approve" data-id="${escapeHTML(i.id)}">Approve</button>`
-            }
-            <button class="btn btn--ghost btn-sm" type="button" data-action="reject" data-id="${escapeHTML(i.id)}">Reject</button>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-async function setInvoiceApproval(invoiceId, approved) {
-  const msg = $("invMsg");
-  if (msg) msg.textContent = approved ? "Approving..." : "Rejecting...";
-
-  const patch = {
-    approved,
-    approved_at: approved ? new Date().toISOString() : null,
-    approved_by: approved ? (currentAdmin?.id || null) : null,
-  };
-
-  const { error } = await supabase.from("invoices").update(patch).eq("id", invoiceId);
-  if (error) {
-    if (msg) msg.textContent = error.message;
-    return;
-  }
-
-  if (msg) msg.textContent = approved ? "Approved." : "Rejected.";
-  await renderInvoices();
-  await renderOverview();
-}
-
-async function openInvoicePreview(filePath) {
-  const el = $("invoicePreview");
-  if (!el) return;
-
-  if (!filePath) {
-    el.textContent = "No invoice selected.";
-    return;
-  }
-
-  const { data, error } = await supabase.storage.from(INVOICE_BUCKET).createSignedUrl(filePath, 60 * 10);
-  if (error || !data?.signedUrl) {
-    el.innerHTML = `<div class="muted">Could not open invoice: ${escapeHTML(error?.message || "Unknown error")}</div>`;
-    return;
-  }
-
-  el.innerHTML = `<a class="btn btn--ghost" href="${data.signedUrl}" target="_blank" rel="noopener">Open invoice in new tab</a>
-                  <div class="muted small" style="margin-top:8px;">Link expires in 10 minutes.</div>`;
 }
 
 // ========================
@@ -954,32 +676,11 @@ async function renderConversations() {
   const filter = ($("msgFilter")?.value || "").trim();
 
   // Fetch recent messages and group in JS (simple + reliable)
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from("messages")
-    .select("id,user_id,sender,body,created_at,resolved, profiles!messages_user_id_fkey(email,full_name,customer_no)")
+    .select("id,user_id,sender,body,created_at,resolved")
     .order("created_at", { ascending: false })
     .limit(400);
-
-  // Fallback if join fails
-  if (error && /profiles/i.test(error.message || "")) {
-    const fallback = await supabase
-      .from("messages")
-      .select("id,user_id,sender,body,created_at,resolved")
-      .order("created_at", { ascending: false })
-      .limit(400);
-
-    data = fallback.data;
-    error = fallback.error;
-
-    if (!error && data?.length) {
-      const ids = [...new Set(data.map((m) => m.user_id).filter(Boolean))];
-      if (ids.length) {
-        const prof = await supabase.from("profiles").select("id,email,full_name,customer_no").in("id", ids);
-        const map = new Map((prof.data || []).map((r) => [r.id, r]));
-        data = data.map((m) => ({ ...m, profiles: map.get(m.user_id) || null }));
-      }
-    }
-  }
 
   if (error) {
     list.innerHTML = `<div class="muted">${escapeHTML(error.message)}</div>`;
@@ -997,13 +698,7 @@ async function renderConversations() {
   if (filter === "resolved") convos = convos.filter((m) => !!m.resolved);
 
   if (q) {
-    convos = convos.filter((m) => {
-      const bodyTxt = (m.body || "").toLowerCase();
-      const email = (m.profiles?.email || "").toLowerCase();
-      const name = (m.profiles?.full_name || "").toLowerCase();
-      const acct = (m.profiles?.customer_no || "").toLowerCase();
-      return bodyTxt.includes(q) || email.includes(q) || name.includes(q) || acct.includes(q);
-    });
+    convos = convos.filter((m) => (m.body || "").toLowerCase().includes(q));
   }
 
   if (!convos.length) {
@@ -1013,35 +708,29 @@ async function renderConversations() {
 
   // Show list
   list.innerHTML = convos
-    .map((m) => {
-      const label = customerLabel(m.profiles, m.user_id);
-      return `
-        <button class="convo ${m.user_id === currentCustomer?.id ? "active" : ""}" type="button" data-uid="${escapeHTML(
-          m.user_id
-        )}">
-          <div class="row between">
-            <div><strong>${escapeHTML(label)}</strong></div>
-            <div>${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}</div>
-          </div>
-          <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
-          <div class="muted small">${new Date(m.created_at).toLocaleString()}</div>
-        </button>
-      `;
-    })
+    .map(
+      (m) => `
+    <button class="convo ${m.user_id === currentCustomer?.id ? "active" : ""}" type="button" data-uid="${escapeHTML(
+        m.user_id
+      )}">
+      <div class="row">
+        <strong>${escapeHTML(m.user_id)}</strong>
+        ${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}
+      </div>
+      <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
+      <div class="muted small">${new Date(m.created_at).toLocaleString()}</div>
+    </button>
+  `
+    )
     .join("");
 
-  // click handlers (delegate)
-  if (!list.__delegated) {
-    list.__delegated = true;
-    list.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button[data-uid]");
-      if (!btn) return;
+  list.querySelectorAll("button[data-uid]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
       const uid = btn.getAttribute("data-uid");
       await selectConversationByCustomer(uid);
     });
-  }
+  });
 }
-
 
 async function selectConversationByCustomer(userId) {
   if (!userId) return;
@@ -1049,7 +738,7 @@ async function selectConversationByCustomer(userId) {
   // Load minimal profile for header
   const prof = await supabase
     .from("profiles")
-    .select("id,email,full_name,customer_no")
+    .select("id,email,full_name")
     .eq("id", userId)
     .maybeSingle();
 
@@ -1058,7 +747,8 @@ async function selectConversationByCustomer(userId) {
     : { id: userId, email: "", full_name: "" };
 
   if ($("convoTitle")) {
-    $("convoTitle").textContent = customerLabel({ full_name: currentCustomer.full_name, email: currentCustomer.email }, currentCustomer.id);
+    $("convoTitle").textContent =
+      currentCustomer.full_name || currentCustomer.email || `Customer ${currentCustomer.id}`;
   }
 
   await renderChat();
@@ -1260,8 +950,8 @@ function setupBulkUploadIfPresent() {
 
   if (!uploadBtn) return; // feature not on this admin.html yet
 
-  const template = `tracking,customer_email,status,store,notes
-1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,Fragile
+  const template = `tracking,customer_email,status,store,approved,notes
+1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile
 `;
 
   tplBtn?.addEventListener("click", () => {
@@ -1313,6 +1003,7 @@ function setupBulkUploadIfPresent() {
         tracking: (r.tracking || "").trim(),
         status: (r.status || "RECEIVED").trim(),
         store: (r.store || "").trim() || null,
+        approved: String(r.approved || "true").toLowerCase() !== "false",
         notes: (r.notes || "").trim() || null,
         user_id: emailToId.get((r.customer_email || "").trim().toLowerCase()) || null,
       })).filter((p) => p.tracking);
