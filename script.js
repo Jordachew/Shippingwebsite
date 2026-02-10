@@ -72,26 +72,30 @@ const HOURS_TEXT =
 // SHIPPING ADDRESS (U.S. WAREHOUSE)
 // ========================
 const WAREHOUSE_ADDRESS_LINES = [
-  "SNS-JM",
-  "8465 W 44th Ave",
-  "STE119, SNS-JM2 43935 KIN",
-  "Hialeah, FL 33018"
+  "3706 NW 16th Street",
+  "Lauderhill, Florida 33311"
 ];
 
-function buildShipToText(customerName){
-  const nameLine = (customerName || "Customer").trim();
+function getFirstNameFromProfile(profile, fallbackEmail){
+  const full = (profile?.full_name || "").trim();
+  if(full) return full.split(/\s+/)[0];
+  const em = (fallbackEmail || "").trim();
+  return em ? em.split("@")[0] : "Customer";
+}
+
+function buildShipToText(profile, fallbackEmail){
+  const first = getFirstNameFromProfile(profile, fallbackEmail);
+  const acct = (profile?.customer_no || "SNS-JMXXXX").trim();
   return [
-    nameLine,
+    `${first} — ${acct}`,
     ...WAREHOUSE_ADDRESS_LINES
   ].join("\n");
 }
 
-function renderShipTo(customerName){
+function renderShipTo(profile, fallbackEmail){
   const el = $("shipToBlock");
   if(!el) return;
-  const txt = buildShipToText(customerName);
-  // Show as formatted block
-  el.textContent = txt;
+  el.textContent = buildShipToText(profile, fallbackEmail);
 }
 
 function setupShipToCopy(){
@@ -100,8 +104,9 @@ function setupShipToCopy(){
   if(!btn) return;
   btn.addEventListener("click", async () => {
     try{
-      const customerName = ($("userName")?.textContent || "Customer").trim();
-      const txt = buildShipToText(customerName);
+      const profile = window.__LAST_PROFILE__ || null;
+      const email = window.__LAST_EMAIL__ || "";
+      const txt = buildShipToText(profile, email);
       await navigator.clipboard.writeText(txt);
       if(msg) msg.textContent = "Copied.";
       setTimeout(()=>{ if(msg) msg.textContent=""; }, 2000);
@@ -110,6 +115,7 @@ function setupShipToCopy(){
     }
   });
 }
+
 
 // ========================
 // CUSTOMER CHAT VISIBILITY FIX (WHITE TEXT)
@@ -285,10 +291,23 @@ async function ensureProfile({ full_name, phone } = {}) {
     phone: phone || "",
   });
 
-  if (upsertRes.error) {
-    console.error("PROFILE UPSERT ERROR:", upsertRes.error);
-    return { ok: false, error: upsertRes.error };
+// If your profiles table doesn't have phone yet, retry without it.
+if (upsertRes.error) {
+  const msg = String(upsertRes.error.message || "");
+  if (msg.toLowerCase().includes("phone") && msg.toLowerCase().includes("does not exist")) {
+    console.warn("profiles.phone missing — retrying upsert without phone");
+    upsertRes = await supabase.from("profiles").upsert({
+      id: user.id,
+      email: user.email,
+      full_name: full_name || "",
+    });
   }
+}
+
+if (upsertRes.error) {
+  console.error("PROFILE UPSERT ERROR:", upsertRes.error);
+  return { ok: false, error: upsertRes.error };
+}
 
   const read2 = await supabase
     .from("profiles")
@@ -841,17 +860,27 @@ async function renderAuth() {
 
     const profRes = await supabase
       .from("profiles")
-      .select("full_name,role")
+      .select("full_name,role,customer_no")
       .eq("id", user.id)
       .maybeSingle();
 
     if (profRes.error) console.error("PROFILE READ (renderAuth) ERROR:", profRes.error);
 
     const profile = profRes.data;
-    const displayName = profile?.full_name || user.email || "Customer";
-    if ($("userName")) $("userName").textContent = displayName;
 
-    renderShipTo(displayName);
+// cache for copy-to-clipboard + other UI helpers
+window.__LAST_PROFILE__ = profile || null;
+window.__LAST_EMAIL__ = user.email || "";
+
+const firstName = (profile?.full_name || "").trim()
+  ? profile.full_name.trim().split(/\s+/)[0]
+  : (user.email ? user.email.split("@")[0] : "Customer");
+
+const label = `${firstName} — ${user.email || ""}`.trim();
+if ($("userName")) $("userName").textContent = label;
+
+// Shipping address block uses SNS-JMXXXX from profile.customer_no
+renderShipTo(profile, user.email);
 
     const role = profile?.role || "customer";
     const isStaff = role === "staff" || role === "admin";
