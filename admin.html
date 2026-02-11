@@ -2,153 +2,378 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sueños Admin — Dashboard</title>
-  <meta name="robots" content="noindex,nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sueños Shipping — Staff Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
+  <meta name="theme-color" content="#ffffff" />
+
+  <style>
+    /* ADMIN CHAT OVERRIDE */
+    body.admin-page #adminChatBody,
+    body.admin-page #adminChatBody * {
+      color: #111 !important;
+    }
+    body.admin-page #adminChatInput {
+      color:#111 !important;
+      background:#fff !important;
+    }
+  </style>
+
 </head>
-<body>
-  <header class="header">
-    <div class="container header__inner">
-      <a class="brand" href="/#portal" aria-label="Back to portal">
-        <img class="brand__logo" src="assets/logo.jpeg" alt="Sueños Shipping logo" />
-        <div class="brand__text">
-          <div class="brand__name">Sueños Admin</div>
-          <div class="brand__tag">Staff Dashboard</div>
-        </div>
+<body class="bg admin-page">
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="index.html">
+        <span class="brand__mark">Sueños</span>
+        <span class="brand__sub">Shipping • Staff</span>
       </a>
-
-      <nav class="nav" id="nav">
-        <a href="#packages">Packages</a>
-        <a href="#invoices">Invoices</a>
-        <a href="#messages">Messages</a>
-      </nav>
-
-      <button class="navToggle" id="navToggle" aria-label="Toggle menu" type="button">☰</button>
+      <div class="topbar__actions">
+        <span id="whoami" class="muted small"></span>
+        <a class="btn btn--ghost" href="index.html">Customer Site</a>
+        <button id="logoutBtn" class="btn btn--ghost hidden" type="button">Log out</button>
+      </div>
     </div>
   </header>
 
-  <main class="container section">
-    <div class="card" id="authCard">
+  <main class="container">
+    <!-- LOGIN -->
+    <section id="adminLoginCard" class="card card--tight">
       <div class="card__head">
-        <h2 class="m0">Admin Login</h2>
-        <div class="muted small">Staff/Admin accounts only.</div>
+        <h1 class="h2">Staff sign in</h1>
+        <p class="muted">Use your staff email and password.</p>
       </div>
-
-      <form class="form" id="adminLoginForm">
-        <label>Email <input id="adminEmail" type="email" required /></label>
-        <label>Password <input id="adminPassword" type="password" minlength="8" required /></label>
-        <button class="btn btn--primary" type="submit">Sign in</button>
-        <div class="alert muted small" id="authMsg" role="status"></div>
+      <form id="adminLoginForm" class="form">
+        <div class="grid2">
+          <label class="field">
+            <span>Email</span>
+            <input id="adminEmail" type="email" autocomplete="email" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="adminPassword" type="password" autocomplete="current-password" required />
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn" type="submit">Sign in</button>
+          <span id="adminLoginMsg" class="muted"></span>
+        </div>
+        <div class="muted small">
+          Not staff yet? Log in on the customer site once so your profile row exists, then set your role to <code>staff</code> or <code>admin</code> in Supabase.
+        </div>
       </form>
-    </div>
+    </section>
 
-    <div class="card hidden" id="adminApp">
-      <div class="dashHead">
-        <div>
-          <h3 class="m0">Dashboard</h3>
-          <div class="muted small" id="whoami">—</div>
-        </div>
-        <div class="dashHead__actions">
-          <button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
-        </div>
+    <!-- DASHBOARD -->
+    <section id="adminApp" class="hidden">
+      <div class="dash__hero">
+        <h1 class="h2">Dashboard</h1>
+        <p class="muted">Manage customers, packages, invoices, and support.</p>
       </div>
 
-      <div class="grid3" id="statsRow">
-        <div class="stat">
-          <div class="stat__label">In Transit</div>
-          <div class="stat__value" id="statInTransit">—</div>
-        </div>
-        <div class="stat">
-          <div class="stat__label">Ready for Pickup</div>
-          <div class="stat__value" id="statReady">—</div>
-        </div>
-        <div class="stat">
-          <div class="stat__label">Delivered</div>
-          <div class="stat__value" id="statDelivered">—</div>
-        </div>
+      <div class="stats" id="statsRow">
+        <!-- populated by JS -->
       </div>
 
-      <hr class="hr" />
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab active" data-tab="overview" type="button">Overview</button>
+        <button class="tab" data-tab="customers" type="button">Customers</button>
+        <button class="tab" data-tab="packages" type="button">Packages</button>
+        <button class="tab" data-tab="messages" type="button">Messages</button>
+        <button class="tab" data-tab="reports" type="button">Reports</button>
+        <button class="tab" data-tab="roles" type="button">Roles</button>
+      </nav>
 
-      <section id="customers" class="sectionSm">
-        <h3 class="m0">Customer Search</h3>
-        <form class="formRow" id="findForm">
-          <input id="custEmail" type="text" placeholder="Search by email or SNS-JMXXXX" required />
-          <button class="btn btn--primary" type="submit">Find</button>
-        </form>
-        <div class="alert muted small" id="findMsg"></div>
-        <div class="muted small">Selected customer: <strong id="custId">—</strong></div>
-      </section>
-
-      <hr class="hr" />
-
-      <section id="packages" class="sectionSm">
-        <div class="rowBetween">
-          <h3 class="m0">Packages</h3>
-          <input id="pkgSearch" class="input" placeholder="Search tracking / status / store" />
-        </div>
-
-        <div class="tableWrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Tracking</th>
-                <th>Status</th>
-                <th>Pickup</th>
-                <th>Updated</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="pkgBody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="pkgEdit" class="sectionSm">
-        <h3 class="m0">Edit Package</h3>
-        <form class="form" id="updateForm">
-          <label>Tracking <input id="mTitle" type="text" readonly /></label>
-          <label>Status <input id="mStatus" type="text" /></label>
-          <label>Notes <textarea id="mNotes" rows="3"></textarea></label>
-          <button class="btn btn--primary" type="submit">Save</button>
-          <div class="alert muted small" id="updateMsg"></div>
-        </form>
-      </section>
-
-      <hr class="hr" />
-
-      <section id="invoices" class="sectionSm">
-        <h3 class="m0">Invoice Approvals</h3>
-        <div class="muted small">Approve invoices uploaded by customers.</div>
-        <ul class="list" id="invoiceList"></ul>
-      </section>
-
-      <hr class="hr" />
-
-      <section id="messages" class="sectionSm">
-        <div class="rowBetween">
-          <h3 class="m0">Messages</h3>
-          <div class="muted small">Realtime for selected customer.</div>
-        </div>
-
-        <div class="chatWidget chatWidget--static">
-          <div class="chatHead">
-            <div class="chatTitle">Support chat</div>
-            <div class="chatHours muted small" id="chatHoursText"></div>
+      <!-- OVERVIEW -->
+      <section class="panel" id="tab-overview">
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head">
+              <h2 class="h3">Recent activity</h2>
+              <p class="muted small">Latest packages updated and newest messages.</p>
+            </div>
+            <div class="card__body">
+              <div class="split">
+                <div>
+                  <div class="muted small">Recent packages</div>
+                  <ul id="recentPackages" class="list"></ul>
+                </div>
+                <div>
+                  <div class="muted small">Newest messages</div>
+                  <ul id="recentMessages" class="list"></ul>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="chatBody" id="chatBody"></div>
-          <form class="chatForm" id="chatForm">
-            <input class="chatInput" id="chatInput" placeholder="Type your reply…" />
-            <button class="btn btn--primary" type="submit">Send</button>
-          </form>
-          <div class="alert muted small" id="chatMsg"></div>
+
+          <div class="card">
+            <div class="card__head">
+              <h2 class="h3">Quick actions</h2>
+              <p class="muted small">Common admin tasks.</p>
+            </div>
+            <div class="card__body">
+              <div class="stack">
+                <button id="goPackagesBtn" class="btn btn--ghost" type="button">Update a package status</button>
+                <button id="goMessagesBtn" class="btn btn--ghost" type="button">Reply to a customer message</button>
+                <button id="exportPackagesBtn" class="btn btn--ghost" type="button">Export packages (CSV)</button>
+              </div>
+              <div id="quickMsg" class="muted small"></div>
+            </div>
+          </div>
         </div>
       </section>
-    </div>
+
+      <!-- CUSTOMERS -->
+      <section class="panel hidden" id="tab-customers">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Customers</h2>
+            <p class="muted small">View profiles, deactivate accounts, and review history.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="custSearch" class="input" placeholder="Search name / email / phone" />
+            <button id="refreshCustomers" class="btn btn--ghost" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__body">
+            <div class="tableWrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="customersBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h3 class="h3">Customer details</h3>
+            <p class="muted small">Select a customer from the list above.</p>
+          </div>
+          <div class="card__body">
+            <div id="customerDetail" class="muted">No customer selected.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PACKAGES -->
+      <section class="panel hidden" id="tab-packages">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Packages</h2>
+            <p class="muted small">Approve, edit, assign, update status, and attach photos/invoices.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="pkgSearch" class="input" placeholder="Search tracking / status / customer" />
+            <select id="statusFilter" class="input">
+              <option value="">All statuses</option>
+              <option>RECEIVED</option>
+              <option>IN_TRANSIT</option>
+              <option>ARRIVED_JA</option>
+              <option>READY_FOR_PICKUP</option>
+              <option>PICKED_UP</option>
+              <option>ON_HOLD</option>
+            </select>
+            <button id="refreshPackages" class="btn btn--ghost" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__body">
+            <div class="tableWrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Tracking</th><th>Status</th><th>Approved</th><th>Customer</th><th>Store</th><th>Updated</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="packagesBody"></tbody>
+              </table>
+            </div>
+            <div id="pkgMsg" class="muted small"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h3 class="h3">Edit package</h3>
+            <p class="muted small">Select a package to edit.</p>
+          </div>
+          <div class="card__body">
+            <form id="pkgEditForm" class="form">
+              <input type="hidden" id="pkgEditId" />
+              <div class="grid2">
+                <label class="field"><span>Tracking</span><input id="pkgEditTracking" required /></label>
+                <label class="field">
+                  <span>Status</span>
+                  <select id="pkgEditStatus" class="input">
+                    <option>RECEIVED</option>
+                    <option>IN_TRANSIT</option>
+                    <option>ARRIVED_JA</option>
+                    <option>READY_FOR_PICKUP</option>
+                    <option>PICKED_UP</option>
+                    <option>ON_HOLD</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="grid2">
+                <label class="field"><span>Store</span><input id="pkgEditStore" placeholder="Amazon / Shein / Temu" /></label>
+                <label class="field"><span>Approved</span>
+                  <select id="pkgEditApproved" class="input">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Notes</span>
+                <textarea id="pkgEditNotes" rows="3" placeholder="Internal notes (optional)"></textarea>
+              </label>
+
+              <div class="grid2">
+                <label class="field">
+                  <span>Upload package photo (optional)</span>
+                  <input id="pkgPhotoFile" type="file" accept="image/*" />
+                </label>
+                <label class="field">
+                  <span>Upload invoice (optional)</span>
+                  <input id="pkgInvoiceFile" type="file" accept=".pdf,.jpg,.jpeg,.docx,.xls,.xlsx" />
+                </label>
+              </div>
+
+              <div class="row">
+                <button class="btn" type="submit">Save changes</button>
+                <span id="pkgEditMsg" class="muted"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- MESSAGES -->
+      <section class="panel hidden" id="tab-messages">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Messages</h2>
+            <p class="muted small">Reply to customers and mark issues resolved.</p>
+          </div>
+          <div class="panel__actions">
+            <input id="msgSearch" class="input" placeholder="Search customer / message text" />
+            <select id="msgFilter" class="input">
+              <option value="open">Open only</option>
+              <option value="all">All</option>
+            </select>
+            <button id="refreshMessages" class="btn btn--ghost" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head">
+              <h3 class="h3">Conversations</h3>
+              <p class="muted small">Select a customer.</p>
+            </div>
+            <div class="card__body">
+              <ul id="convoList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <h3 class="h3">Chat</h3>
+              <p id="convoTitle" class="muted small">No conversation selected.</p>
+            </div>
+            <div class="card__body">
+              <div id="adminChatBody" class="chatBody"></div>
+
+              <form id="adminChatForm" class="row">
+                <input id="adminChatInput" class="input" placeholder="Type a reply…" />
+                <button class="btn" type="submit">Send</button>
+              </form>
+
+              <div class="row">
+                <button id="markResolvedBtn" class="btn btn--ghost" type="button">Mark resolved</button>
+                <span id="adminChatMsg" class="muted small"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section class="panel hidden" id="tab-reports">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Reports</h2>
+            <p class="muted small">Shipments by week/month and popular stores. Export CSV.</p>
+          </div>
+          <div class="panel__actions">
+            <select id="reportRange" class="input">
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">Last 12 months</option>
+            </select>
+            <button id="runReports" class="btn btn--ghost" type="button">Run</button>
+            <button id="exportReports" class="btn btn--ghost" type="button">Export CSV</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="card__head"><h3 class="h3">Shipments over time</h3></div>
+            <div class="card__body"><div id="shipmentsChart" class="muted small">Run reports to view.</div></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><h3 class="h3">Popular stores</h3></div>
+            <div class="card__body"><div id="storesChart" class="muted small">Run reports to view.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROLES -->
+      <section class="panel hidden" id="tab-roles">
+        <div class="panel__top">
+          <div>
+            <h2 class="h3">Roles & security</h2>
+            <p class="muted small">Admin can add staff, set permissions, and deactivate accounts.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head"><h3 class="h3">Promote user to staff/admin</h3></div>
+          <div class="card__body">
+            <form id="roleForm" class="form">
+              <div class="grid2">
+                <label class="field"><span>User email</span><input id="roleEmail" type="email" required /></label>
+                <label class="field">
+                  <span>Role</span>
+                  <select id="roleValue" class="input">
+                    <option value="staff">staff</option>
+                    <option value="admin">admin</option>
+                    <option value="customer">customer</option>
+                  </select>
+                </label>
+              </div>
+              <div class="row">
+                <button class="btn" type="submit">Update role</button>
+                <span id="roleMsg" class="muted"></span>
+              </div>
+              <div class="muted small">Only admins can change roles.</div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script defer src="admin.js"></script>
+  <script src="admin.js"></script>
 </body>
 </html>
