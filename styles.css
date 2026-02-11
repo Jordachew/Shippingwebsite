@@ -444,18 +444,110 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
 .tabs { position: relative; z-index: 6; }
 .tab { position: relative; z-index: 7; pointer-events: auto; }
 
-
-/* --- Shipping address block --- */
-.shiptoCard .shiptoBlock{
-  margin: .75rem 0;
-  padding: .9rem 1rem;
-  border: 1px dashed var(--line);
-  background: rgba(255,255,255,.03);
-  border-radius: 14px;
-  color: var(--text);
-  white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: .95rem;
-  line-height: 1.35;
+/* -----------------------------
+   Added: Logo + ship-to block + admin UI helpers
+------------------------------*/
+.brand__logo{
+  width:48px;
+  height:48px;
+  object-fit:cover;
+  border-radius:14px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.35);
 }
 
+.shipTo{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid var(--line2);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,.03);
+}
+.shipTo__title{
+  font-weight:700;
+  margin-bottom:8px;
+}
+.shipTo__box{
+  white-space:pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background: rgba(0,0,0,.22);
+  color: var(--text);
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  padding: 12px;
+  margin: 0;
+}
+.shipTo__copy{ margin-top:10px; }
+.shipTo__note{ margin-top:8px; }
+
+/* Admin helpers */
+.grid3{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 860px){
+  .grid3{ grid-template-columns: 1fr; }
+}
+.stat{
+  padding: 14px;
+  border:1px solid var(--line2);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,.03);
+}
+.stat__label{ color: var(--muted); font-size: 13px; }
+.stat__value{ font-size: 26px; font-weight: 800; margin-top: 6px; }
+
+.hr{
+  border:0;
+  border-top:1px solid var(--line2);
+  margin: 18px 0;
+}
+.sectionSm{ margin-top: 18px; }
+
+.rowBetween{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom: 10px;
+}
+
+.formRow{
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+}
+.formRow input{
+  flex:1;
+}
+
+.input{
+  width: 320px;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line2);
+  background: rgba(0,0,0,.18);
+  color: var(--text);
+}
+
+.list{ list-style:none; padding:0; margin: 12px 0 0; }
+.list__item{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,.03);
+  margin-bottom: 10px;
+}
+.list__actions{ display:flex; gap:8px; align-items:center; }
+
+/* Chat input: ensure visible on dark bg */
+.chatInput{
+  background: rgba(0,0,0,.22) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--line2) !important;
+}
