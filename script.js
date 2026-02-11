@@ -1,162 +1,109 @@
-// ========================
-// CONFIG (PASTE YOUR VALUES)
-// ========================
+
+/* ============================================================
+   Sueños Shipping — Customer Portal script.js (Fresh, Stable)
+   - Fixes: "supabase already declared", "supabase undefined/auth"
+   - Uses global singleton: window.__SB__
+   - Uses sb everywhere (NOT const supabase)
+   - Safe profile read: eq("id", user.id).maybeSingle()
+   - Shows: FirstName — Email + SNS-JMXXXX shipping address header
+   ============================================================ */
+
+/* -------------------------
+   1) SUPABASE INIT (SINGLETON)
+   ------------------------- */
 const SUPABASE_URL = "https://ykpcgcjudotzakaxgnxh.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrcGNnY2p1ZG90emFrYXhnbnhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTQ5ODMsImV4cCI6MjA4NTc5MDk4M30.PPh1QMU-eUI7N7dy0W5gzqcvSod2hKALItM7cyT0Gt8";
 
-// Safe singleton (prevents "already declared" + multi-load issues)
-window.__SB__ = window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const supabase = window.__SB__;
-
-// Storage buckets
-const INVOICE_BUCKET = "invoices";
-
-// Warehouse address (UPDATED)
-const WAREHOUSE_ADDRESS_LINES = [
-  "3706 NW 16th Street",
-  "Lauderhill, Florida 33311"
-];
-
-// ========================
-// RATES (EDIT)
-// ========================
-const rates = [
-  { lbs: 1, jmd: 400 },
-  { lbs: 2, jmd: 750 },
-  { lbs: 3, jmd: 1050 },
-  { lbs: 4, jmd: 1350 },
-  { lbs: 5, jmd: 1600 },
-  { lbs: 6, jmd: 1950 },
-  { lbs: 7, jmd: 2150 },
-  { lbs: 8, jmd: 2350 },
-  { lbs: 9, jmd: 2600 },
-  { lbs: 10, jmd: 2950 }
-];
-const fixedFeeJMD = 500;
-
-// ========================
-// HELPERS
-// ========================
-function $(id){ return document.getElementById(id); }
-
-function escapeHTML(s){
-  return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+// IMPORTANT: ensure supabase-js is loaded BEFORE this script:
+// <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// <script defer src="script.js"></script>
+if (!window.supabase) {
+  throw new Error(
+    "Supabase library not loaded. Ensure the supabase-js <script> tag is included BEFORE script.js."
+  );
 }
 
-function formatJMD(n){
+// Global singleton to prevent "Identifier already declared"
+window.__SB__ =
+  window.__SB__ || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Use sb everywhere
+const sb = window.__SB__;
+
+/* -------------------------
+   2) CONFIG
+   ------------------------- */
+const INVOICE_BUCKET = "invoices";
+const CHAT_BUCKET = "chat_files";
+
+// Business hours note
+const HOURS_TEXT =
+  "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
+
+// Warehouse address (updated)
+const WAREHOUSE_ADDRESS_LINES = [
+  "3706 NW 16th Street",
+  "Lauderhill, Florida 33311",
+];
+
+// Calculator base pricing (edit anytime)
+const fixedFeeJMD = 500;
+const rates = [
+  { lbs: 1, jmd: 500 },
+  { lbs: 2, jmd: 850 },
+  { lbs: 3, jmd: 1250 },
+  { lbs: 4, jmd: 1550 },
+  { lbs: 5, jmd: 1900 },
+  { lbs: 6, jmd: 2250 },
+  { lbs: 7, jmd: 2600 },
+  { lbs: 8, jmd: 2950 },
+  { lbs: 9, jmd: 3300 },
+  { lbs: 10, jmd: 3650 },
+];
+
+function $(id) {
+  return document.getElementById(id);
+}
+function escapeHTML(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+function formatJMD(n) {
   return new Intl.NumberFormat("en-JM", {
     style: "currency",
     currency: "JMD",
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(Number(n || 0));
 }
-
-function firstNameFrom(fullName, email){
-  const name = (fullName || "").trim();
-  if(name) return name.split(/\s+/)[0];
-  const e = (email || "").trim();
-  if(!e) return "Customer";
-  return e.split("@")[0] || "Customer";
+function pickupLabel(v) {
+  return v === "RHODEN_HALL_CLARENDON"
+    ? "Rhoden Hall District, Clarendon"
+    : "UWI, Kingston";
 }
 
-function setYear(){
-  const y = $("year");
-  if(y) y.textContent = new Date().getFullYear();
-}
-
-// ========================
-// SHIPPING ADDRESS (Account # + Address)
-// ========================
-function buildShipToText(profile, email){
-  const first = firstNameFrom(profile?.full_name, email);
-  const acct = (profile?.customer_no || "SNS-JMXXXX").trim();
-  return [
-    `${first} — ${acct}`,
-    ...WAREHOUSE_ADDRESS_LINES
-  ].join("\n");
-}
-
-function renderShipTo(profile, email){
-  const block = $("shipToBlock");
-  const badge = $("accountBadge");
-  if(block) block.textContent = buildShipToText(profile, email);
-
-  if(badge){
-    const acct = profile?.customer_no ? `Account #: ${profile.customer_no}` : "";
-    badge.textContent = acct;
-  }
-}
-
-async function copyShipTo(){
-  const block = $("shipToBlock");
-  if(!block) return;
-  try{
-    await navigator.clipboard.writeText(block.textContent || "");
-    const btn = $("copyShipTo");
-    if(btn){
-      const old = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(()=>{ btn.textContent = old; }, 900);
-    }
-  }catch(_){
-    alert("Copy failed. Please select and copy manually.");
-  }
-}
-
-// ========================
-// CALCULATOR
-// ========================
-function findRateForWeight(weightLbs){
-  const rounded = Math.ceil(weightLbs);
-  const match = rates.find(r => r.lbs === rounded);
-  if(match) return { rounded, rate: match.jmd };
-
-  const last = rates[rates.length - 1];
-  const prev = rates[rates.length - 2] || last;
-  const step = Math.max(0, last.jmd - prev.jmd);
-  const extraLbs = Math.max(0, rounded - last.lbs);
-  return { rounded, rate: last.jmd + (extraLbs * step) };
-}
-
-function setupCalculator(){
-  const form = $("calcForm");
-  const result = $("result");
-  if(!form || !result) return;
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const weight = parseFloat($("weight")?.value);
-    const valueUSD = parseFloat($("value")?.value);
-
-    if(!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(valueUSD) || valueUSD < 0){
-      result.innerHTML = `<div class="result__big">—</div><div class="result__sub">Please enter valid numbers.</div>`;
-      return;
-    }
-
-    const { rounded, rate } = findRateForWeight(weight);
-    const total = rate + fixedFeeJMD;
-
-    result.innerHTML = `
-      <div class="result__big">${formatJMD(total)}</div>
-      <div class="result__sub">Weight used: <strong>${rounded} lb</strong>. Base: ${formatJMD(rate)} + Fee: ${formatJMD(fixedFeeJMD)}.</div>
-    `;
+/* -------------------------
+   3) NAV + TABS
+   ------------------------- */
+function setupMobileNav() {
+  const toggle = $("navToggle");
+  const nav = $("nav");
+  if (!toggle || !nav) return;
+  toggle.addEventListener("click", () => {
+    const open = nav.style.display === "flex";
+    nav.style.display = open ? "none" : "flex";
   });
 }
 
-// ========================
-// AUTH TABS
-// ========================
-function setupAuthTabs(){
+function setupAuthTabs() {
   const tabLogin = $("tabLogin");
   const tabRegister = $("tabRegister");
   const loginPane = $("loginPane");
   const registerPane = $("registerPane");
-  if(!tabLogin || !tabRegister || !loginPane || !registerPane) return;
+  if (!tabLogin || !tabRegister || !loginPane || !registerPane) return;
 
   const setTab = (which) => {
     const isLogin = which === "login";
@@ -170,184 +117,365 @@ function setupAuthTabs(){
   tabRegister.addEventListener("click", () => setTab("register"));
 }
 
-// ========================
-// LOGIN / REGISTER
-// ========================
-function setupLoginRegister(){
+/* -------------------------
+   4) CALCULATOR
+   ------------------------- */
+function findRateForWeight(weightLbs) {
+  const rounded = Math.ceil(weightLbs);
+  const match = rates.find((r) => r.lbs === rounded);
+  if (match) return { rounded, rate: match.jmd };
+
+  const last = rates[rates.length - 1];
+  const prev = rates[rates.length - 2] || last;
+  const step = Math.max(0, last.jmd - prev.jmd);
+  return { rounded, rate: last.jmd + (rounded - last.lbs) * step };
+}
+
+function setupCalculator() {
+  const form = $("calcForm");
+  const result = $("result");
+  if (!form || !result) return;
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const w = parseFloat($("weight")?.value);
+    const v = parseFloat($("value")?.value);
+
+    if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
+      result.innerHTML =
+        `<div class="result__big">—</div>` +
+        `<div class="result__sub">Enter valid numbers.</div>`;
+      return;
+    }
+
+    const { rounded, rate } = findRateForWeight(w);
+    const total = rate + fixedFeeJMD;
+
+    result.innerHTML = `
+      <div class="result__big">${formatJMD(total)}</div>
+      <div class="result__sub">
+        Weight used: <strong>${rounded} lb</strong>.
+        Base: ${formatJMD(rate)} + Fee: ${formatJMD(fixedFeeJMD)}.
+      </div>
+    `;
+  });
+}
+
+/* -------------------------
+   5) PROFILE + SHIPPING ADDRESS
+   ------------------------- */
+function firstNameFrom(fullName, email) {
+  const fn = (fullName || "").trim().split(/\s+/)[0];
+  if (fn) return fn;
+  const fromEmail = (email || "Customer").split("@")[0];
+  return fromEmail || "Customer";
+}
+
+function buildShipToText(profile, email) {
+  const first = firstNameFrom(profile?.full_name, email);
+  const acct = profile?.customer_no || "SNS-JMXXXX";
+
+  return [`${first} — ${acct}`, ...WAREHOUSE_ADDRESS_LINES].join("\n");
+}
+
+function renderShipTo(profile, email) {
+  const el = $("shipToBlock");
+  if (!el) return;
+  el.textContent = buildShipToText(profile, email);
+}
+
+/**
+ * ensureProfileSafe()
+ * Creates/updates a basic profiles row if missing.
+ * - Never uses .single() without filters
+ * - Avoids columns that might not exist
+ */
+async function ensureProfileSafe({ full_name, phone } = {}) {
+  const { data: uData, error: uErr } = await sb.auth.getUser();
+  if (uErr) return { ok: false, error: uErr };
+  const user = uData?.user;
+  if (!user) return { ok: false, error: new Error("Not logged in") };
+
+  // Read profile safely
+  const { data: profile, error: pErr } = await sb
+    .from("profiles")
+    .select("id,email,full_name,phone,role,customer_no")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // If exists, optionally patch missing values
+  if (!pErr && profile) {
+    const patch = {};
+    if (full_name && !profile.full_name) patch.full_name = full_name;
+    if (phone && !profile.phone) patch.phone = phone;
+
+    if (Object.keys(patch).length) {
+      await sb.from("profiles").update(patch).eq("id", user.id);
+    }
+    return { ok: true, profile };
+  }
+
+  // If missing, attempt minimal insert (avoid schema mismatches)
+  // We include full_name/phone only if your table has them; if it fails, fallback.
+  const baseRow = { id: user.id, email: user.email };
+  const attemptRow = {
+    ...baseRow,
+    full_name: full_name || "",
+    phone: phone || "",
+  };
+
+  let ins = await sb.from("profiles").insert(attemptRow);
+  if (ins.error) {
+    // fallback minimal insert
+    ins = await sb.from("profiles").insert(baseRow);
+    if (ins.error) return { ok: false, error: ins.error };
+  }
+
+  const { data: profile2, error: p2Err } = await sb
+    .from("profiles")
+    .select("id,email,full_name,phone,role,customer_no")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (p2Err) return { ok: false, error: p2Err };
+  return { ok: true, profile: profile2 || null };
+}
+
+/* -------------------------
+   6) LOGIN / REGISTER
+   ------------------------- */
+function setupLoginRegister() {
   const loginForm = $("loginForm");
   const regForm = $("registerForm");
-  const logoutBtn = $("logoutBtn");
 
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = $("loginMsg");
-    if(msg) msg.textContent = "Signing in...";
+    if (msg) msg.textContent = "Signing in...";
 
-    try{
+    try {
       const email = ($("loginEmail")?.value || "").trim().toLowerCase();
       const password = $("loginPassword")?.value || "";
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if(error){ if(msg) msg.textContent = error.message; return; }
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (msg) msg.textContent = error.message;
+        return;
+      }
 
-      if(msg) msg.textContent = "";
+      // confirm session
+      const { data: sessData, error: sessErr } = await sb.auth.getSession();
+      if (sessErr) {
+        if (msg) msg.textContent = "Session error: " + sessErr.message;
+        return;
+      }
+      if (!sessData?.session) {
+        if (msg)
+          msg.textContent =
+            "No session returned. If email confirmation is ON, confirm email then log in.";
+        return;
+      }
+
+      // ensure profile exists (safe)
+      const ensured = await ensureProfileSafe();
+      if (!ensured.ok) {
+        if (msg) msg.textContent = "Profile error: " + ensured.error.message;
+        return;
+      }
+
+      if (msg) msg.textContent = "";
       await renderAuth();
-    }catch(err){
+    } catch (err) {
       console.error(err);
-      if(msg) msg.textContent = "Sign-in failed. Please try again.";
+      if (msg)
+        msg.textContent = "Unexpected error: " + (err?.message || String(err));
     }
   });
 
   regForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = $("regMsg");
-    if(msg) msg.textContent = "Creating account...";
+    if (msg) msg.textContent = "Creating account...";
 
-    const full_name = ($("regName")?.value || "").trim();
-    const email = ($("regEmail")?.value || "").trim().toLowerCase();
-    const password = $("regPassword")?.value || "";
+    try {
+      const full_name = ($("regName")?.value || "").trim();
+      const phone = ($("regPhone")?.value || "").trim();
+      const email = ($("regEmail")?.value || "").trim().toLowerCase();
+      const password = $("regPassword")?.value || "";
 
-    try{
-      const { error } = await supabase.auth.signUp({
+      const { error } = await sb.auth.signUp({
         email,
         password,
-        options: { data: { full_name } }
+        options: { data: { full_name, phone } },
       });
 
-      if(error){ if(msg) msg.textContent = `Signup error: ${error.message}`; return; }
+      if (error) {
+        if (msg) msg.textContent = "Signup error: " + error.message;
+        return;
+      }
 
-      if(msg) msg.textContent = "Account created. Check your email (if confirmation is enabled), then log in.";
+      // If email confirmation OFF, we may have a session; if ON, they must confirm.
+      // We DON'T force profile creation here if no session exists.
+      const { data: sessData } = await sb.auth.getSession();
+      if (sessData?.session) {
+        await ensureProfileSafe({ full_name, phone });
+        if (msg) msg.textContent = "Account created. You can now log in.";
+      } else {
+        if (msg)
+          msg.textContent =
+            "Account created. Please check your email to confirm, then log in.";
+      }
+
       regForm.reset();
-    }catch(err){
+    } catch (err) {
       console.error(err);
-      if(msg) msg.textContent = "Signup failed. Please try again.";
+      if (msg)
+        msg.textContent = "Unexpected error: " + (err?.message || String(err));
     }
   });
 
-  logoutBtn?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
+  $("logoutBtn")?.addEventListener("click", async () => {
+    await sb.auth.signOut();
     await renderAuth();
   });
-
-  $("copyShipTo")?.addEventListener("click", copyShipTo);
 }
 
-// ========================
-// DATA: PACKAGES
-// ========================
-async function renderPackages(filter=""){
+/* -------------------------
+   7) PACKAGES + INVOICES
+   ------------------------- */
+async function renderPackages(filter = "") {
   const body = $("pkgBody");
-  if(!body) return;
+  if (!body) return;
 
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  const user = userData?.user;
-
-  if(userErr || !user){
-    body.innerHTML = `<tr><td colspan="3" class="muted">Please log in.</td></tr>`;
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
+  if (!user) {
+    body.innerHTML =
+      `<tr><td colspan="4" class="muted">Please log in.</td></tr>`;
     return;
   }
 
-  let q = supabase
+  let q = sb
     .from("packages")
-    .select("tracking,status,updated_at")
+    .select("tracking,status,pickup,pickup_confirmed,updated_at")
     .order("updated_at", { ascending: false });
 
-  if(filter.trim()){
+  if (filter.trim()) {
     q = q.ilike("tracking", `%${filter.trim()}%`);
   }
 
   const { data, error } = await q;
-  if(error){
-    body.innerHTML = `<tr><td colspan="3" class="muted">${escapeHTML(error.message)}</td></tr>`;
+  if (error) {
+    body.innerHTML =
+      `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    return;
+  }
+  if (!data?.length) {
+    body.innerHTML =
+      `<tr><td colspan="4" class="muted">No packages yet.</td></tr>`;
     return;
   }
 
-  if(!data?.length){
-    body.innerHTML = `<tr><td colspan="3" class="muted">No packages found.</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = data.map(p => `
+  body.innerHTML = data
+    .map(
+      (p) => `
     <tr>
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
-      <td><span class="tag">${escapeHTML(p.status || "—")}</span></td>
-      <td class="muted small">${p.updated_at ? new Date(p.updated_at).toLocaleString() : ""}</td>
+      <td><span class="tag">${escapeHTML(p.status)}</span></td>
+      <td>${escapeHTML(pickupLabel(p.pickup))}${
+        p.pickup_confirmed
+          ? ` <span class="tag">Confirmed</span>`
+          : ` <span class="tag">Pending</span>`
+      }</td>
+      <td class="muted">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-function setupPackageSearch(){
-  $("pkgSearch")?.addEventListener("input", (e)=> renderPackages(e.target.value || ""));
-  $("resetSearch")?.addEventListener("click", ()=> {
-    if($("pkgSearch")) $("pkgSearch").value = "";
-    renderPackages("");
-  });
-}
-
-// ========================
-// DATA: INVOICE UPLOADS
-// ========================
-async function renderUploads(){
+async function renderUploads() {
   const list = $("uploadsList");
-  if(!list) return;
+  if (!list) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if(!user){
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
+  if (!user) {
     list.innerHTML = `<li class="muted">Log in to see uploads.</li>`;
     return;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("invoices")
-    .select("tracking,file_name,file_type,created_at,note")
+    .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
     .order("created_at", { ascending: false })
     .limit(10);
 
-  if(error){
+  if (error) {
     list.innerHTML = `<li class="muted">${escapeHTML(error.message)}</li>`;
     return;
   }
-
-  if(!data?.length){
+  if (!data?.length) {
     list.innerHTML = `<li class="muted">No invoices uploaded yet.</li>`;
     return;
   }
 
-  list.innerHTML = data.map(i => `
+  list.innerHTML = data
+    .map(
+      (i) => `
     <li>
-      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(i.file_name || "file")}</div>
-      <div class="muted small">${i.file_type ? escapeHTML(i.file_type) : ""} • ${i.created_at ? new Date(i.created_at).toLocaleString() : ""}${i.note ? ` • ${escapeHTML(i.note)}` : ""}</div>
+      <div><strong>${escapeHTML(i.tracking)}</strong> • ${escapeHTML(
+        i.file_name
+      )} (${escapeHTML(i.file_type)})</div>
+      <div class="muted small">
+        Pickup: ${escapeHTML(pickupLabel(i.pickup))} • ${
+        i.pickup_confirmed ? "Confirmed" : "Pending confirmation"
+      } • ${new Date(i.created_at).toLocaleString()}
+        ${i.note ? ` • ${escapeHTML(i.note)}` : ""}
+      </div>
     </li>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-function setupInvoiceUpload(){
+function setupPackageSearch() {
+  $("pkgSearch")?.addEventListener("input", (e) =>
+    renderPackages(e.target.value)
+  );
+  $("resetSearch")?.addEventListener("click", () => {
+    if ($("pkgSearch")) $("pkgSearch").value = "";
+    renderPackages("");
+  });
+}
+
+function setupInvoiceUpload() {
   const form = $("invoiceForm");
-  if(!form) return;
+  if (!form) return;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = $("invMsg");
-    if(msg) msg.textContent = "Uploading...";
+    if (msg) msg.textContent = "Uploading...";
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if(!user){
-      if(msg) msg.textContent = "Please log in.";
+    const { data: uData } = await sb.auth.getUser();
+    const user = uData?.user;
+    if (!user) {
+      if (msg) msg.textContent = "Please log in.";
       return;
     }
 
     const tracking = ($("invTracking")?.value || "").trim();
+    const pickup = $("invPickup")?.value || "";
     const note = ($("invNote")?.value || "").trim();
     const fileInput = $("invFile");
 
-    if(!tracking){
-      if(msg) msg.textContent = "Tracking ID required.";
+    if (!tracking) {
+      if (msg) msg.textContent = "Tracking ID required.";
       return;
     }
-    if(!fileInput?.files?.length){
-      if(msg) msg.textContent = "Choose a file.";
+    if (!fileInput?.files?.length) {
+      if (msg) msg.textContent = "Choose a file.";
       return;
     }
 
@@ -355,184 +483,257 @@ function setupInvoiceUpload(){
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${user.id}/${tracking}/${Date.now()}_${safeName}`;
 
-    const up = await supabase.storage.from(INVOICE_BUCKET).upload(path, file, { upsert: false });
-    if(up.error){
-      if(msg) msg.textContent = up.error.message;
+    const up = await sb.storage.from(INVOICE_BUCKET).upload(path, file, {
+      upsert: false,
+    });
+    if (up.error) {
+      if (msg) msg.textContent = up.error.message;
       return;
     }
 
-    const ins = await supabase.from("invoices").insert({
+    const ins = await sb.from("invoices").insert({
       user_id: user.id,
       tracking,
+      pickup,
+      pickup_confirmed: false,
       file_path: path,
       file_name: safeName,
       file_type: file.type || "unknown",
-      note: note || null
+      note: note || null,
     });
 
-    if(ins.error){
-      if(msg) msg.textContent = ins.error.message;
+    if (ins.error) {
+      if (msg) msg.textContent = ins.error.message;
       return;
     }
 
     form.reset();
-    if(msg) msg.textContent = "Uploaded.";
+    if (msg)
+      msg.textContent =
+        "Uploaded. Pickup location will be confirmed by staff.";
     await renderUploads();
   });
 }
 
-// ========================
-// CHAT (simple)
-// ========================
+/* -------------------------
+   8) CHAT
+   ------------------------- */
 let chatChannel = null;
 
-function openChat(){
-  $("chatWidget")?.classList.remove("hidden");
-  $("chatWidget")?.setAttribute("aria-hidden","false");
-  renderChat().then(setupChatRealtime);
-}
-function closeChat(){
-  $("chatWidget")?.classList.add("hidden");
-  $("chatWidget")?.setAttribute("aria-hidden","true");
-}
-
-async function renderChat(){
+async function renderChat() {
   const body = $("chatBody");
-  if(!body) return;
+  if (!body) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if(!user){
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
+  if (!user) {
     body.innerHTML = `<div class="muted small">Log in to chat with support.</div>`;
     return;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("messages")
     .select("id,sender,body,created_at")
-    .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .limit(200);
 
-  if(error){
-    body.innerHTML = `<div class="muted small">${escapeHTML(error.message)}</div>`;
+  if (error) {
+    body.innerHTML = `<div class="muted small">${escapeHTML(
+      error.message
+    )}</div>`;
     return;
   }
 
-  body.innerHTML = (data || []).map(m => `
-    <div class="bubble ${m.sender === "customer" ? "me" : ""}">
-      <div>${escapeHTML(m.body)}</div>
-      <div class="meta">
-        <span>${m.sender === "customer" ? "You" : "Support"}</span>
-        <span>${m.created_at ? new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""}</span>
+  body.innerHTML =
+    (data?.length ? data : [])
+      .map(
+        (m) => `
+      <div class="bubble ${m.sender === "customer" ? "me" : ""}">
+        <div>${escapeHTML(m.body)}</div>
+        <div class="meta">
+          <span>${m.sender === "customer" ? "You" : "Support"}</span>
+          <span>${new Date(m.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}</span>
+        </div>
       </div>
-    </div>
-  `).join("") || `<div class="muted small">Start the conversation.</div>`;
+    `
+      )
+      .join("") ||
+    `<div class="muted small">Start the conversation. ${escapeHTML(
+      HOURS_TEXT
+    )}</div>`;
 
   body.scrollTop = body.scrollHeight;
 }
 
-async function setupChatRealtime(){
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if(!user) return;
+async function setupChatRealtime() {
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
+  if (!user) return;
 
-  if(chatChannel){
-    supabase.removeChannel(chatChannel);
+  if (chatChannel) {
+    sb.removeChannel(chatChannel);
     chatChannel = null;
   }
 
-  chatChannel = supabase
+  chatChannel = sb
     .channel(`messages:${user.id}`)
-    .on("postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${user.id}` },
-      async () => { await renderChat(); }
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `user_id=eq.${user.id}`,
+      },
+      async () => {
+        await renderChat();
+      }
     )
     .subscribe();
 }
 
-async function sendChatMessage(text){
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if(!user) return alert("Please log in to chat.");
+async function sendChatMessage(text, file) {
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
+  if (!user) return alert("Please log in to chat.");
 
-  const { error } = await supabase.from("messages").insert({
-    user_id: user.id,
-    sender: "customer",
-    body: text
-  });
+  const { data: msg, error: mErr } = await sb
+    .from("messages")
+    .insert({ user_id: user.id, sender: "customer", body: text })
+    .select("id")
+    .single();
 
-  if(error) alert(error.message);
+  if (mErr) return alert(mErr.message);
+
+  if (file) {
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${user.id}/messages/${Date.now()}_${safeName}`;
+
+    const up = await sb.storage.from(CHAT_BUCKET).upload(path, file, {
+      upsert: false,
+    });
+    if (up.error) return alert(up.error.message);
+
+    const ins = await sb.from("message_attachments").insert({
+      message_id: msg.id,
+      user_id: user.id,
+      file_path: path,
+      file_name: safeName,
+      file_type: file.type || "unknown",
+    });
+
+    if (ins.error) return alert(ins.error.message);
+  }
 }
 
-function setupChatUI(){
+function openChat() {
+  $("chatWidget")?.classList.remove("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "false");
+  if ($("chatHoursText")) $("chatHoursText").textContent = HOURS_TEXT;
+  renderChat().then(setupChatRealtime);
+}
+function closeChat() {
+  $("chatWidget")?.classList.add("hidden");
+  $("chatWidget")?.setAttribute("aria-hidden", "true");
+}
+
+function setupChatUI() {
   $("chatFab")?.addEventListener("click", openChat);
+  $("openChatTop")?.addEventListener("click", openChat);
+  $("openChatCalc")?.addEventListener("click", openChat);
+  $("openChatDash")?.addEventListener("click", openChat);
+  $("openChatContact")?.addEventListener("click", openChat);
   $("closeChat")?.addEventListener("click", closeChat);
 
   $("chatForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("chatInput");
+    const file = $("chatFile")?.files?.[0] || null;
+    const msgEl = $("chatMsg");
+
     const text = (input?.value || "").trim();
-    if(!text) return;
-    if(input) input.value = "";
-    await sendChatMessage(text);
+    if (!text && !file) {
+      if (msgEl) msgEl.textContent = "Type a message or attach a file.";
+      return;
+    }
+
+    if (msgEl) msgEl.textContent = "Sending...";
+    if (input) input.value = "";
+    if ($("chatFile")) $("chatFile").value = "";
+
+    await sendChatMessage(text || "(Attachment)", file);
+    if (msgEl) msgEl.textContent = "";
   });
 }
 
-// ========================
-// AUTH RENDER
-// ========================
-async function renderAuth(){
+/* -------------------------
+   9) AUTH RENDER
+   ------------------------- */
+async function renderAuth() {
   const loginCard = $("loginCard");
   const dashCard = $("dashCard");
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const { data: uData } = await sb.auth.getUser();
+  const user = uData?.user;
   const authed = !!user;
 
-  if(loginCard) loginCard.classList.toggle("hidden", authed);
-  if(dashCard) dashCard.classList.toggle("hidden", !authed);
+  if (loginCard) loginCard.classList.toggle("hidden", authed);
+  if (dashCard) dashCard.classList.toggle("hidden", !authed);
 
-  if(!authed){
-    if($("adminLink")) $("adminLink").style.display = "none";
-    if($("userName")) $("userName").textContent = "Customer";
-    if(chatChannel){ supabase.removeChannel(chatChannel); chatChannel = null; }
+  if (!authed) {
+    if ($("adminLink")) $("adminLink").style.display = "none";
+    if (chatChannel) {
+      sb.removeChannel(chatChannel);
+      chatChannel = null;
+    }
     return;
   }
 
-  // Pull profile for this user only
-  const { data: profile, error: profErr } = await supabase
+  // Ensure profile exists safely
+  const ensured = await ensureProfileSafe();
+  if (!ensured.ok) {
+    console.warn("PROFILE ensure error:", ensured.error);
+  }
+
+  // Read profile for display + customer_no
+  const { data: profile, error: pErr } = await sb
     .from("profiles")
     .select("full_name,role,customer_no")
     .eq("id", user.id)
     .maybeSingle();
 
-  if(profErr){
-    console.warn("PROFILE READ ERROR:", profErr);
-  }
+  const displayName =
+    (!pErr && profile?.full_name)
+      ? profile.full_name
+      : (user.email || "Customer");
 
+  // Show "FirstName — Email" if there is a #userName element
   const first = firstNameFrom(profile?.full_name, user.email);
-  if($("userName")) $("userName").textContent = `${first} — ${user.email}`;
+  if ($("userName")) $("userName").textContent = `${first} — ${user.email}`;
 
-  // admin link visible if staff/admin
-  const role = (profile?.role || "").toLowerCase();
-  if($("adminLink")) $("adminLink").style.display = (role === "staff" || role === "admin") ? "inline-flex" : "none";
-
+  // Shipping address block (FirstName — SNS-JMXXXX)
   renderShipTo(profile, user.email);
+
+  // Show admin link if staff
+  const isStaff = (!pErr && profile?.role === "staff") || (!pErr && profile?.role === "admin");
+  if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
   await renderPackages("");
   await renderUploads();
 }
 
-supabase.auth.onAuthStateChange(async () => {
+sb.auth.onAuthStateChange(async () => {
   await renderAuth();
 });
 
-// ========================
-// INIT
-// ========================
-function init(){
-  setYear();
+/* -------------------------
+   10) INIT
+   ------------------------- */
+function init() {
+  setupMobileNav();
   setupAuthTabs();
   setupCalculator();
   setupLoginRegister();
