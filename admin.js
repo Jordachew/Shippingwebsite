@@ -590,7 +590,7 @@ function fillPackageEditor(pkg) {
   if ($("pkgEditTracking")) $("pkgEditTracking").value = pkg.tracking || "";
   if ($("pkgEditStatus")) $("pkgEditStatus").value = pkg.status || "";
   if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
-  if (if ($("pkgEditApproved")) $("pkgEditApproved").value = (pkg.approved ? "true" : "false");
+  if ($("pkgEditApproved")) $("pkgEditApproved").value = (pkg.approved ? "true" : "false");
   if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
   if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
 }
