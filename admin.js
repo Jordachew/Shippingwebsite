@@ -1083,7 +1083,7 @@ SNS-JM0001,1Z999AA10123456785,In Transit,RHODEN_HALL_CLARENDON,1.2,2250,,Shein
       console.error(err);
     }
   });
-}}
+}
 
 // ========================
 // INIT

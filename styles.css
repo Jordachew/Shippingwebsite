@@ -866,3 +866,54 @@ input[type="file"]::-webkit-file-upload-button{
   margin-right: 10px;
   cursor: pointer;
 }
+
+
+
+/* ===== v6 UI fixes ===== */
+.dashBrand{ display:flex; align-items:center; }
+.dashLogo{ height: 86px !important; width: auto !important; display:block; object-fit:contain; }
+@media (max-width: 680px){ .dashLogo{ height: 72px !important; } }
+
+/* Fix any light surfaces inheriting white text */
+.light-surface, .bg-light, .card--pad.bg-light{
+  background: rgba(255,255,255,.85) !important;
+  color: #111 !important;
+}
+.light-surface *, .bg-light *{ color:#111 !important; }
+input[style*="background"], .field input, .field select, .field textarea{
+  color: var(--text) !important;
+}
+
+/* Variety Store preview panel in dashboard */
+.storePreview__grid{
+  display:grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.storePreview__item{
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  border-radius: 14px;
+  padding: 12px;
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  color: var(--text);
+  font-weight: 800;
+}
+
+/* Landing page calculator: estimate under form, rate chart beside */
+.grid2--calc{
+  align-items: start;
+}
+.calcLeft{
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+.calcRates{
+  height: 100%;
+}
+.calcRates .ratesList{
+  margin-top: 10px;
+}

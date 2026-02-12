@@ -135,31 +135,36 @@
       <p>Estimate shipping cost by weight and optional fees.</p>
     </div>
 
-    <div class="grid2">
-      <form class="form card card--pad" id="calcForm">
-        <label>Weight (lbs) <span class="req">*</span>
-          <input id="weight" type="number" step="0.1" min="0.1" required/>
-        </label>
-        <label>Declared Value (USD) <span class="req">*</span>
-          <input id="value" type="number" step="0.01" min="0" required/>
-        </label>
-        <button class="btn btn--primary" type="submit">Calculate</button>
-        <p class="muted small">Estimate only. Final cost may change based on duties/handling.</p>
-      </form>
+    <div class="grid2 grid2--calc">
+      <div class="calcLeft">
+        <form class="form card card--pad" id="calcForm">
+          <label>Weight (lbs) <span class="req">*</span>
+            <input id="weight" type="number" step="0.1" min="0.1" required/>
+          </label>
+          <label>Declared Value (USD) <span class="req">*</span>
+            <input id="value" type="number" step="0.01" min="0" required/>
+          </label>
+          <button class="btn btn--primary" type="submit">Calculate</button>
+          <p class="muted small">Estimate only. Final cost may change based on duties/handling.</p>
+        </form>
 
-      <div class="card card--pad">
-        <h3>Estimate</h3>
-        <div id="result">
-          <div class="result__big">—</div>
-          <div class="result__sub">Enter weight and value to calculate.</div>
+        <div class="card card--pad calcEstimate">
+          <h3>Estimate</h3>
+          <div id="result">
+            <div class="result__big">—</div>
+            <div class="result__sub">Enter weight and value to calculate.</div>
+          </div>
+          <div class="divider"></div>
+          <button class="btn btn--ghost" id="openChatCalc" type="button">Ask a question</button>
         </div>
-        <div class="divider"></div>
-        <button class="btn btn--ghost" id="openChatCalc" type="button">Ask a question</button>
+      </div>
+
+      <div class="card card--pad calcRates">
+        <h3>Rate Chart</h3>
+        <div id="ratesList" class="ratesList"></div>
       </div>
     </div>
   </div>
-
-    <div id="ratesList" class="ratesList"></div>
 </section>
 
 <section id="portal" class="section section--alt">
@@ -325,14 +330,21 @@
                 </div>
 
                 <div class="panel panel--soft" style="margin-top:14px">
+                <div class="panel panel--soft" style="margin-top:14px">
                   <div class="panel__head">
-                    <div class="panel__title">Need help?</div>
-                    <div class="panel__sub muted small">Message support for package updates.</div>
+                    <div class="panel__title">Variety Store</div>
+                    <div class="panel__sub muted small">Shop clothing, shoes, bags, perfume and more.</div>
                   </div>
-                  <button class="btn btn--primary" id="openChatDash" type="button" style="width:100%">Open Chat</button>
-                  <div class="muted small" style="margin-top:10px">If you don’t see a response right away, we’ll reply during business hours.</div>
+                  <div class="storePreview">
+                    <div class="storePreview__grid">
+                      <div class="storePreview__item">👗 <span>Clothing</span></div>
+                      <div class="storePreview__item">👟 <span>Shoes</span></div>
+                      <div class="storePreview__item">👜 <span>Bags</span></div>
+                      <div class="storePreview__item">🌸 <span>Perfume</span></div>
+                    </div>
+                    <a class="btn btn--primary" href="#variety" style="width:100%;margin-top:12px">Browse Variety Store</a>
+                  </div>
                 </div>
-              </aside>
             </div>
           </div>
 
