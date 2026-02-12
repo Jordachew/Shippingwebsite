@@ -232,7 +232,8 @@
             <button class="dashTab" data-tab="packages" type="button">Packages</button>
             <button class="dashTab" data-tab="invoices" type="button">Invoices</button>
             <button class="dashTab" data-tab="chat" type="button">Chat Support</button>
-            <button class="dashTab" data-tab="rates" type="button">Rate Calculator</button>
+            <button class="dashTab" data-tab="rates" type="button">Rates</button>
+            <button class="dashTab" data-tab="store" type="button">Variety Store & Live Preview</button>
           </nav>
 
           <div class="dashSection active" data-section="overview">
@@ -272,6 +273,39 @@
                   </div>
                 </div>
 
+                <div class="panel panel--soft" style="margin-bottom:14px">
+                  <div class="panel__head">
+                    <div class="panel__title">Summary by Status</div>
+                    <div class="panel__sub muted small">Counts, weight, volume, due, and paid — grouped by your current statuses.</div>
+                  </div>
+
+                  <div class="tableWrap tableWrap--soft">
+                    <table class="table table--mini">
+                      <thead>
+                        <tr>
+                          <th>Status</th>
+                          <th>Count</th>
+                          <th>Total Weight (lb)</th>
+                          <th>Total Volume (in³)</th>
+                          <th>Total Due</th>
+                          <th>Total Paid</th>
+                        </tr>
+                      </thead>
+                      <tbody id="statusSummaryBody">
+                        <tr><td colspan="6" class="muted">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="row row--wrap" style="justify-content:space-between; margin-top:10px">
+                    <div class="muted small">Totals</div>
+                    <div class="row row--wrap" style="gap:10px">
+                      <span class="tag" id="totalDueTag">Due: —</span>
+                      <span class="tag" id="totalPaidTag">Paid: —</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="panel panel--soft">
                   <div class="panel__head">
                     <div class="panel__title">Awaiting Pickup</div>
@@ -285,8 +319,8 @@
                           <th>Tracking #</th>
                           <th>Status</th>
                           <th>Weight</th>
-                          <th>Value</th>
-                          <th>Cost</th>
+                          <th>Due</th>
+                          <th>Paid</th>
                         </tr>
                       </thead>
                       <tbody id="awaitingTableBody">
@@ -339,25 +373,85 @@
 
           <div class="dashSection" data-section="packages">
             <div class="dashGridSingle">
-              <div class="panel">
-            <div class="panel__head">
-              <div class="panel__title">Your Packages</div>
-              <div class="panel__sub muted small">Search by tracking number.</div>
-            </div>
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Your Packages</div>
+                  <div class="panel__sub muted small">Search by tracking number.</div>
+                </div>
 
-            
-            </div>
+                <div class="row row--wrap" style="gap:10px; align-items:center; margin-bottom:10px;">
+                  <input id="pkgSearch" type="text" placeholder="Search tracking..." style="max-width:320px" />
+                  <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
+                </div>
+
+                <div class="tableWrap tableWrap--soft">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Tracking #</th>
+                        <th>Status</th>
+                        <th>Pickup</th>
+                        <th>Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pkgBody">
+                      <tr><td colspan="4" class="muted">Loading…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
           </div>
 
           <div class="dashSection" data-section="invoices">
             <div class="dashGridSingle">
-              <div class="panel">
-            <div class="panel__head">
-              <div class="panel__title">Upload Invoice</div>
-              <div class="panel__sub muted small">Required for processing.</div>
-            </div>
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Upload Invoice</div>
+                  <div class="panel__sub muted small">Upload the supplier invoice (Amazon/Shein/eBay etc). Staff will approve it.</div>
+                </div>
 
-            
+                <form class="form" id="invoiceForm">
+                  <label>Tracking # <span class="req">*</span>
+                    <input id="invTracking" type="text" required />
+                  </label>
+
+                  <div class="grid2" style="grid-template-columns: 1fr 1fr; gap:12px">
+                    <label>Supplier (optional)
+                      <input id="invSupplier" type="text" placeholder="Amazon, Shein..." />
+                    </label>
+                    <label>Declared Value (USD) (optional)
+                      <input id="invValue" type="number" step="0.01" min="0" />
+                    </label>
+                  </div>
+
+                  <div class="grid2" style="grid-template-columns: 1fr 1fr; gap:12px">
+                    <label>Weight (lbs) (optional)
+                      <input id="invWeight" type="number" step="0.1" min="0" />
+                    </label>
+                    <label>Pickup Location
+                      <select id="invPickup">
+                        <option value="uwi">UWI, Kingston</option>
+                        <option value="clarendon">Rhoden Hall District, Clarendon</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label>Invoice File <span class="req">*</span>
+                    <input id="invFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" required />
+                  </label>
+
+                  <label>Note (optional)
+                    <input id="invNote" type="text" placeholder="Any extra details..." />
+                  </label>
+
+                  <button class="btn btn--primary" type="submit">Upload Invoice</button>
+                  <div class="muted small" id="invMsg"></div>
+                </form>
+
+                <div class="divider"></div>
+                <h3 style="margin:0 0 8px">Recent Uploads</h3>
+                <ul id="uploadsList" class="list"></ul>
+              </div>
             </div>
           </div>
 
@@ -398,6 +492,35 @@
 
                 <div class="divider"></div>
                 <div id="rateTabResult" class="result"></div>
+
+                <div class="divider"></div>
+                <div id="rateTabRatesList" class="ratesList"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashSection" data-section="store">
+            <div class="dashGridSingle">
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Variety Store & Live Preview</div>
+                  <div class="panel__sub muted small">Browse the store and see live status preview side-by-side.</div>
+                </div>
+
+                <div class="grid2" style="grid-template-columns: 1fr 1fr; gap:14px">
+                  <div class="card card--pad" style="padding:0; overflow:hidden">
+                    <div class="muted small" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08)">Variety Store</div>
+                    <iframe id="storeFrame" title="Variety Store" style="width:100%; height:520px; border:0; background:#fff" src="about:blank"></iframe>
+                  </div>
+                  <div class="card card--pad" style="padding:0; overflow:hidden">
+                    <div class="muted small" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08)">Live Preview</div>
+                    <iframe id="previewFrame" title="Live Preview" style="width:100%; height:520px; border:0; background:#fff" src="about:blank"></iframe>
+                  </div>
+                </div>
+
+                <div class="muted small" style="margin-top:10px">
+                  Tip: set <code>window.SUENOS_STORE_URL</code> and <code>window.SUENOS_PREVIEW_URL</code> in <code>script.js</code> if you want these to load automatically.
+                </div>
               </div>
             </div>
           </div>

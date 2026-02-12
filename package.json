@@ -1,7 +1,9 @@
 {
   "name": "suenos-shipping",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4"
+    "@supabase/supabase-js": "^2.45.4",
+    "resend": "^4.0.0"
   }
 }

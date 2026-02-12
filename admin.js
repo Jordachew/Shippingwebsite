@@ -35,6 +35,28 @@ window.__SB__ =
 const supabase = window.__SB__;
 
 // ========================
+// NOTIFICATION QUEUE (send immediately)
+// ========================
+async function processNotificationQueueNow() {
+  try {
+    const sess = await supabase.auth.getSession();
+    const token = sess?.data?.session?.access_token;
+    if (!token) return;
+
+    await fetch("/api/process-queue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ limit: 25 }),
+    });
+  } catch (_) {
+    // Silent: don't block admin UX if mail sending fails.
+  }
+}
+
+// ========================
 // DOM HELPERS
 // ========================
 function $(id) {
@@ -631,6 +653,9 @@ async function savePackageEdits() {
 
   if (msg) msg.textContent = "Saved.";
   await renderPackages();
+
+  // Send status-change notifications immediately (DB triggers enqueue them).
+  processNotificationQueueNow();
 }
 
 async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
