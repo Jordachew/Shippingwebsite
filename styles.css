@@ -917,3 +917,30 @@ input[style*="background"], .field input, .field select, .field textarea{
 .calcRates .ratesList{
   margin-top: 10px;
 }
+
+
+/* ===== Variety Store hero card ===== */
+.storeHero { padding-top: 6px; }
+.storeHero__grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.storeHero__item{
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  border-radius: 14px;
+  padding: 12px 12px;
+  color: rgba(255,255,255,.92);
+  font-weight: 800;
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.storeHero__item span{ font-weight: 800; }
+.storeHero__note{
+  margin-top: 12px;
+  color: rgba(255,255,255,.72);
+  font-size: 14px;
+  line-height: 1.35;
+}

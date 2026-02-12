@@ -65,10 +65,26 @@
     <div class="hero__visual">
       <div class="glassCard">
         <div class="glassCard__head">
-          <div class="glassCard__title">Live Status Preview</div>
-          <div class="badge">Portal</div>
+          <div class="glassCard__title">Variety Store</div>
+          <div class="badge">Shop</div>
         </div>
-        <div class="timeline">
+
+        <div class="storeHero">
+          <div class="storeHero__grid">
+            <div class="storeHero__item">👗 <span>Clothing</span></div>
+            <div class="storeHero__item">👟 <span>Shoes</span></div>
+            <div class="storeHero__item">👜 <span>Bags</span></div>
+            <div class="storeHero__item">🌸 <span>Perfume</span></div>
+            <div class="storeHero__item">⌚ <span>Accessories</span></div>
+            <div class="storeHero__item">💄 <span>Beauty</span></div>
+          </div>
+
+          <div class="storeHero__note">Browse our variety store while you wait on your shipments.</div>
+
+          <a class="btn btn--primary" href="#variety" style="width:100%;margin-top:12px">Browse Variety Store</a>
+        </div>
+      </div>
+<div class="timeline">
           <div class="tl">
             <div class="tl__dot ok"></div>
             <div class="tl__content">
@@ -276,79 +292,7 @@
                   </div>
                 </div>
 
-                <div class="panel panel--soft">
-                  <div class="panel__head">
-                    <div class="panel__title">Awaiting Pickup</div>
-                    <div class="panel__sub muted small">Most recent packages first.</div>
-                  </div>
-
-                  <div class="tableWrap tableWrap--soft">
-                    <table class="table table--mini">
-                      <thead>
-                        <tr>
-                          <th>Tracking #</th>
-                          <th>Status</th>
-                          <th>Weight (lb)</th>
-                          
-                          <th>Cost (JMD)</th>
-                        </tr>
-                      </thead>
-                      <tbody id="awaitingTableBody">
-                        <tr><td colspan="5" class="muted">Loading…</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div class="row" style="justify-content:flex-end;margin-top:10px">
-                    <button class="btn btn--primary" id="jumpUpload" type="button">Upload Invoice</button>
-                  </div>
-                </div>
-              </section>
-
-              <aside class="dashRightCol">
-                <div class="panel panel--soft">
-                  <div class="panel__head">
-                    <div class="panel__title">Shipping Rates Calculator</div>
-                    <div class="panel__sub muted small">Quick estimate (JMD).</div>
-                  </div>
-
-                  <form id="miniCalcForm" class="miniCalc">
-                    <label>Weight (lbs)
-                      <input id="miniWeight" type="number" step="0.1" min="0.1" required>
-                    </label>
-                    <label>Value (USD)
-                      <input id="miniValue" type="number" step="0.01" min="0" required>
-                    </label>
-                    <button class="btn btn--primary" type="submit">Calculate</button>
-                  </form>
-
-                  <div class="miniCalcOut">
-                    <div class="muted small">Estimated Cost:</div>
-                    <div class="bigMoney" id="miniResult">—</div>
-                    <div class="muted small" id="miniResultSub"></div>
-                  </div>
-                </div>
-
-                <div class="panel panel--soft" style="margin-top:14px">
-                <div class="panel panel--soft" style="margin-top:14px">
-                  <div class="panel__head">
-                    <div class="panel__title">Variety Store</div>
-                    <div class="panel__sub muted small">Shop clothing, shoes, bags, perfume and more.</div>
-                  </div>
-                  <div class="storePreview">
-                    <div class="storePreview__grid">
-                      <div class="storePreview__item">👗 <span>Clothing</span></div>
-                      <div class="storePreview__item">👟 <span>Shoes</span></div>
-                      <div class="storePreview__item">👜 <span>Bags</span></div>
-                      <div class="storePreview__item">🌸 <span>Perfume</span></div>
-                    </div>
-                    <a class="btn btn--primary" href="#variety" style="width:100%;margin-top:12px">Browse Variety Store</a>
-                  </div>
-                </div>
-            </div>
-          </div>
-
-          <div class="dashSection" data-section="packages">
+<div class="dashSection" data-section="packages">
   <div class="dashGridSingle">
     <div class="panel panel--soft">
       <div class="panel__head">
