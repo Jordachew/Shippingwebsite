@@ -35,28 +35,6 @@ window.__SB__ =
 const supabase = window.__SB__;
 
 // ========================
-// NOTIFICATION QUEUE (send immediately)
-// ========================
-async function processNotificationQueueNow() {
-  try {
-    const sess = await supabase.auth.getSession();
-    const token = sess?.data?.session?.access_token;
-    if (!token) return;
-
-    await fetch("/api/process-queue", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify({ limit: 25 }),
-    });
-  } catch (_) {
-    // Silent: don't block admin UX if mail sending fails.
-  }
-}
-
-// ========================
 // DOM HELPERS
 // ========================
 function $(id) {
@@ -547,15 +525,6 @@ function setupPackagesUI() {
   $("statusFilter")?.addEventListener("change", () => renderPackages());
   $("refreshPackages")?.addEventListener("click", () => renderPackages());
 
-  var csvBtn = $("csvUploadBtn");
-  if (csvBtn) csvBtn.addEventListener("click", async function () {
-    var inp = $("csvUploadInput");
-    var file = inp && inp.files ? inp.files[0] : null;
-    if (!file) { var msg = $("csvUploadMsg"); if (msg) msg.textContent = "Choose a CSV file first."; return; }
-    await importPackagesFromCsvFile(file);
-  });
-
-
   $("pkgEditForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     await savePackageEdits();
@@ -586,6 +555,31 @@ async function renderPackages() {
     return;
   }
 
+  // Populate status filter + edit status suggestions from existing values
+  const statuses = Array.from(new Set((data || []).map(p => p.status).filter(Boolean))).sort();
+  const filter = $("statusFilter");
+  if (filter) {
+    const current = filter.value || "";
+    filter.innerHTML = `<option value="">All statuses</option>` + statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+    filter.value = current;
+  }
+  const list = $("statusList");
+  if (list) {
+    list.innerHTML = statuses.map(s => `<option value="${escapeHTML(s)}"></option>`).join("");
+  }
+
+  // Fetch customer display names (full_name + customer_no)
+  const userIds = Array.from(new Set((data || []).map(p => p.user_id).filter(Boolean)));
+  const idToLabel = new Map();
+  if (userIds.length) {
+    const { data: profs } = await supabase.from("profiles").select("id,full_name,customer_no,email").in("id", userIds);
+    for (const p of profs || []) {
+      const name = (p.full_name || p.email || "Customer").trim();
+      const no = (p.customer_no || "").trim();
+      idToLabel.set(p.id, no ? `${name} — ${no}` : name);
+    }
+  }
+
   if (!data?.length) {
     body.innerHTML = `<tr><td colspan="6" class="muted">No packages.</td></tr>`;
     return;
@@ -599,7 +593,7 @@ async function renderPackages() {
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
       <td>${escapeHTML(p.store || "—")}</td>
       <td class="muted small">${p.approved ? "Yes" : "No"}</td>
-      <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
+      <td class="muted small">${escapeHTML(idToLabel.get(p.user_id) || p.user_id || "Unassigned")}</td>
       <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
     </tr>
   `
@@ -662,9 +656,6 @@ async function savePackageEdits() {
 
   if (msg) msg.textContent = "Saved.";
   await renderPackages();
-
-  // Send status-change notifications immediately (DB triggers enqueue them).
-  processNotificationQueueNow();
 }
 
 async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
@@ -681,92 +672,6 @@ async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
     if (msgEl) msgEl.textContent = `Saved, but ${kind} upload failed.`;
   }
 }
-
-
-// ========================
-// CSV IMPORT (Freight list)
-// Expected columns (header):
-// customer_lookup,tracking,status,pickup,weight,cost,notes,store
-// customer_lookup can be email OR customer_no (SNS-JMXXXX).
-// ========================
-function parseCsv(text) {
-  var lines = String(text || "").replace(/\r/g, "").split("\n").filter(function (l) { return l.trim().length; });
-  if (!lines.length) return { header: [], rows: [] };
-  var header = lines[0].split(",").map(function (h) { return h.trim(); });
-  var rows = lines.slice(1).map(function (line) {
-    var cols = line.split(","); // simple CSV (no quoted commas)
-    var obj = {};
-    header.forEach(function (h, i) { obj[h] = (cols[i] || "").trim(); });
-    return obj;
-  });
-  return { header: header, rows: rows };
-}
-
-async function lookupUsersByCustomerLookup(lookups) {
-  var map = {};
-  var uniq = Array.from(new Set((lookups || []).filter(Boolean)));
-  if (!uniq.length) return map;
-
-  // Email matches
-  var emailMatches = await supabase.from("profiles").select("id,email,full_name,customer_no").in("email", uniq);
-  if (!emailMatches.error && emailMatches.data) {
-    emailMatches.data.forEach(function (p) { if (p.email) map[p.email] = p; });
-  }
-
-  // Customer # matches
-  var custMatches = await supabase.from("profiles").select("id,email,full_name,customer_no").in("customer_no", uniq);
-  if (!custMatches.error && custMatches.data) {
-    custMatches.data.forEach(function (p) { if (p.customer_no) map[p.customer_no] = p; });
-  }
-
-  return map;
-}
-
-async function importPackagesFromCsvFile(file) {
-  var msg = $("csvUploadMsg");
-  if (msg) msg.textContent = "Reading CSV...";
-  var text = await file.text();
-  var parsed = parseCsv(text);
-  var rows = parsed.rows || [];
-  if (!rows.length) { if (msg) msg.textContent = "CSV has no rows."; return; }
-
-  var lookups = rows.map(function (r) { return r.customer_lookup; });
-  var userMap = await lookupUsersByCustomerLookup(lookups);
-
-  var toUpsert = [];
-  var skipped = [];
-  rows.forEach(function (r) {
-    var lu = r.customer_lookup;
-    var prof = userMap[lu];
-    if (!prof || !prof.id) { skipped.push((lu || "missing") + " / " + (r.tracking || "missing tracking")); return; }
-
-    var patch = {
-      user_id: prof.id,
-      tracking: r.tracking,
-      status: r.status || "Received at warehouse",
-      pickup: r.pickup || null,
-      weight: r.weight ? Number(r.weight) : null,
-      cost: r.cost ? Number(r.cost) : null,
-      notes: r.notes || null,
-      store: r.store || null,
-      approved: false
-    };
-    toUpsert.push(patch);
-  });
-
-  if (!toUpsert.length) {
-    if (msg) msg.textContent = "No valid rows to import. Check customer_lookup values.";
-    return;
-  }
-
-  if (msg) msg.textContent = "Importing " + toUpsert.length + " packages...";
-  var up = await supabase.from("packages").upsert(toUpsert, { onConflict: "user_id,tracking" });
-  if (up.error) { if (msg) msg.textContent = up.error.message; return; }
-
-  if (msg) msg.textContent = "Imported " + toUpsert.length + " packages." + (skipped.length ? (" Skipped: " + skipped.length) : "");
-  await renderPackages();
-}
-
 
 // ========================
 // MESSAGES
@@ -1073,10 +978,11 @@ function setupBulkUploadIfPresent() {
   const tplBtn = $("bulkTemplateBtn");
   const msg = $("bulkMsg");
 
-  if (!uploadBtn) return; // feature not on this admin.html yet
+  if (!uploadBtn) return;
 
-  const template = `tracking,customer_email,status,store,approved,notes
-1Z999AA10123456784,customer@example.com,RECEIVED,Amazon,true,Fragile
+  const template = `customer_lookup,tracking,status,pickup,weight,cost,notes,store
+customer@example.com,1Z999AA10123456784,Received at warehouse,UWI_KINGSTON,2.5,3650,Fragile,Amazon
+SNS-JM0001,1Z999AA10123456785,In Transit,RHODEN_HALL_CLARENDON,1.2,2250,,Shein
 `;
 
   tplBtn?.addEventListener("click", () => {
@@ -1108,90 +1014,55 @@ function setupBulkUploadIfPresent() {
 
       if (msg) msg.textContent = `Uploading ${rows.length}...`;
 
-      // Map emails -> ids
-      const emails = Array.from(
-        new Set(rows.map((r) => (r.customer_email || "").trim().toLowerCase()).filter(Boolean))
-      );
+      const lookups = Array.from(new Set(rows.map(r => (r.customer_lookup || r.customer_email || "").trim()).filter(Boolean)));
+      const emails = lookups.filter(x => x.includes("@")).map(x => x.toLowerCase());
+      const custNos = lookups.filter(x => !x.includes("@")).map(x => x.toUpperCase());
 
-      let emailToId = new Map();
+      const emailToId = new Map();
+      const custNoToId = new Map();
+
       if (emails.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id,email")
-          .in("email", emails);
-
+        const { data: profs, error: e1 } = await supabase.from("profiles").select("id,email").in("email", emails);
+        if (e1) throw e1;
         for (const p of profs || []) emailToId.set((p.email || "").toLowerCase(), p.id);
       }
+      if (custNos.length) {
+        const { data: profs2, error: e2 } = await supabase.from("profiles").select("id,customer_no").in("customer_no", custNos);
+        if (e2) throw e2;
+        for (const p of profs2 || []) custNoToId.set((p.customer_no || "").toUpperCase(), p.id);
+      }
 
-      // Build insert payload
-      const payload = rows.map((r) => ({
-        tracking: (r.tracking || "").trim(),
-        status: (r.status || "RECEIVED").trim(),
-        store: (r.store || "").trim() || null,
-        approved: String(r.approved || "true").toLowerCase() !== "false",
-        notes: (r.notes || "").trim() || null,
-        user_id: emailToId.get((r.customer_email || "").trim().toLowerCase()) || null,
-      })).filter((p) => p.tracking);
+      const payload = rows.map((r) => {
+        const lk = (r.customer_lookup || r.customer_email || "").trim();
+        let user_id = null;
+        if (lk.includes("@")) user_id = emailToId.get(lk.toLowerCase()) || null;
+        else if (lk) user_id = custNoToId.get(lk.toUpperCase()) || null;
 
-      // Upsert by tracking (requires unique index on tracking; if not, it’ll just insert)
+        return {
+          user_id,
+          tracking: (r.tracking || "").trim(),
+          status: (r.status || "").trim() || "Received at warehouse",
+          pickup: (r.pickup || "").trim() || null,
+          weight: (r.weight != null && String(r.weight).trim() !== "") ? Number(r.weight) : null,
+          cost: (r.cost != null && String(r.cost).trim() !== "") ? Number(r.cost) : null,
+          notes: (r.notes || "").trim() || null,
+          store: (r.store || "").trim() || null,
+          approved: String(r.approved || "false").toLowerCase() === "true"
+        };
+      }).filter(p => p.tracking);
+
+      // Upsert by tracking (if tracking is unique); otherwise create a unique index and change onConflict as needed.
       const { error } = await supabase.from("packages").upsert(payload, { onConflict: "tracking" });
       if (error) throw error;
 
-      if (msg) msg.textContent = "Bulk upload complete.";
-      if (file) file.value = "";
-      if (text) text.value = "";
+      if (msg) msg.textContent = "Import complete.";
       await renderPackages();
-    } catch (e) {
-      console.error(e);
-      if (msg) msg.textContent = e?.message || String(e);
+    } catch (err) {
+      if (msg) msg.textContent = `CSV import failed: ${err?.message || err}`;
+      console.error(err);
     }
   });
-}
-
-function parseCsv(csvText) {
-  // basic CSV parser supporting quoted values
-  const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length);
-  if (lines.length < 2) return [];
-
-  const headers = splitCsvLine(lines[0]).map((h) => h.trim());
-  const out = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i]);
-    const row = {};
-    headers.forEach((h, idx) => (row[h] = cols[idx] ?? ""));
-    out.push(row);
-  }
-  return out;
-}
-
-function splitCsvLine(line) {
-  const res = [];
-  let cur = "";
-  let inQ = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-
-    if (ch === '"' && line[i + 1] === '"') {
-      cur += '"';
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQ = !inQ;
-      continue;
-    }
-    if (ch === "," && !inQ) {
-      res.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  res.push(cur);
-  return res.map((s) => s.trim());
-}
+}}
 
 // ========================
 // INIT

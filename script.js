@@ -1,12 +1,6 @@
 (function () {
   "use strict";
 
-  // Optional: set these in the console or inline before script loads
-  // window.SUENOS_STORE_URL = "https://...";
-  // window.SUENOS_PREVIEW_URL = "https://...";
-  var STORE_URL = window.SUENOS_STORE_URL || "";
-  var PREVIEW_URL = window.SUENOS_PREVIEW_URL || "";
-
   // ============================================================
   // Sueños Shipping — Customer Portal script.js (Stable Build)
   // Fixes:
@@ -160,14 +154,14 @@
   // RATES TABLE RENDER
   // ------------------------
   function renderRatesTable() {
-    function paint(host) {
-      if (!host) return;
+    var host = $("ratesList");
+    if (!host) return;
 
     var rows = rates.map(function (r) {
       return "<tr><td>" + r.lbs + " lb</td><td><strong>" + formatJMD(r.jmd) + "</strong></td></tr>";
     }).join("");
 
-      host.innerHTML =
+    host.innerHTML =
       '<div class="card card--pad">' +
         '<h3>Rate Chart</h3>' +
         '<p class="muted small">Base rate by weight. Final total = base rate + ' + formatJMD(fixedFeeJMD) + ' fee.</p>' +
@@ -178,10 +172,6 @@
           '</table>' +
         '</div>' +
       '</div>';
-    }
-
-    paint($("ratesList"));
-    paint($("rateTabRatesList"));
   }
 
   // ------------------------
@@ -272,11 +262,9 @@
   function renderShipTo(profile, email) {
     var el = $("shipToBlock");
     if (!el) return;
-    var full = (profile && profile.full_name) ? profile.full_name : (email || "Customer");
-    var acct = (profile && profile.customer_no) ? profile.customer_no : "SNS-JMXXXX";
-    // Address block should show full name on its own line (not just first name)
-    el.textContent = [full, acct].concat(WAREHOUSE_LINES).join("
-");
+    var fn = String(profile?.full_name || '').trim() || firstName(profile?.full_name, email);
+    var acct = profile?.customer_no || "SNS-JMXXXX";
+    el.textContent = [fn + " — " + acct].concat(WAREHOUSE_LINES).join("\n");
   }
 
   // ------------------------
@@ -420,7 +408,7 @@
     }
 
     var res = await sb.from("invoices")
-      .select("tracking,file_name,file_type,pickup,pickup_confirmed,approved,approved_at,created_at,note,supplier,value_usd,weight")
+      .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -436,7 +424,6 @@
     }
 
     list.innerHTML = data.map(function (i) {
-      var approveText = i.approved ? "Approved" : "Pending approval";
       return (
         "<li>" +
           "<div><strong>" + escapeHTML(i.tracking) + "</strong> • " +
@@ -445,11 +432,7 @@
           '<div class="muted small">' +
             "Pickup: " + escapeHTML(pickupLabel(i.pickup)) + " • " +
             (i.pickup_confirmed ? "Confirmed" : "Pending confirmation") + " • " +
-            approveText + " • " +
             new Date(i.created_at).toLocaleString() +
-            (i.supplier ? " • " + escapeHTML(i.supplier) : "") +
-            (i.value_usd != null ? " • $" + Number(i.value_usd).toFixed(2) : "") +
-            (i.weight != null ? " • " + Number(i.weight).toFixed(1) + " lb" : "") +
             (i.note ? " • " + escapeHTML(i.note) : "") +
           "</div>" +
         "</li>"
@@ -481,9 +464,6 @@
       var tracking = ($("invTracking")?.value || "").trim();
       var pickup = $("invPickup")?.value || "";
       var note = ($("invNote")?.value || "").trim();
-      var supplier = ($("invSupplier")?.value || "").trim();
-      var invVal = parseFloat($("invValue")?.value);
-      var invWeight = parseFloat($("invWeight")?.value);
       var fileInput = $("invFile");
 
       if (!tracking) { if (msg) msg.textContent = "Tracking ID required."; return; }
@@ -504,10 +484,7 @@
         file_path: path,
         file_name: safeName,
         file_type: (file.type || "unknown"),
-        note: note || null,
-        supplier: supplier || null,
-        value_usd: Number.isFinite(invVal) ? invVal : null,
-        weight: Number.isFinite(invWeight) ? invWeight : null
+        note: note || null
       });
 
       if (ins.error) { if (msg) msg.textContent = ins.error.message; return; }
@@ -690,13 +667,11 @@
 
       var profile = pr.data || null;
 
-      // Show "Full Name — Customer #" (not raw UID)
+      // Show "FirstName — Email"
       var fn = firstName(profile?.full_name, user.email);
-      var displayName = (profile?.full_name || fn || "Customer").trim();
-      var cno = (profile?.customer_no || "").trim();
-      if ($("userName")) $("userName").textContent = cno ? (displayName + " — " + cno) : displayName;
+      if ($("userName")) $("userName").textContent = fn + " — " + user.email;
       if ($("welcomeName")) $("welcomeName").textContent = fn;
-      if ($("customerNo")) $("customerNo").textContent = cno;
+      if ($("customerNo")) $("customerNo").textContent = (profile?.customer_no || "");
 
       // Shipping address block
       renderShipTo(profile, user.email);
@@ -753,13 +728,6 @@
     } else {
       unembedChatWidget();
     }
-
-    if (name === "store") {
-      var sf = $("storeFrame");
-      var pf = $("previewFrame");
-      if (sf && STORE_URL && sf.src === "about:blank") sf.src = STORE_URL;
-      if (pf && PREVIEW_URL && pf.src === "about:blank") pf.src = PREVIEW_URL;
-    }
   }
 
   function setupDashboardTabs() {
@@ -772,14 +740,12 @@
       });
     });
 
-    var _ju = $("jumpUpload");
-    if (_ju) _ju.addEventListener("click", function () {
+    $("jumpUpload")?.addEventListener("click", function () {
       showDashTab("invoices");
-      var it = $("invTracking"); if (it) it.focus();
+      $("invTracking")?.focus();
     });
 
-    var _cct = $("closeChatTab");
-    if (_cct) _cct.addEventListener("click", function () {
+    $("closeChatTab")?.addEventListener("click", function () {
       showDashTab("overview");
       closeChat();
     });
@@ -843,97 +809,109 @@
     var picked = $("statPicked");
     var transit = $("statTransit");
     var tBody = $("awaitingTableBody");
-    if (!awaiting || !picked || !transit || !tBody) return;
+    var sumBody = $("dashSummaryBody");
 
+    // It's OK if some elements don't exist (older layouts)
     var res = await sb.from("packages")
-      .select("tracking,status,weight,volume_in3,amount_due_jmd,amount_paid_jmd,cost,updated_at")
+      .select("id,tracking,status,weight,cost,amount_due_jmd,amount_paid_jmd,is_paid,updated_at,created_at")
       .order("updated_at", { ascending: false });
 
     if (res.error) {
-      tBody.innerHTML = '<tr><td colspan="5" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
+      if (tBody) tBody.innerHTML = '<tr><td colspan="4" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
+      if (sumBody) sumBody.innerHTML = '<tr><td colspan="5" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
       return;
     }
 
     var rows = res.data || [];
     var norm = function (s) { return String(s || "").toLowerCase(); };
 
-    var awaitingRows = rows.filter(function (r) { return norm(r.status).includes("await") || norm(r.status).includes("ready") || norm(r.status).includes("pickup"); });
-    var pickedRows   = rows.filter(function (r) { return norm(r.status).includes("picked"); });
-    var transitRows  = rows.filter(function (r) { return norm(r.status).includes("transit"); });
+    // Heuristics for the three hero stats using existing status text (no forced enum)
+    var awaitingRows = rows.filter(function (r) {
+      var s = norm(r.status);
+      return s.includes("ready") || s.includes("await") || s.includes("pickup");
+    });
+    var pickedRows = rows.filter(function (r) {
+      var s = norm(r.status);
+      return s.includes("picked") || s.includes("delivered");
+    });
+    var transitRows = rows.filter(function (r) {
+      var s = norm(r.status);
+      return s.includes("transit") || s.includes("shipped") || s.includes("air") || s.includes("jamaica");
+    });
 
-    awaiting.textContent = String(awaitingRows.length);
-    picked.textContent = String(pickedRows.length);
-    transit.textContent = String(transitRows.length);
+    if (awaiting) awaiting.textContent = String(awaitingRows.length);
+    if (picked) picked.textContent = String(pickedRows.length);
+    if (transit) transit.textContent = String(transitRows.length);
 
-    var show = awaitingRows.slice(0, 8);
-    if (!show.length) {
-      tBody.innerHTML = '<tr><td colspan="5" class="muted">No awaiting pickup packages.</td></tr>';
-      return;
+    // Awaiting pickup table (recent)
+    if (tBody) {
+      var show = awaitingRows.slice(0, 8);
+      if (!show.length) {
+        tBody.innerHTML = '<tr><td colspan="4" class="muted">No packages currently awaiting pickup.</td></tr>';
+      } else {
+        tBody.innerHTML = show.map(function (p) {
+          var due = (p.amount_due_jmd != null) ? Number(p.amount_due_jmd) : (p.cost != null ? Number(p.cost) : null);
+          return (
+            '<tr>' +
+              '<td><strong>' + escapeHTML(p.tracking || "") + '</strong></td>' +
+              '<td><span class="tag">' + escapeHTML(p.status || "") + '</span></td>' +
+              '<td>' + (p.weight != null ? (Number(p.weight).toFixed(2) + ' lb') : '—') + '</td>' +
+              '<td>' + (due != null ? formatJMD(due) : '—') + '</td>' +
+            '</tr>'
+          );
+        }).join("");
+      }
     }
 
-    tBody.innerHTML = show.map(function (p) {
-      return (
-        "<tr>" +
-          "<td><strong>" + escapeHTML(p.tracking || "") + "</strong></td>" +
-          "<td><span class=\"tag\">" + escapeHTML(p.status || "") + "</span></td>" +
-          "<td>" + (p.weight != null ? escapeHTML(String(p.weight)) + " lb" : "—") + "</td>" +
-          "<td>" + (p.amount_due_jmd != null ? formatJMD(Number(p.amount_due_jmd)) : (p.cost != null ? formatJMD(Number(p.cost)) : "—")) + "</td>" +
-          "<td>" + (p.amount_paid_jmd != null ? formatJMD(Number(p.amount_paid_jmd)) : "—") + "</td>" +
-        "</tr>"
-      );
-    }).join("");
-
-    // Summary by status (use existing status strings exactly)
-    var sumBody = $("statusSummaryBody");
-    var totalDueTag = $("totalDueTag");
-    var totalPaidTag = $("totalPaidTag");
-
+    // Dashboard summary (group by status)
     if (sumBody) {
-      var groups = {};
-      var totalDue = 0;
-      var totalPaid = 0;
+      var map = {};
+      var totalCount = 0, totalWeight = 0, totalDue = 0, totalPaid = 0;
 
-      rows.forEach(function (r) {
-        var st = r.status || "Unknown";
-        if (!groups[st]) groups[st] = { count: 0, weight: 0, volume: 0, due: 0, paid: 0 };
-        groups[st].count += 1;
-        if (r.weight != null) groups[st].weight += Number(r.weight) || 0;
-        if (r.volume_in3 != null) groups[st].volume += Number(r.volume_in3) || 0;
+      rows.forEach(function (p) {
+        var st = p.status || "Unknown";
+        map[st] = map[st] || { count: 0, weight: 0, due: 0, paid: 0 };
+        map[st].count += 1;
+        totalCount += 1;
 
-        var due = (r.amount_due_jmd != null ? Number(r.amount_due_jmd) : (r.cost != null ? Number(r.cost) : 0)) || 0;
-        var paid = (r.amount_paid_jmd != null ? Number(r.amount_paid_jmd) : 0) || 0;
+        if (p.weight != null) {
+          var w = Number(p.weight) || 0;
+          map[st].weight += w;
+          totalWeight += w;
+        }
 
-        groups[st].due += due;
-        groups[st].paid += paid;
+        var due = (p.amount_due_jmd != null) ? Number(p.amount_due_jmd) : (p.cost != null ? Number(p.cost) : 0);
+        map[st].due += (Number.isFinite(due) ? due : 0);
+        totalDue += (Number.isFinite(due) ? due : 0);
 
-        totalDue += due;
-        totalPaid += paid;
+        var paid = (p.amount_paid_jmd != null) ? Number(p.amount_paid_jmd) : (p.is_paid ? due : 0);
+        map[st].paid += (Number.isFinite(paid) ? paid : 0);
+        totalPaid += (Number.isFinite(paid) ? paid : 0);
       });
 
-      var statuses = Object.keys(groups).sort(function (a, b) {
-        return a.localeCompare(b);
-      });
+      var statuses = Object.keys(map).sort(function (a, b) { return map[b].count - map[a].count; });
 
       if (!statuses.length) {
-        sumBody.innerHTML = '<tr><td colspan="6" class="muted">No packages yet.</td></tr>';
+        sumBody.innerHTML = '<tr><td colspan="5" class="muted">No packages yet.</td></tr>';
       } else {
         sumBody.innerHTML = statuses.map(function (st) {
-          var g = groups[st];
+          var o = map[st];
           return (
-            "<tr>" +
-              "<td><span class=\"tag\">" + escapeHTML(st) + "</span></td>" +
-              "<td>" + escapeHTML(String(g.count)) + "</td>" +
-              "<td>" + escapeHTML(g.weight.toFixed(1)) + "</td>" +
-              "<td>" + escapeHTML(Math.round(g.volume).toString()) + "</td>" +
-              "<td>" + formatJMD(g.due) + "</td>" +
-              "<td>" + formatJMD(g.paid) + "</td>" +
-            "</tr>"
+            '<tr>' +
+              '<td>' + escapeHTML(st) + '</td>' +
+              '<td>' + o.count + '</td>' +
+              '<td>' + (o.weight ? (o.weight.toFixed(2) + ' lb') : '—') + '</td>' +
+              '<td>' + formatJMD(o.due) + '</td>' +
+              '<td>' + formatJMD(o.paid) + '</td>' +
+            '</tr>'
           );
         }).join("");
       }
 
-      if (totalDueTag) totalDueTag.textContent = "Due: " + formatJMD(totalDue);
-      if (totalPaidTag) totalPaidTag.textContent = "Paid: " + formatJMD(totalPaid);
+      if ($("dashTotalCount")) $("dashTotalCount").textContent = String(totalCount);
+      if ($("dashTotalWeight")) $("dashTotalWeight").textContent = totalWeight ? (totalWeight.toFixed(2) + " lb") : "0";
+      if ($("dashTotalDue")) $("dashTotalDue").textContent = formatJMD(totalDue);
+      if ($("dashTotalPaid")) $("dashTotalPaid").textContent = formatJMD(totalPaid);
     }
   }
 

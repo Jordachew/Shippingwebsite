@@ -110,6 +110,25 @@
             </div>
           </div>
         </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="card__body">
+            <div class="row row--wrap" style="gap:10px; align-items:flex-end;">
+              <label class="field" style="flex:1; min-width:260px;">
+                <span>Import packages (CSV)</span>
+                <input id="bulkCsvFile" type="file" accept=".csv" class="input" />
+              </label>
+              <button id="bulkUploadBtn" class="btn btn--primary" type="button">Import CSV</button>
+              <button id="bulkTemplateBtn" class="btn btn--ghost" type="button">Download template</button>
+              <div class="muted small" id="bulkMsg"></div>
+            </div>
+            <textarea id="bulkCsvText" class="input" rows="4" placeholder="Or paste CSV here..." style="margin-top:10px;width:100%;"></textarea>
+            <div class="muted small" style="margin-top:10px;">
+              CSV columns: <code>customer_lookup,tracking,status,pickup,weight,cost,notes,store</code>
+              (customer_lookup = email or SNS-JMXXXX)
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- CUSTOMERS -->
@@ -164,13 +183,7 @@
               <option value="">All statuses</option>
             </select>
             <button id="refreshPackages" class="btn btn--ghost" type="button">Refresh</button>
-            <label class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-              <input id="csvUploadInput" type="file" accept=".csv" style="display:none"/>
-              Upload CSV
-            </label>
-            <button id="csvUploadBtn" class="btn btn--primary" type="button">Import</button>
           </div>
-          <div class="muted small" id="csvUploadMsg" style="margin-top:8px"></div>
         </div>
 
         <div class="card">
@@ -179,7 +192,7 @@
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Tracking</th><th>Status</th><th>Approved</th><th>Customer</th><th>Store</th><th>Updated</th><th>Actions</th>
+                    <th>Tracking</th><th>Status</th><th>Store</th><th>Approved</th><th>Customer</th><th>Updated</th>
                   </tr>
                 </thead>
                 <tbody id="packagesBody"></tbody>
@@ -201,8 +214,8 @@
                 <label class="field"><span>Tracking</span><input id="pkgEditTracking" required /></label>
                 <label class="field">
                   <span>Status</span>
-                  <input id="pkgEditStatus" class="input" list="statusDatalist" placeholder="Type or choose status" />
-                  <datalist id="statusDatalist"></datalist>
+                  <input id="pkgEditStatus" class="input" list="statusList" placeholder="Type or select status" />
+                  <datalist id="statusList"></datalist>
                 </label>
               </div>
 
