@@ -232,7 +232,6 @@
             <button class="dashTab" data-tab="packages" type="button">Packages</button>
             <button class="dashTab" data-tab="invoices" type="button">Invoices</button>
             <button class="dashTab" data-tab="chat" type="button">Chat Support</button>
-            <button class="dashTab" data-tab="rates" type="button">Rate Calculator</button>
           </nav>
 
           <div class="dashSection active" data-section="overview">
@@ -338,88 +337,90 @@
           </div>
 
           <div class="dashSection" data-section="packages">
-            <div class="dashGridSingle">
-              <div class="panel">
-            <div class="panel__head">
-              <div class="panel__title">Your Packages</div>
-              <div class="panel__sub muted small">Search by tracking number.</div>
-            </div>
+  <div class="dashGridSingle">
+    <div class="panel panel--soft">
+      <div class="panel__head">
+        <div class="panel__title">Your Packages</div>
+        <div class="panel__sub muted small">Search by tracking number.</div>
+      </div>
 
-            
-            <div class="row row--wrap" style="gap:10px; align-items:flex-end;">
-              <label style="flex:1; min-width:220px;">Search
-                <input id="pkgSearch" type="text" placeholder="Enter tracking number..." />
-              </label>
-              <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
-            </div>
+      <div class="row row--wrap" style="gap:10px; align-items:flex-end;">
+        <label style="flex:1; min-width:220px;">Search
+          <input id="pkgSearch" type="text" placeholder="Enter tracking number..." />
+        </label>
+        <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
+      </div>
 
-            <div class="tableWrap" style="margin-top:14px;">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Tracking</th>
-                    <th>Status</th>
-                    <th>Weight (lb)</th>
-                    <th>Cost (JMD)</th>
-                    <th>Notes</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody id="pkgBody">
-                  <tr><td colspan="6" class="muted">Loading...</td></tr>
-                </tbody>
-              </table>
-            </div>
+      <div class="tableWrap" style="margin-top:14px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tracking</th>
+              <th>Status</th>
+              <th>Weight (lb)</th>
+              <th>Cost (JMD)</th>
+              <th>Notes</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="pkgBody">
+            <tr><td colspan="6" class="muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
 
+      <div class="muted small" id="pkgMsg" style="margin-top:10px;"></div>
+    </div>
+  </div>
 </div>
-          </div>
 
-          <div class="dashSection" data-section="invoices">
-            <div class="dashGridSingle">
-              <div class="panel">
-            <div class="panel__head">
-              <div class="panel__title">Upload Invoice</div>
-              <div class="panel__sub muted small">Required for processing.</div>
-            </div>
+<div class="dashSection" data-section="invoices">
+  <div class="dashGridSingle">
+    <div class="panel panel--soft">
+      <div class="panel__head">
+        <div class="panel__title">Upload Invoice</div>
+        <div class="panel__sub muted small">Upload supplier invoice (Amazon/Shein/eBay etc.). Staff will approve it.</div>
+      </div>
 
-            
-            <form class="form" id="invoiceForm">
-              <div class="grid2">
-                <label>Tracking #
-                  <input id="invTracking" type="text" required placeholder="e.g. 1Z..." />
-                </label>
-                <label>Pickup Location
-                  <select id="invPickup" required>
-                    <option value="UWI_KINGSTON">UWI, Kingston</option>
-                    <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
-                  </select>
-                </label>
-              </div>
+      <form class="form" id="invoiceForm">
+        <div class="grid2">
+          <label>Tracking #
+            <input id="invTracking" type="text" required placeholder="e.g. 1Z..." />
+          </label>
+          <label>Pickup Location
+            <select id="invPickup" required>
+              <option value="UWI_KINGSTON">UWI, Kingston</option>
+              <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
+            </select>
+          </label>
+        </div>
 
-              <label>Invoice File
-                <input id="invFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
-              </label>
+        <label>Invoice File
+          <input id="invFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
+        </label>
 
-              <label>Note (optional)
-                <input id="invNote" type="text" placeholder="Amazon/Shein/etc. Any notes..." />
-              </label>
+        <label>Note (optional)
+          <input id="invNote" type="text" placeholder="Amazon/Shein/etc. Any notes..." />
+        </label>
 
-              <button class="btn btn--primary" type="submit">Upload Invoice</button>
-              <div class="muted small" id="invMsg" style="margin-top:8px;"></div>
-            </form>
+        <div class="row row--wrap" style="gap:10px; align-items:center;">
+          <button class="btn btn--primary" type="submit">Upload Invoice</button>
+          <span class="muted small" id="invMsg"></span>
+        </div>
+      </form>
 
-            <div class="divider" style="margin:18px 0;"></div>
+      <div class="divider" style="margin:18px 0;"></div>
 
-            <div class="panel__head" style="padding:0;">
-              <div class="panel__title">Recent Uploads</div>
-              <div class="panel__sub muted small">Your latest invoice uploads.</div>
-            </div>
-            <ul class="list" id="uploadsList" style="margin-top:10px;"></ul>
-
+      <div class="panel__head" style="padding:0;">
+        <div class="panel__title">Recent Uploads</div>
+        <div class="panel__sub muted small">If empty, you haven't uploaded any invoices yet.</div>
+      </div>
+      <ul class="list" id="uploadsList" style="margin-top:10px;"></ul>
+    </div>
+  </div>
 </div>
-          </div>
 
-          <div class="dashSection" data-section="chat">
+<div class="dashSection" data-section="chat">
             <div class="dashGridSingle">
               <div class="panel panel--soft">
                 <div class="panel__head">
@@ -435,30 +436,7 @@
             </div>
           </div>
 
-          <div class="dashSection" data-section="rates">
-            <div class="dashGridSingle">
-              <div class="panel panel--soft">
-                <div class="panel__head">
-                  <div class="panel__title">Shipping Cost Calculator</div>
-                  <div class="panel__sub muted small">Estimate only. Final cost may change based on duties/handling.</div>
-                </div>
-
-                <form class="form" id="rateTabForm">
-                  <label>Weight (lbs) <span class="req">*</span>
-                    <input id="rateTabWeight" type="number" step="0.1" min="0.1" required/>
-                  </label>
-                  <label>Declared Value (USD) <span class="req">*</span>
-                    <input id="rateTabValue" type="number" step="0.01" min="0" required/>
-                  </label>
-                  <button class="btn btn--primary" type="submit">Calculate</button>
-                  <div class="muted small" id="rateTabMsg"></div>
-                </form>
-
-                <div class="divider"></div>
-                <div id="rateTabResult" class="result"></div>
-              </div>
-            </div>
-          </div>
+          
 
         </div>
 

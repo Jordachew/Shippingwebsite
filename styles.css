@@ -836,3 +836,33 @@ select option{ color:#111; }
 }
 .bg-white *, .card--light *{ color: var(--text) !important; }
 a{ color: inherit; }
+
+
+/* ===== Stronger form control contrast (file inputs especially) ===== */
+input[type="file"]{
+  background: rgba(0,0,0,.28) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text) !important;
+}
+input[type="file"]::file-selector-button{
+  background: rgba(212,175,55,.90);
+  border: 0;
+  color: #0a0a0a;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+input[type="file"]::-webkit-file-upload-button{
+  background: rgba(212,175,55,.90);
+  border: 0;
+  color: #0a0a0a;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-right: 10px;
+  cursor: pointer;
+}

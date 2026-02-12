@@ -66,6 +66,24 @@ function clearSupabaseAuthToken() {
   } catch (_) {}
 }
 
+
+// ========================
+// PROFILE BOOTSTRAP (ensure row exists)
+// ========================
+async function ensureProfileSafe(user) {
+  try {
+    if (!user?.id) return;
+    const full_name = user.user_metadata?.full_name || user.user_metadata?.name || null;
+    const phone = user.user_metadata?.phone || null;
+    // Upsert minimal profile; role remains whatever is already set (default 'customer')
+    await supabase.from("profiles").upsert(
+      { id: user.id, email: user.email, full_name, phone },
+      { onConflict: "id" }
+    );
+  } catch (e) {
+    console.warn("ensureProfileSafe failed:", e);
+  }
+}
 // ========================
 // SAFE AUTH HELPERS
 // ========================
@@ -272,6 +290,9 @@ async function renderApp() {
     teardownMessageRealtime();
     return;
   }
+
+  // Ensure profile row exists (prevents "can’t sign in" confusion)
+  await ensureProfileSafe(user);
 
   // Profile/role gate
   const { profile, error: pErr } = await getMyProfile();

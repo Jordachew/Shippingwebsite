@@ -937,27 +937,7 @@
     });
 
     // Rates tab calc
-    $("rateTabForm")?.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var w = parseFloat($("rateTabWeight")?.value);
-      var v = parseFloat($("rateTabValue")?.value);
-
-      if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
-        if ($("rateTabMsg")) $("rateTabMsg").textContent = "Enter valid numbers.";
-        if ($("rateTabResult")) $("rateTabResult").innerHTML = '<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>';
-        return;
       }
-
-      var rr = findRateForWeight(w);
-      var total = rr.rate + fixedFeeJMD;
-
-      if ($("rateTabMsg")) $("rateTabMsg").textContent = "";
-      if ($("rateTabResult")) $("rateTabResult").innerHTML =
-        '<div class="result__big">' + formatJMD(total) + '</div>' +
-        '<div class="result__sub">Weight used: <strong>' + rr.rounded + ' lb</strong>. Base: ' +
-        formatJMD(rr.rate) + ' + Fee: ' + formatJMD(fixedFeeJMD) + '.</div>';
-    });
-  }
 
 // ------------------------
   // INIT
