@@ -547,6 +547,15 @@ function setupPackagesUI() {
   $("statusFilter")?.addEventListener("change", () => renderPackages());
   $("refreshPackages")?.addEventListener("click", () => renderPackages());
 
+  var csvBtn = $("csvUploadBtn");
+  if (csvBtn) csvBtn.addEventListener("click", async function () {
+    var inp = $("csvUploadInput");
+    var file = inp && inp.files ? inp.files[0] : null;
+    if (!file) { var msg = $("csvUploadMsg"); if (msg) msg.textContent = "Choose a CSV file first."; return; }
+    await importPackagesFromCsvFile(file);
+  });
+
+
   $("pkgEditForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     await savePackageEdits();
@@ -672,6 +681,92 @@ async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
     if (msgEl) msgEl.textContent = `Saved, but ${kind} upload failed.`;
   }
 }
+
+
+// ========================
+// CSV IMPORT (Freight list)
+// Expected columns (header):
+// customer_lookup,tracking,status,pickup,weight,cost,notes,store
+// customer_lookup can be email OR customer_no (SNS-JMXXXX).
+// ========================
+function parseCsv(text) {
+  var lines = String(text || "").replace(/\r/g, "").split("\n").filter(function (l) { return l.trim().length; });
+  if (!lines.length) return { header: [], rows: [] };
+  var header = lines[0].split(",").map(function (h) { return h.trim(); });
+  var rows = lines.slice(1).map(function (line) {
+    var cols = line.split(","); // simple CSV (no quoted commas)
+    var obj = {};
+    header.forEach(function (h, i) { obj[h] = (cols[i] || "").trim(); });
+    return obj;
+  });
+  return { header: header, rows: rows };
+}
+
+async function lookupUsersByCustomerLookup(lookups) {
+  var map = {};
+  var uniq = Array.from(new Set((lookups || []).filter(Boolean)));
+  if (!uniq.length) return map;
+
+  // Email matches
+  var emailMatches = await supabase.from("profiles").select("id,email,full_name,customer_no").in("email", uniq);
+  if (!emailMatches.error && emailMatches.data) {
+    emailMatches.data.forEach(function (p) { if (p.email) map[p.email] = p; });
+  }
+
+  // Customer # matches
+  var custMatches = await supabase.from("profiles").select("id,email,full_name,customer_no").in("customer_no", uniq);
+  if (!custMatches.error && custMatches.data) {
+    custMatches.data.forEach(function (p) { if (p.customer_no) map[p.customer_no] = p; });
+  }
+
+  return map;
+}
+
+async function importPackagesFromCsvFile(file) {
+  var msg = $("csvUploadMsg");
+  if (msg) msg.textContent = "Reading CSV...";
+  var text = await file.text();
+  var parsed = parseCsv(text);
+  var rows = parsed.rows || [];
+  if (!rows.length) { if (msg) msg.textContent = "CSV has no rows."; return; }
+
+  var lookups = rows.map(function (r) { return r.customer_lookup; });
+  var userMap = await lookupUsersByCustomerLookup(lookups);
+
+  var toUpsert = [];
+  var skipped = [];
+  rows.forEach(function (r) {
+    var lu = r.customer_lookup;
+    var prof = userMap[lu];
+    if (!prof || !prof.id) { skipped.push((lu || "missing") + " / " + (r.tracking || "missing tracking")); return; }
+
+    var patch = {
+      user_id: prof.id,
+      tracking: r.tracking,
+      status: r.status || "Received at warehouse",
+      pickup: r.pickup || null,
+      weight: r.weight ? Number(r.weight) : null,
+      cost: r.cost ? Number(r.cost) : null,
+      notes: r.notes || null,
+      store: r.store || null,
+      approved: false
+    };
+    toUpsert.push(patch);
+  });
+
+  if (!toUpsert.length) {
+    if (msg) msg.textContent = "No valid rows to import. Check customer_lookup values.";
+    return;
+  }
+
+  if (msg) msg.textContent = "Importing " + toUpsert.length + " packages...";
+  var up = await supabase.from("packages").upsert(toUpsert, { onConflict: "user_id,tracking" });
+  if (up.error) { if (msg) msg.textContent = up.error.message; return; }
+
+  if (msg) msg.textContent = "Imported " + toUpsert.length + " packages." + (skipped.length ? (" Skipped: " + skipped.length) : "");
+  await renderPackages();
+}
+
 
 // ========================
 // MESSAGES

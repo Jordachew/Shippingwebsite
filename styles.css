@@ -821,3 +821,23 @@ body.admin-page #adminChatBody * {
   .dashH1{ font-size: 34px; }
   .shipLabel{ width: 140px; }
 }
+
+
+/* ===== Fix: prevent white-on-white and improve readability ===== */
+input, select, textarea{
+  color: var(--text) !important;
+  background-color: rgba(255,255,255,.05) !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+input::placeholder, textarea::placeholder{ color: rgba(255,255,255,.55) !important; }
+input[type="file"]{ padding: 10px 12px; border-radius: 12px; }
+.table, table{ color: var(--text); }
+.tableWrap, .tableWrap--soft{ background: rgba(0,0,0,.25) !important; }
+.panel, .card, .shipCard{ background: rgba(0,0,0,.30) !important; }
+
+/* Make the logo more readable */
+.dashLogo{ height: 86px !important; }
+.dashBrand{ gap: 14px !important; }
+.dashBrandText{ display:flex; flex-direction:column; line-height:1.05; }
+.dashBrandText .t1{ font-family: Sora, Inter, system-ui; font-weight: 900; font-size: 22px; color: rgba(247,215,122,.98); letter-spacing:.02em; }
+.dashBrandText .t2{ font-size: 12px; font-weight: 700; color: rgba(255,255,255,.72); }

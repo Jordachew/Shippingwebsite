@@ -272,9 +272,11 @@
   function renderShipTo(profile, email) {
     var el = $("shipToBlock");
     if (!el) return;
-    var fn = firstName(profile?.full_name, email);
-    var acct = profile?.customer_no || "SNS-JMXXXX";
-    el.textContent = [fn + " — " + acct].concat(WAREHOUSE_LINES).join("\n");
+    var full = (profile && profile.full_name) ? profile.full_name : (email || "Customer");
+    var acct = (profile && profile.customer_no) ? profile.customer_no : "SNS-JMXXXX";
+    // Address block should show full name on its own line (not just first name)
+    el.textContent = [full, acct].concat(WAREHOUSE_LINES).join("
+");
   }
 
   // ------------------------
@@ -770,12 +772,14 @@
       });
     });
 
-    $("jumpUpload")?.addEventListener("click", function () {
+    var _ju = $("jumpUpload");
+    if (_ju) _ju.addEventListener("click", function () {
       showDashTab("invoices");
-      $("invTracking")?.focus();
+      var it = $("invTracking"); if (it) it.focus();
     });
 
-    $("closeChatTab")?.addEventListener("click", function () {
+    var _cct = $("closeChatTab");
+    if (_cct) _cct.addEventListener("click", function () {
       showDashTab("overview");
       closeChat();
     });

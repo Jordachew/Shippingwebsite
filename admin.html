@@ -162,15 +162,15 @@
             <input id="pkgSearch" class="input" placeholder="Search tracking / status / customer" />
             <select id="statusFilter" class="input">
               <option value="">All statuses</option>
-              <option>RECEIVED</option>
-              <option>IN_TRANSIT</option>
-              <option>ARRIVED_JA</option>
-              <option>READY_FOR_PICKUP</option>
-              <option>PICKED_UP</option>
-              <option>ON_HOLD</option>
             </select>
             <button id="refreshPackages" class="btn btn--ghost" type="button">Refresh</button>
+            <label class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+              <input id="csvUploadInput" type="file" accept=".csv" style="display:none"/>
+              Upload CSV
+            </label>
+            <button id="csvUploadBtn" class="btn btn--primary" type="button">Import</button>
           </div>
+          <div class="muted small" id="csvUploadMsg" style="margin-top:8px"></div>
         </div>
 
         <div class="card">
@@ -201,14 +201,8 @@
                 <label class="field"><span>Tracking</span><input id="pkgEditTracking" required /></label>
                 <label class="field">
                   <span>Status</span>
-                  <select id="pkgEditStatus" class="input">
-                    <option>RECEIVED</option>
-                    <option>IN_TRANSIT</option>
-                    <option>ARRIVED_JA</option>
-                    <option>READY_FOR_PICKUP</option>
-                    <option>PICKED_UP</option>
-                    <option>ON_HOLD</option>
-                  </select>
+                  <input id="pkgEditStatus" class="input" list="statusDatalist" placeholder="Type or choose status" />
+                  <datalist id="statusDatalist"></datalist>
                 </label>
               </div>
 
