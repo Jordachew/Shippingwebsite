@@ -62,9 +62,9 @@ code{background: rgba(255,255,255,.06); padding:.12rem .35rem; border-radius:8px
 }
 .brand{display:flex; align-items:center; gap:10px}
 .brand__mark{
-  width:42px; height:42px; border-radius:14px;
+  width:56px; height:56px; border-radius:16px;
   display:grid; place-items:center;
-  background: var(--accent);
+  background: transparent;
   border:1px solid var(--line);
   box-shadow: var(--shadow);
   font-weight:900;
@@ -668,3 +668,17 @@ body.admin-page #adminChatBody * {
 
 /* --- Shipping address block --- */
 .shipTo{white-space:pre-wrap;line-height:1.45;margin:0;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.03)}
+
+
+.card--compact{padding:14px}
+.card--compact h3{margin:0 0 6px 0}
+.card--compact .tableWrap{margin-top:10px}
+.card--compact .muted{margin:0}
+
+.ratesTable th,.ratesTable td{padding:10px 12px}
+
+
+/* Light background safety (avoid white-on-white) */
+.onlight, .onlight *{color:#111 !important}
+.onlight .muted{color:#444 !important}
+.onlight .input{color:#111 !important}

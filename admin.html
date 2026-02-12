@@ -68,7 +68,8 @@
         <button class="tab active" data-tab="overview" type="button">Overview</button>
         <button class="tab" data-tab="customers" type="button">Customers</button>
         <button class="tab" data-tab="packages" type="button">Packages</button>
-        <button class="tab" data-tab="messages" type="button">Messages</button>
+                <button class="tab" data-tab="invoices" type="button">Invoices</button>
+<button class="tab" data-tab="messages" type="button">Messages</button>
         <button class="tab" data-tab="reports" type="button">Reports</button>
         <button class="tab" data-tab="roles" type="button">Roles</button>
       </nav>
@@ -156,7 +157,7 @@
         <div class="panel__top">
           <div>
             <h2 class="h3">Packages</h2>
-            <p class="muted small">Approve, edit, assign, update status, and attach photos/invoices.</p>
+            <p class="muted small">Edit, assign, update status, and attach photos/invoices.</p>
           </div>
           <div class="panel__actions">
             <input id="pkgSearch" class="input" placeholder="Search tracking / status / customer" />
@@ -179,7 +180,7 @@
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Tracking</th><th>Status</th><th>Approved</th><th>Customer</th><th>Store</th><th>Updated</th><th>Actions</th>
+                    <th>Tracking</th><th>Status</th><th>Customer</th><th>Store</th><th>Updated</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="packagesBody"></tbody>
@@ -189,7 +190,23 @@
           </div>
         </div>
 
-        <div class="card">
+        
+<div class="card">
+  <div class="card__head">
+    <h3 class="h3">Bulk upload packages (CSV)</h3>
+    <p class="muted small">Upload a CSV to create/update packages in bulk. Columns: tracking,status,store,email_or_account (optional),notes (optional).</p>
+  </div>
+  <div class="card__body">
+    <div class="row">
+      <input id="pkgCsvFile" type="file" class="input" accept=".csv,text/csv" />
+      <button id="uploadPkgCsv" class="btn" type="button">Upload CSV</button>
+      <button id="downloadPkgCsvTemplate" class="btn btn--ghost" type="button">Download template</button>
+    </div>
+    <div id="pkgCsvMsg" class="muted small"></div>
+  </div>
+</div>
+
+<div class="card">
           <div class="card__head">
             <h3 class="h3">Edit package</h3>
             <p class="muted small">Select a package to edit.</p>
@@ -214,13 +231,7 @@
 
               <div class="grid2">
                 <label class="field"><span>Store</span><input id="pkgEditStore" placeholder="Amazon / Shein / Temu" /></label>
-                <label class="field"><span>Approved</span>
-                  <select id="pkgEditApproved" class="input">
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </select>
-                </label>
-              </div>
+                </div>
 
               <label class="field">
                 <span>Notes</span>
@@ -248,7 +259,43 @@
       </section>
 
       <!-- MESSAGES -->
-      <section class="panel hidden" id="tab-messages">
+      
+<!-- INVOICES -->
+<section class="panel" id="tab-invoices">
+  <div class="panel__top">
+    <div>
+      <h2 class="h3">Invoices</h2>
+      <p class="muted small">Review customer uploads and approve/confirm pickup location.</p>
+    </div>
+    <div class="panel__actions">
+      <input id="invSearch" class="input" placeholder="Search tracking / customer email / account #" />
+      <select id="invApprovalFilter" class="input">
+        <option value="">All</option>
+        <option value="pending">Pending approval</option>
+        <option value="approved">Approved</option>
+      </select>
+      <button id="refreshInvoices" class="btn btn--ghost" type="button">Refresh</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__body">
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tracking</th><th>Customer</th><th>File</th><th>Pickup</th><th>Status</th><th>Uploaded</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoicesBody"></tbody>
+        </table>
+      </div>
+      <div id="invMsg" class="muted small"></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel hidden" id="tab-messages">
         <div class="panel__top">
           <div>
             <h2 class="h3">Messages</h2>

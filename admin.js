@@ -50,6 +50,51 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
+
+/* ========================
+   DATA HELPERS
+   ======================== */
+async function getProfilesMap(ids) {
+  const uniq = Array.from(new Set((ids || []).filter(Boolean)));
+  if (!uniq.length) return new Map();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,email,full_name,customer_no")
+    .in("id", uniq);
+
+  if (error) {
+    console.warn("profiles map error:", error);
+    return new Map();
+  }
+
+  const m = new Map();
+  (data || []).forEach((p) => m.set(p.id, p));
+  return m;
+}
+
+function formatCustomerLabel(p) {
+  if (!p) return "—";
+  const first = (p.full_name || "").trim().split(/\s+/)[0] || (p.email || "Customer").split("@")[0];
+  const acct = p.customer_no || "SNS-JMXXXX";
+  return `${first} — ${acct} (${p.email || "—"})`;
+}
+
+
+function parseCSV(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim());
+  const out = [];
+  for (let i=1;i<lines.length;i++){
+    const cols = lines[i].split(","); // simple CSV (no quoted commas)
+    const row = {};
+    headers.forEach((h, idx) => row[h] = (cols[idx] ?? "").trim());
+    out.push(row);
+  }
+  return out;
+}
+
 function getProjectRef() {
   try {
     return new URL(SUPABASE_URL).hostname.split(".")[0];
@@ -172,7 +217,7 @@ function setupTabs() {
   function showTab(tabName) {
     buttons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
 
-    const panels = ["overview", "customers", "packages", "messages", "reports", "roles"];
+    const panels = ["overview", "customers", "packages", "invoices", "messages", "reports", "roles"];
     panels.forEach((p) => {
       const el = $(`tab-${p}`);
       if (el) el.classList.toggle("hidden", p !== tabName);
@@ -182,6 +227,7 @@ function setupTabs() {
     if (tabName === "overview") renderOverview();
     if (tabName === "customers") renderCustomers();
     if (tabName === "packages") renderPackages();
+    if (tabName === "invoices") renderInvoices();
     if (tabName === "messages") renderConversations();
   }
 
@@ -342,10 +388,10 @@ async function renderOverview() {
   if (!statsRow) return;
 
   // Pull last N packages/messages for “Recent”
-  const [pkgRes, msgRes, custRes] = await Promise.all([
+  const [pkgRes, msgRes, statusRes, invRes] = await Promise.all([
     supabase
       .from("packages")
-      .select("id,tracking,status,updated_at")
+      .select("id,tracking,status,updated_at,user_id")
       .order("updated_at", { ascending: false })
       .limit(8),
     supabase
@@ -353,21 +399,42 @@ async function renderOverview() {
       .select("id,user_id,sender,body,created_at")
       .order("created_at", { ascending: false })
       .limit(8),
+    // For dashboard analytics (counts)
     supabase
-      .from("profiles")
-      .select("id")
-      .limit(1),
+      .from("packages")
+      .select("status")
+      .order("updated_at", { ascending: false })
+      .limit(1000),
+    // Pending invoices (if invoices table exists)
+    supabase
+      .from("invoices")
+      .select("id", { count: "exact" })
+      .limit(1000),
   ]);
 
-  // Build quick status counts (lightweight)
-  const statusCounts = {};
-  if (pkgRes.data) {
-    for (const p of pkgRes.data) {
-      statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
-    }
+  
+// Build status counts from last 1000 packages
+const statusCounts = {};
+if (statusRes.data) {
+  for (const p of statusRes.data) {
+    statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
   }
+}
 
-  const stats = [
+const inTransit = statusCounts["IN_TRANSIT"] || 0;
+const ready = statusCounts["READY_FOR_PICKUP"] || 0;
+const delivered = statusCounts["PICKED_UP"] || 0;
+
+const stats = [
+  { label: "In Transit", value: inTransit },
+  { label: "Ready for Pickup", value: ready },
+  { label: "Picked Up", value: delivered },
+  { label: "Packages (sampled)", value: statusRes.data?.length || 0 },
+  { label: "Customers (table)", value: "—" },
+  { label: "Invoices (table)", value: invRes.count ?? (invRes.data?.length || 0) },
+];
+
+
     { label: "Recent packages", value: pkgRes.data?.length || 0 },
     { label: "Recent messages", value: msgRes.data?.length || 0 },
     { label: "Statuses shown", value: Object.keys(statusCounts).length },
@@ -442,6 +509,14 @@ async function renderCustomers() {
   if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
 
   const { data, error } = await query;
+
+// Enrich with customer labels
+const profMap = await getProfilesMap((data || []).map(p => p.user_id));
+(data || []).forEach(p => {
+  const prof = profMap.get(p.user_id);
+  p.__customerLabel = prof ? formatCustomerLabel(prof) : (p.user_id ? `Unassigned (${p.user_id.slice(0,8)}…)` : "Unassigned");
+});
+
   if (error) {
     body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
@@ -463,6 +538,21 @@ async function renderCustomers() {
     </tr>
   `
     )
+
+
+// Edit buttons (avoid row click issues)
+body.querySelectorAll('button[data-edit]').forEach((btn) => {
+  btn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const id = btn.getAttribute("data-edit");
+    const pkg = data.find((x) => x.id === id);
+    if (!pkg) return;
+    fillPackageEditor(pkg);
+    // jump to editor
+    document.getElementById("pkgEditForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+});
+
     .join("");
 
   body.querySelectorAll("tr[data-id]").forEach((tr) => {
@@ -529,6 +619,71 @@ function setupPackagesUI() {
     e.preventDefault();
     await savePackageEdits();
   });
+
+$("uploadPkgCsv")?.addEventListener("click", async () => {
+  const msg = $("pkgCsvMsg");
+  if (msg) msg.textContent = "Uploading…";
+
+  const file = $("pkgCsvFile")?.files?.[0];
+  if (!file) { if (msg) msg.textContent = "Choose a CSV file first."; return; }
+
+  try {
+    const text = await file.text();
+    const rows = parseCSV(text);
+    if (!rows.length) { if (msg) msg.textContent = "No rows found in CSV."; return; }
+
+    // Resolve customers by email/account if provided
+    const patches = [];
+    for (const r of rows) {
+      const tracking = (r.tracking || "").trim();
+      if (!tracking) continue;
+
+      const status = (r.status || "").trim() || "RECEIVED";
+      const store = (r.store || "").trim() || null;
+      const notes = (r.notes || "").trim() || null;
+
+      let user_id = null;
+      const key = (r.email_or_account || "").trim();
+      if (key) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("id")
+          .or(`email.eq.${key},customer_no.eq.${key}`)
+          .maybeSingle();
+        user_id = prof?.id || null;
+      }
+
+      patches.push({ tracking, status, store, notes, user_id });
+    }
+
+    if (!patches.length) { if (msg) msg.textContent = "No valid rows (missing tracking)."; return; }
+
+    // Upsert by tracking (assumes tracking unique). If your DB enforces per-user uniqueness, adjust accordingly.
+    const { error } = await supabase.from("packages").upsert(patches, { onConflict: "tracking" });
+    if (error) { if (msg) msg.textContent = error.message; return; }
+
+    if (msg) msg.textContent = `Uploaded ${patches.length} row(s).`;
+    $("pkgCsvFile").value = "";
+    await renderPackages();
+  } catch (e) {
+    console.error(e);
+    if (msg) msg.textContent = "CSV error: " + (e?.message || e);
+  }
+});
+
+$("downloadPkgCsvTemplate")?.addEventListener("click", () => {
+  const header = "tracking,status,store,email_or_account,notes
+";
+  const sample = "1Z999AA10123456784,IN_TRANSIT,Amazon,suenoshipping@gmail.com,Sample note
+";
+  const blob = new Blob([header + sample], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "packages_template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
 }
 
 async function renderPackages() {
@@ -542,11 +697,28 @@ async function renderPackages() {
 
   let query = supabase
     .from("packages")
-    .select("id,tracking,status,store,approved,notes,user_id,updated_at")
+    .select("id,tracking,status,store,notes,user_id,updated_at")
     .order("updated_at", { ascending: false })
     .limit(200);
 
-  if (q) query = query.ilike("tracking", `%${q}%`);
+
+if (q) {
+  // Search by tracking OR customer email/account/name
+  const { data: hits } = await supabase
+    .from("profiles")
+    .select("id")
+    .or(`email.ilike.%${q}%,customer_no.ilike.%${q}%,full_name.ilike.%${q}%`)
+    .limit(50);
+
+  const ids = (hits || []).map((h) => h.id);
+
+  if (ids.length) {
+    // tracking OR assigned customer
+    query = query.or(`tracking.ilike.%${q}%,user_id.in.(${ids.join(",")})`);
+  } else {
+    query = query.ilike("tracking", `%${q}%`);
+  }
+}
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
@@ -560,20 +732,22 @@ async function renderPackages() {
     return;
   }
 
-  body.innerHTML = data
+  
+body.innerHTML = data
     .map(
       (p) => `
     <tr data-id="${escapeHTML(p.id)}" class="clickrow">
       <td><strong>${escapeHTML(p.tracking)}</strong></td>
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
+      <td class="muted small">${escapeHTML(p.__customerLabel || "Unassigned")}</td>
       <td>${escapeHTML(p.store || "—")}</td>
-      <td class="muted small">${p.approved ? "Yes" : "No"}</td>
-      <td class="muted small">${escapeHTML(p.user_id || "Unassigned")}</td>
       <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
+      <td><button class="btn btn--ghost btn--sm" type="button" data-edit="${escapeHTML(p.id)}">Edit</button></td>
     </tr>
   `
     )
     .join("");
+
 
   body.querySelectorAll("tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", () => {
@@ -590,7 +764,6 @@ function fillPackageEditor(pkg) {
   if ($("pkgEditTracking")) $("pkgEditTracking").value = pkg.tracking || "";
   if ($("pkgEditStatus")) $("pkgEditStatus").value = pkg.status || "";
   if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
-  if ($("pkgEditApproved")) $("pkgEditApproved").value = (pkg.approved ? "true" : "false");
   if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
   if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
 }
@@ -609,7 +782,6 @@ async function savePackageEdits() {
     tracking: ($("pkgEditTracking")?.value || "").trim(),
     status: ($("pkgEditStatus")?.value || "").trim(),
     store: ($("pkgEditStore")?.value || "").trim() || null,
-    approved: ($("pkgEditApproved")?.value === "true"),
     notes: ($("pkgEditNotes")?.value || "").trim() || null,
   };
 
@@ -651,6 +823,115 @@ async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
 // ========================
 // MESSAGES
 // ========================
+
+/* ========================
+   INVOICES (Approval queue)
+   Notes:
+   - This expects invoices table to have at least: id, user_id, tracking, file_name, file_type, pickup, pickup_confirmed, created_at
+   - Optional columns supported if present: approved (bool), approved_at, approved_by
+   ======================== */
+let __invoicesHasApprovedCol = true;
+
+function setupInvoicesUI() {
+  $("refreshInvoices")?.addEventListener("click", () => renderInvoices());
+  $("invSearch")?.addEventListener("input", () => renderInvoices());
+  $("invApprovalFilter")?.addEventListener("change", () => renderInvoices());
+}
+
+async function renderInvoices() {
+  setupInvoicesUI();
+
+  const body = $("invoicesBody");
+  if (!body) return;
+
+  const q = ($("invSearch")?.value || "").trim();
+  const f = ($("invApprovalFilter")?.value || "").trim();
+  body.innerHTML = `<tr><td colspan="7" class="muted">Loading…</td></tr>`;
+
+  // Try select with approved; if the column doesn't exist, retry without and disable approval UI
+  let sel = "id,user_id,tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note";
+  if (__invoicesHasApprovedCol) sel += ",approved";
+
+  let query = supabase
+    .from("invoices")
+    .select(sel)
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (q) {
+    // search by tracking or customer
+    const { data: hits } = await supabase
+      .from("profiles")
+      .select("id")
+      .or(`email.ilike.%${q}%,customer_no.ilike.%${q}%,full_name.ilike.%${q}%`)
+      .limit(50);
+    const ids = (hits || []).map((h) => h.id);
+    if (ids.length) query = query.or(`tracking.ilike.%${q}%,user_id.in.(${ids.join(",")})`);
+    else query = query.ilike("tracking", `%${q}%`);
+  }
+
+  if (f === "pending" && __invoicesHasApprovedCol) query = query.eq("approved", false);
+  if (f === "approved" && __invoicesHasApprovedCol) query = query.eq("approved", true);
+
+  let res = await query;
+  if (res.error && __invoicesHasApprovedCol && /approved/i.test(res.error.message || "")) {
+    // column likely missing
+    __invoicesHasApprovedCol = false;
+    return renderInvoices();
+  }
+
+  if (res.error) {
+    body.innerHTML = `<tr><td colspan="7" class="muted">${escapeHTML(res.error.message)}</td></tr>`;
+    return;
+  }
+
+  const rows = res.data || [];
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7" class="muted">No invoices found.</td></tr>`;
+    return;
+  }
+
+  const profMap = await getProfilesMap(rows.map(r => r.user_id));
+
+  body.innerHTML = rows.map((i) => {
+    const prof = profMap.get(i.user_id);
+    const cust = prof ? formatCustomerLabel(prof) : (i.user_id ? i.user_id.slice(0,8)+"…" : "—");
+    const ok = (__invoicesHasApprovedCol ? (i.approved ? "Approved" : "Pending") : (i.pickup_confirmed ? "Confirmed" : "Pending"));
+    return `
+      <tr>
+        <td><strong>${escapeHTML(i.tracking || "—")}</strong></td>
+        <td class="muted small">${escapeHTML(cust)}</td>
+        <td class="muted small">${escapeHTML(i.file_name || "—")}</td>
+        <td class="muted small">${escapeHTML(i.pickup || "—")}</td>
+        <td><span class="tag">${escapeHTML(ok)}</span></td>
+        <td class="muted small">${i.created_at ? new Date(i.created_at).toLocaleString() : "—"}</td>
+        <td>
+          ${__invoicesHasApprovedCol ? `
+            <button class="btn btn--ghost btn--sm" type="button" data-inv-approve="${escapeHTML(i.id)}">${i.approved ? "Unapprove" : "Approve"}</button>
+          ` : `
+            <span class="muted small">Add invoices.approved to enable approval</span>
+          `}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  if (__invoicesHasApprovedCol) {
+    body.querySelectorAll("button[data-inv-approve]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-inv-approve");
+        const row = rows.find(r => String(r.id) === String(id));
+        if (!row) return;
+
+        const next = !row.approved;
+        const { error } = await supabase.from("invoices").update({ approved: next }).eq("id", id);
+        if (error) return alert(error.message);
+        await renderInvoices();
+      });
+    });
+  }
+}
+
 function setupMessagesUI() {
   $("refreshMessages")?.addEventListener("click", () => renderConversations());
   $("msgSearch")?.addEventListener("input", () => renderConversations());

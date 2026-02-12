@@ -162,11 +162,11 @@
     }).join("");
 
     host.innerHTML =
-      '<div class="card card--pad">' +
+      '<div class="card card--pad card--compact">' +
         '<h3>Rate Chart</h3>' +
         '<p class="muted small">Base rate by weight. Final total = base rate + ' + formatJMD(fixedFeeJMD) + ' fee.</p>' +
         '<div class="tableWrap">' +
-          '<table class="table">' +
+          '<table class="table ratesTable">' +
             '<thead><tr><th>Weight</th><th>Base Rate</th></tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
           '</table>' +
@@ -267,7 +267,25 @@
     el.textContent = [fn + " — " + acct].concat(WAREHOUSE_LINES).join("\n");
   }
 
-  // ------------------------
+  
+async function sendWelcomeEmailSafe() {
+  try {
+    var u = await sb.auth.getUser();
+    var user = u?.data?.user;
+    if (!user) return;
+
+    await fetch("/api/welcome-email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ user_id: user.id }),
+    });
+  } catch (e) {
+    // Silent fail (email is optional)
+    console.warn("welcome email failed:", e);
+  }
+}
+
+// ------------------------
   // LOGIN / REGISTER
   // ------------------------
   function setupLoginRegister() {
@@ -330,6 +348,7 @@
         var sess = await safeGetSession();
         if (sess.session) {
           await ensureProfileSafe(full_name, phone);
+          await sendWelcomeEmailSafe();
           if (msg) msg.textContent = "Account created. You can now log in.";
         } else {
           if (msg) msg.textContent = "Account created. Please check your email to confirm, then log in.";
