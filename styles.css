@@ -62,9 +62,9 @@ code{background: rgba(255,255,255,.06); padding:.12rem .35rem; border-radius:8px
 }
 .brand{display:flex; align-items:center; gap:10px}
 .brand__mark{
-  width:56px; height:56px; border-radius:16px;
+  width:42px; height:42px; border-radius:14px;
   display:grid; place-items:center;
-  background: transparent;
+  background: var(--accent);
   border:1px solid var(--line);
   box-shadow: var(--shadow);
   font-weight:900;
@@ -670,15 +670,154 @@ body.admin-page #adminChatBody * {
 .shipTo{white-space:pre-wrap;line-height:1.45;margin:0;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.03)}
 
 
-.card--compact{padding:14px}
-.card--compact h3{margin:0 0 6px 0}
-.card--compact .tableWrap{margin-top:10px}
-.card--compact .muted{margin:0}
+/* ===== Screenshot-style dashboard ===== */
+.dashShell { padding: 8px; }
+.dashTop{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:10px 6px 6px;
+}
+.dashBrand{ display:flex; align-items:center; gap:10px; }
+.dashLogo{ height:52px; width:auto; object-fit:contain; filter: drop-shadow(0 10px 22px rgba(0,0,0,.35)); }
 
-.ratesTable th,.ratesTable td{padding:10px 12px}
+.dashRight{ display:flex; align-items:center; gap:10px; }
+.userPill{
+  display:flex; align-items:center; gap:10px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.35);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color:#fff;
+}
+.userPill .avatar{ opacity:.9; }
+.userPill .caret{ opacity:.7; }
+
+.iconBtn{
+  position:relative;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.35);
+  color:#fff;
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor:pointer;
+}
+.notifDot{
+  position:absolute; top:-6px; right:-6px;
+  min-width:18px; height:18px; border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800;
+  background:#e11d48; color:#fff;
+  border:2px solid rgba(0,0,0,.6);
+}
+
+.dashNav{
+  display:flex; gap:18px; flex-wrap:wrap;
+  padding: 10px 6px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.dashTab{
+  background: transparent;
+  border:0;
+  color: rgba(255,255,255,.75);
+  font-weight:700;
+  cursor:pointer;
+  padding: 8px 6px;
+}
+.dashTab.active{ color:#fff; border-bottom:2px solid rgba(212,175,55,.85); }
+
+.dashGrid2{
+  display:grid;
+  grid-template-columns: 1.55fr .95fr;
+  gap: 18px;
+  padding: 18px 6px 6px;
+}
+@media (max-width: 980px){
+  .dashGrid2{ grid-template-columns: 1fr; }
+}
+
+.dashH1{
+  margin: 0 0 12px;
+  font-size: 42px;
+  letter-spacing: -0.02em;
+  color:#fff;
+}
+
+.shipCard{
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.30);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.shipRow{ display:flex; gap:14px; padding: 8px 0; }
+.shipLabel{ width:160px; color: rgba(212,175,55,.9); font-weight:800; }
+.shipValue{ color:#fff; font-weight:700; }
+.shipTo{
+  margin:0;
+  white-space:pre-wrap;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.03);
+}
+
+.statRow{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+@media (max-width: 680px){ .statRow{ grid-template-columns: 1fr; } }
+
+.statCard{
+  border-radius: 16px;
+  padding: 14px 16px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.30);
+}
+.statTitle{ color: rgba(255,255,255,.80); font-weight:800; }
+.statNum{ font-size: 44px; font-weight: 900; margin-top: 8px; color:#fff; }
+
+.statCard.gold{ background: linear-gradient(135deg, rgba(212,175,55,.35), rgba(0,0,0,.35)); }
+.statCard.blue{ background: linear-gradient(135deg, rgba(59,130,246,.35), rgba(0,0,0,.35)); }
+.statCard.green{ background: linear-gradient(135deg, rgba(16,185,129,.30), rgba(0,0,0,.35)); }
+
+.panel--soft{
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.30);
+  border-radius: 18px;
+}
+
+.miniCalc{ display:grid; gap:10px; }
+.miniCalc input{
+  width:100%;
+  border-radius: 12px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  color:#fff;
+  padding: 10px 12px;
+}
+.miniCalcOut{ margin-top: 12px; }
+.bigMoney{ font-size: 28px; font-weight: 900; color: rgba(212,175,55,.95); }
 
 
-/* Light background safety (avoid white-on-white) */
-.onlight, .onlight *{color:#111 !important}
-.onlight .muted{color:#444 !important}
-.onlight .input{color:#111 !important}
+/* ===== Screenshot-style dashboard tabs + layout ===== */
+.dashSection{ display:none; }
+.dashSection.active{ display:block; }
+.dashGridSingle{ padding: 18px 6px 6px; max-width: 1200px; margin: 0 auto; }
+.tableWrap--soft{ overflow:auto; border-radius:14px; border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.02); }
+.table--mini th, .table--mini td{ padding: 10px 12px; }
+.chat--embedded{
+  position: static !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  right: auto !important;
+  bottom: auto !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  margin: 0;
+}
+.chat--embedded .chat__body{ height: 420px; }
+@media (max-width: 980px){
+  .dashH1{ font-size: 34px; }
+  .shipLabel{ width: 140px; }
+}

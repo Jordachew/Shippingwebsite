@@ -205,94 +205,205 @@
 
       <!-- Dashboard -->
       <div class="card card--pad hidden" id="dashCard">
-        <div class="dashHead">
-          <div>
-            <h3 class="m0">Dashboard</h3>
-            <div class="muted small">Welcome, <span id="userName">Customer</span></div>
-          </div>
-          <div class="dashHead__actions">
-            <a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
-            <button class="btn btn--ghost" id="openChatDash" type="button">Chat</button>
-            <button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
-          </div>
-        </div>
-
-        <div class="dashGrid">
-
-          <div class="panel">
-            <div class="panel__head">
-              <div class="panel__title">Your U.S. Shipping Address</div>
-              <div class="panel__sub muted small">Use this address when shopping online. Your name is included so we can match your package.</div>
+        <div class="dashShell">
+          <div class="dashTop">
+            <div class="dashBrand">
+              <img src="assets/logo.jpeg" class="dashLogo" alt="Sueños logo">
             </div>
 
-            <div class="addrBlock" id="shipToBlock" aria-live="polite"></div>
-            <div class="row row--wrap">
-              <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
-              <span class="muted small" id="shipToMsg"></span>
+            <div class="dashRight">
+              <button class="iconBtn" id="notifBtn" type="button" aria-label="Notifications">
+                🔔 <span class="notifDot" id="notifDot" style="display:none;">2</span>
+              </button>
+
+              <div class="userPill">
+                <span class="avatar">👤</span>
+                <span id="userName">Customer</span>
+                <span class="caret">▾</span>
+              </div>
+
+              <a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
+              <button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
             </div>
           </div>
-          <div class="panel">
+
+          <nav class="dashNav" aria-label="Dashboard tabs">
+            <button class="dashTab active" data-tab="overview" type="button">Dashboard</button>
+            <button class="dashTab" data-tab="packages" type="button">Packages</button>
+            <button class="dashTab" data-tab="invoices" type="button">Invoices</button>
+            <button class="dashTab" data-tab="chat" type="button">Chat Support</button>
+            <button class="dashTab" data-tab="rates" type="button">Rate Calculator</button>
+          </nav>
+
+          <div class="dashSection active" data-section="overview">
+            <div class="dashGrid2">
+              <section class="dashLeft">
+                <h2 class="dashH1">Welcome back, <span id="welcomeName">Customer</span>!</h2>
+
+                <div class="shipCard">
+                  <div class="shipRow">
+                    <div class="shipLabel">Customer #:</div>
+                    <div class="shipValue" id="customerNo">SNS-JMXXXX</div>
+                  </div>
+                  <div class="shipRow">
+                    <div class="shipLabel">Shipping Address:</div>
+                    <div class="shipValue" style="flex:1">
+                      <pre class="shipTo" id="shipToBlock"></pre>
+                    </div>
+                  </div>
+                  <div class="row row--wrap">
+                    <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
+                    <span class="muted small" id="shipToMsg"></span>
+                  </div>
+                </div>
+
+                <div class="statRow">
+                  <div class="statCard gold">
+                    <div class="statTitle">Awaiting Pickup</div>
+                    <div class="statNum" id="statAwaiting">0</div>
+                  </div>
+                  <div class="statCard blue">
+                    <div class="statTitle">Picked Up</div>
+                    <div class="statNum" id="statPicked">0</div>
+                  </div>
+                  <div class="statCard green">
+                    <div class="statTitle">In Transit</div>
+                    <div class="statNum" id="statTransit">0</div>
+                  </div>
+                </div>
+
+                <div class="panel panel--soft">
+                  <div class="panel__head">
+                    <div class="panel__title">Awaiting Pickup</div>
+                    <div class="panel__sub muted small">Most recent packages first.</div>
+                  </div>
+
+                  <div class="tableWrap tableWrap--soft">
+                    <table class="table table--mini">
+                      <thead>
+                        <tr>
+                          <th>Tracking #</th>
+                          <th>Status</th>
+                          <th>Weight</th>
+                          <th>Value</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody id="awaitingTableBody">
+                        <tr><td colspan="5" class="muted">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="row" style="justify-content:flex-end;margin-top:10px">
+                    <button class="btn btn--primary" id="jumpUpload" type="button">Upload Invoice</button>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="dashRightCol">
+                <div class="panel panel--soft">
+                  <div class="panel__head">
+                    <div class="panel__title">Shipping Rates Calculator</div>
+                    <div class="panel__sub muted small">Quick estimate (JMD).</div>
+                  </div>
+
+                  <form id="miniCalcForm" class="miniCalc">
+                    <label>Weight (lbs)
+                      <input id="miniWeight" type="number" step="0.1" min="0.1" required>
+                    </label>
+                    <label>Value (USD)
+                      <input id="miniValue" type="number" step="0.01" min="0" required>
+                    </label>
+                    <button class="btn btn--primary" type="submit">Calculate</button>
+                  </form>
+
+                  <div class="miniCalcOut">
+                    <div class="muted small">Estimated Cost:</div>
+                    <div class="bigMoney" id="miniResult">—</div>
+                    <div class="muted small" id="miniResultSub"></div>
+                  </div>
+                </div>
+
+                <div class="panel panel--soft" style="margin-top:14px">
+                  <div class="panel__head">
+                    <div class="panel__title">Need help?</div>
+                    <div class="panel__sub muted small">Message support for package updates.</div>
+                  </div>
+                  <button class="btn btn--primary" id="openChatDash" type="button" style="width:100%">Open Chat</button>
+                  <div class="muted small" style="margin-top:10px">If you don’t see a response right away, we’ll reply during business hours.</div>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <div class="dashSection" data-section="packages">
+            <div class="dashGridSingle">
+              <div class="panel">
             <div class="panel__head">
               <div class="panel__title">Your Packages</div>
               <div class="panel__sub muted small">Search by tracking number.</div>
             </div>
 
-            <div class="searchRow">
-              <input id="pkgSearch" type="text" placeholder="Search tracking (e.g., SSX-1234)"/>
-              <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
-            </div>
-
-            <div class="tableWrap tableWrap--soft">
-              <table class="table table--mini">
-                <thead>
-                <tr>
-                  <th>Tracking</th>
-                  <th>Status</th>
-                  <th>Pickup</th>
-                  <th>Updated</th>
-                </tr>
-                </thead>
-                <tbody id="pkgBody"></tbody>
-              </table>
+            
             </div>
           </div>
 
-          <div class="panel">
+          <div class="dashSection" data-section="invoices">
+            <div class="dashGridSingle">
+              <div class="panel">
             <div class="panel__head">
               <div class="panel__title">Upload Invoice</div>
               <div class="panel__sub muted small">Required for processing.</div>
             </div>
 
-            <form class="form" id="invoiceForm">
-              <label>Tracking ID <span class="req">*</span>
-                <input id="invTracking" type="text" placeholder="SSX-1234" required/>
-              </label>
-
-              <label>Pickup Location <span class="req">*</span>
-                <select id="invPickup" required>
-                  <option value="UWI_KINGSTON">UWI, Kingston</option>
-                  <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
-                </select>
-              </label>
-
-              <label>Invoice File <span class="req">*</span>
-                <input id="invFile" type="file" required
-                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"/>
-              </label>
-
-              <label>Notes (optional)
-                <input id="invNote" type="text" placeholder="Any notes..."/>
-              </label>
-
-              <button class="btn btn--primary" type="submit">Upload</button>
-              <div class="muted small" id="invMsg"></div>
-            </form>
-
-            <div class="divider"></div>
-            <div class="panel__title">Recent Invoices</div>
-            <ul class="list" id="uploadsList"></ul>
+            
+            </div>
           </div>
+
+          <div class="dashSection" data-section="chat">
+            <div class="dashGridSingle">
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Chat with Support</div>
+                  <div class="panel__sub muted small">Attachments supported (PDF/JPG/DOCX/XLSX).</div>
+                </div>
+                <div id="chatTabHost"></div>
+                <div class="muted small" id="chatTabHint" style="margin-top:10px;">Click “Open Chat” if the widget is hidden.</div>
+                <div class="row" style="justify-content:flex-end;margin-top:10px">
+                  <button class="btn btn--ghost" id="closeChatTab" type="button">Back to Dashboard</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashSection" data-section="rates">
+            <div class="dashGridSingle">
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Shipping Cost Calculator</div>
+                  <div class="panel__sub muted small">Estimate only. Final cost may change based on duties/handling.</div>
+                </div>
+
+                <form class="form" id="rateTabForm">
+                  <label>Weight (lbs) <span class="req">*</span>
+                    <input id="rateTabWeight" type="number" step="0.1" min="0.1" required/>
+                  </label>
+                  <label>Declared Value (USD) <span class="req">*</span>
+                    <input id="rateTabValue" type="number" step="0.01" min="0" required/>
+                  </label>
+                  <button class="btn btn--primary" type="submit">Calculate</button>
+                  <div class="muted small" id="rateTabMsg"></div>
+                </form>
+
+                <div class="divider"></div>
+                <div id="rateTabResult" class="result"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
+
       </div>
     </div>
   </div>

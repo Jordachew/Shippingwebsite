@@ -162,11 +162,11 @@
     }).join("");
 
     host.innerHTML =
-      '<div class="card card--pad card--compact">' +
+      '<div class="card card--pad">' +
         '<h3>Rate Chart</h3>' +
         '<p class="muted small">Base rate by weight. Final total = base rate + ' + formatJMD(fixedFeeJMD) + ' fee.</p>' +
         '<div class="tableWrap">' +
-          '<table class="table ratesTable">' +
+          '<table class="table">' +
             '<thead><tr><th>Weight</th><th>Base Rate</th></tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
           '</table>' +
@@ -267,25 +267,7 @@
     el.textContent = [fn + " — " + acct].concat(WAREHOUSE_LINES).join("\n");
   }
 
-  
-async function sendWelcomeEmailSafe() {
-  try {
-    var u = await sb.auth.getUser();
-    var user = u?.data?.user;
-    if (!user) return;
-
-    await fetch("/api/welcome-email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ user_id: user.id }),
-    });
-  } catch (e) {
-    // Silent fail (email is optional)
-    console.warn("welcome email failed:", e);
-  }
-}
-
-// ------------------------
+  // ------------------------
   // LOGIN / REGISTER
   // ------------------------
   function setupLoginRegister() {
@@ -348,7 +330,6 @@ async function sendWelcomeEmailSafe() {
         var sess = await safeGetSession();
         if (sess.session) {
           await ensureProfileSafe(full_name, phone);
-          await sendWelcomeEmailSafe();
           if (msg) msg.textContent = "Account created. You can now log in.";
         } else {
           if (msg) msg.textContent = "Account created. Please check your email to confirm, then log in.";
@@ -689,6 +670,8 @@ async function sendWelcomeEmailSafe() {
       // Show "FirstName — Email"
       var fn = firstName(profile?.full_name, user.email);
       if ($("userName")) $("userName").textContent = fn + " — " + user.email;
+      if ($("welcomeName")) $("welcomeName").textContent = fn;
+      if ($("customerNo")) $("customerNo").textContent = (profile?.customer_no || "");
 
       // Shipping address block
       renderShipTo(profile, user.email);
@@ -698,8 +681,11 @@ async function sendWelcomeEmailSafe() {
       var isStaff = (role === "staff" || role === "admin");
       if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
+      setupDashboardTabs();
+      setupMiniCalcs();
       await renderPackages("");
       await renderUploads();
+      await renderDashboardStatsAndAwaiting();
     } finally {
       __renderAuthBusy = false;
     }
@@ -717,7 +703,198 @@ async function sendWelcomeEmailSafe() {
     });
   }
 
+  
   // ------------------------
+  // DASHBOARD TABS + OVERVIEW
+  // ------------------------
+  var __dashSetupDone = false;
+  var __dashEmbeddedChat = false;
+  var __chatOriginalParent = null;
+  var __chatOriginalNext = null;
+
+  function showDashTab(name) {
+    var tabs = document.querySelectorAll(".dashTab");
+    var sections = document.querySelectorAll(".dashSection");
+
+    tabs.forEach(function (t) {
+      t.classList.toggle("active", t.getAttribute("data-tab") === name);
+    });
+    sections.forEach(function (s) {
+      s.classList.toggle("active", s.getAttribute("data-section") === name);
+    });
+
+    if (name === "chat") {
+      embedChatWidget();
+    } else {
+      unembedChatWidget();
+    }
+  }
+
+  function setupDashboardTabs() {
+    if (__dashSetupDone) return;
+    __dashSetupDone = true;
+
+    document.querySelectorAll(".dashTab").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        showDashTab(btn.getAttribute("data-tab"));
+      });
+    });
+
+    $("jumpUpload")?.addEventListener("click", function () {
+      showDashTab("invoices");
+      $("invTracking")?.focus();
+    });
+
+    $("closeChatTab")?.addEventListener("click", function () {
+      showDashTab("overview");
+      closeChat();
+    });
+
+    // If user hits X while embedded, go back to dashboard
+    $("closeChat")?.addEventListener("click", function () {
+      if (document.querySelector('.dashSection.active[data-section="chat"]')) {
+        showDashTab("overview");
+      }
+    }, true);
+
+    // Default tab
+    showDashTab("overview");
+  }
+
+  function embedChatWidget() {
+    var widget = $("chatWidget");
+    var host = $("chatTabHost");
+    var fab = $("chatFab");
+    if (!widget || !host) return;
+
+    if (!__chatOriginalParent) {
+      __chatOriginalParent = widget.parentNode;
+      __chatOriginalNext = widget.nextSibling;
+    }
+
+    if (widget.parentNode !== host) host.appendChild(widget);
+    widget.classList.add("chat--embedded");
+    if (fab) fab.style.display = "none";
+
+    openChat();
+    __dashEmbeddedChat = true;
+    if ($("chatTabHint")) $("chatTabHint").style.display = "none";
+  }
+
+  function unembedChatWidget() {
+    if (!__dashEmbeddedChat) return;
+
+    var widget = $("chatWidget");
+    var fab = $("chatFab");
+    if (!widget || !__chatOriginalParent) return;
+
+    // move back
+    if (__chatOriginalNext && __chatOriginalNext.parentNode === __chatOriginalParent) {
+      __chatOriginalParent.insertBefore(widget, __chatOriginalNext);
+    } else {
+      __chatOriginalParent.appendChild(widget);
+    }
+
+    widget.classList.remove("chat--embedded");
+    closeChat();
+
+    if (fab) fab.style.display = "";
+    __dashEmbeddedChat = false;
+
+    if ($("chatTabHint")) $("chatTabHint").style.display = "";
+  }
+
+  async function renderDashboardStatsAndAwaiting() {
+    var awaiting = $("statAwaiting");
+    var picked = $("statPicked");
+    var transit = $("statTransit");
+    var tBody = $("awaitingTableBody");
+    if (!awaiting || !picked || !transit || !tBody) return;
+
+    var res = await sb.from("packages")
+      .select("tracking,status,weight_lbs,value_usd,cost_jmd,updated_at")
+      .order("updated_at", { ascending: false });
+
+    if (res.error) {
+      tBody.innerHTML = '<tr><td colspan="5" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
+      return;
+    }
+
+    var rows = res.data || [];
+    var norm = function (s) { return String(s || "").toLowerCase(); };
+
+    var awaitingRows = rows.filter(function (r) { return norm(r.status).includes("await") || norm(r.status).includes("ready"); });
+    var pickedRows   = rows.filter(function (r) { return norm(r.status).includes("picked"); });
+    var transitRows  = rows.filter(function (r) { return norm(r.status).includes("transit"); });
+
+    awaiting.textContent = String(awaitingRows.length);
+    picked.textContent = String(pickedRows.length);
+    transit.textContent = String(transitRows.length);
+
+    var show = awaitingRows.slice(0, 8);
+    if (!show.length) {
+      tBody.innerHTML = '<tr><td colspan="5" class="muted">No awaiting pickup packages.</td></tr>';
+      return;
+    }
+
+    tBody.innerHTML = show.map(function (p) {
+      return (
+        "<tr>" +
+          "<td><strong>" + escapeHTML(p.tracking || "") + "</strong></td>" +
+          "<td><span class=\"tag\">" + escapeHTML(p.status || "") + "</span></td>" +
+          "<td>" + (p.weight_lbs != null ? escapeHTML(String(p.weight_lbs)) + " lb" : "—") + "</td>" +
+          "<td>" + (p.value_usd != null ? "$" + Number(p.value_usd).toFixed(2) : "—") + "</td>" +
+          "<td>" + (p.cost_jmd != null ? formatJMD(Number(p.cost_jmd)) : "—") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function setupMiniCalcs() {
+    // Overview mini calc
+    $("miniCalcForm")?.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var w = parseFloat($("miniWeight")?.value);
+      var v = parseFloat($("miniValue")?.value);
+
+      if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
+        if ($("miniResult")) $("miniResult").textContent = "—";
+        if ($("miniResultSub")) $("miniResultSub").textContent = "Enter valid numbers.";
+        return;
+      }
+
+      var rr = findRateForWeight(w);
+      var total = rr.rate + fixedFeeJMD;
+
+      if ($("miniResult")) $("miniResult").textContent = formatJMD(total);
+      if ($("miniResultSub")) $("miniResultSub").textContent =
+        "Weight used: " + rr.rounded + " lb. Base: " + formatJMD(rr.rate) + " + Fee: " + formatJMD(fixedFeeJMD) + ".";
+    });
+
+    // Rates tab calc
+    $("rateTabForm")?.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var w = parseFloat($("rateTabWeight")?.value);
+      var v = parseFloat($("rateTabValue")?.value);
+
+      if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(v) || v < 0) {
+        if ($("rateTabMsg")) $("rateTabMsg").textContent = "Enter valid numbers.";
+        if ($("rateTabResult")) $("rateTabResult").innerHTML = '<div class="result__big">—</div><div class="result__sub">Enter valid numbers.</div>';
+        return;
+      }
+
+      var rr = findRateForWeight(w);
+      var total = rr.rate + fixedFeeJMD;
+
+      if ($("rateTabMsg")) $("rateTabMsg").textContent = "";
+      if ($("rateTabResult")) $("rateTabResult").innerHTML =
+        '<div class="result__big">' + formatJMD(total) + '</div>' +
+        '<div class="result__sub">Weight used: <strong>' + rr.rounded + ' lb</strong>. Base: ' +
+        formatJMD(rr.rate) + ' + Fee: ' + formatJMD(fixedFeeJMD) + '.</div>';
+    });
+  }
+
+// ------------------------
   // INIT
   // ------------------------
   function init() {
@@ -730,6 +907,8 @@ async function sendWelcomeEmailSafe() {
     setupPackageSearch();
     setupInvoiceUpload();
     setupChatUI();
+    setupDashboardTabs();
+    setupMiniCalcs();
     renderAuth();
   }
 
