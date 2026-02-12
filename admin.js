@@ -201,6 +201,7 @@ function setupTabs() {
     if (tabName === "customers") renderCustomers();
     if (tabName === "packages") renderPackages();
     if (tabName === "messages") renderConversations();
+    if (tabName === "reports") renderReports();
   }
 
   buttons.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -362,36 +363,36 @@ async function renderOverview() {
   const statsRow = $("statsRow");
   if (!statsRow) return;
 
-  // Pull last N packages/messages for “Recent”
-  const [pkgRes, msgRes, custRes] = await Promise.all([
+  // Pull recent + compute meaningful totals for the dashboard row
+  const [pkgRecent, msgRecent, pkgAgg, openMsgs] = await Promise.all([
+    supabase.from("packages").select("id,tracking,status,updated_at").order("updated_at", { ascending: false }).limit(8),
+    supabase.from("messages").select("id,user_id,sender,body,created_at,resolved").order("created_at", { ascending: false }).limit(8),
     supabase
       .from("packages")
-      .select("id,tracking,status,updated_at")
+      .select("id,status,weight,cost,amount_due_jmd,amount_paid_jmd,is_paid", { count: "exact" })
       .order("updated_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("messages")
-      .select("id,user_id,sender,body,created_at")
-      .order("created_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("profiles")
-      .select("id")
-      .limit(1),
+      .limit(1000),
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("resolved", false),
   ]);
 
-  // Build quick status counts (lightweight)
-  const statusCounts = {};
-  if (pkgRes.data) {
-    for (const p of pkgRes.data) {
-      statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
-    }
+  const totalPkgs = pkgAgg.count || 0;
+  let totalDue = 0;
+  let totalPaid = 0;
+  let unpaidCount = 0;
+  for (const p of pkgAgg.data || []) {
+    const due = Number(p.amount_due_jmd ?? p.cost ?? 0) || 0;
+    const paid = Number(p.amount_paid_jmd ?? 0) || 0;
+    totalDue += due;
+    totalPaid += paid;
+    const isPaid = (p.is_paid === true) || (due > 0 && paid >= due);
+    if (!isPaid) unpaidCount += 1;
   }
 
   const stats = [
-    { label: "Recent packages", value: pkgRes.data?.length || 0 },
-    { label: "Recent messages", value: msgRes.data?.length || 0 },
-    { label: "Statuses shown", value: Object.keys(statusCounts).length },
+    { label: "Total packages", value: totalPkgs },
+    { label: "Unpaid packages", value: unpaidCount },
+    { label: "Total due (JMD)", value: formatJMD(totalDue) },
+    { label: "Open messages", value: openMsgs.count || 0 },
   ];
 
   statsRow.innerHTML = stats
@@ -405,6 +406,8 @@ async function renderOverview() {
     )
     .join("");
 
+  const pkgRes = pkgRecent;
+  const msgRes = msgRecent;
   const recentPackages = $("recentPackages");
   if (recentPackages) {
     recentPackages.innerHTML =
@@ -572,7 +575,7 @@ async function renderPackages() {
 
   const { data, error } = await query;
   if (error) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
@@ -602,7 +605,7 @@ async function renderPackages() {
   }
 
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">No packages.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">No packages.</td></tr>`;
     return;
   }
 
@@ -616,18 +619,28 @@ async function renderPackages() {
       <td class="muted small">${p.approved ? "Yes" : "No"}</td>
       <td class="muted small">${escapeHTML(idToLabel.get(p.user_id) || p.user_id || "Unassigned")}</td>
       <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
+      <td><button class="btn btn--ghost btn--sm" type="button" data-edit="${escapeHTML(p.id)}">Edit</button></td>
     </tr>
   `
     )
     .join("");
 
-  body.querySelectorAll("tr[data-id]").forEach((tr) => {
-    tr.addEventListener("click", () => {
-      const id = tr.getAttribute("data-id");
-      const pkg = data.find((x) => x.id === id);
-      if (!pkg) return;
-      fillPackageEditor(pkg);
+  const goEdit = (id) => {
+    const pkg = data.find((x) => String(x.id) === String(id));
+    if (!pkg) return;
+    fillPackageEditor(pkg);
+    document.getElementById("pkgEditForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  body.querySelectorAll("button[data-edit]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      goEdit(btn.getAttribute("data-edit"));
     });
+  });
+
+  body.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.addEventListener("click", () => goEdit(tr.getAttribute("data-id")));
   });
 }
 
@@ -757,6 +770,21 @@ async function renderConversations() {
     return;
   }
 
+  // Map user_id -> "Full Name — SNS-JMXXXX" (never display raw UUIDs in UI)
+  const uidList = Array.from(new Set(convos.map(c => c.user_id).filter(Boolean)));
+  const idToLabel = new Map();
+  if (uidList.length) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id,full_name,customer_no,email")
+      .in("id", uidList);
+    for (const p of profs || []) {
+      const name = (p.full_name || p.email || "Customer").trim();
+      const no = (p.customer_no || "").trim();
+      idToLabel.set(p.id, no ? `${name} — ${no}` : name);
+    }
+  }
+
   // Show list
   list.innerHTML = convos
     .map(
@@ -765,7 +793,7 @@ async function renderConversations() {
         m.user_id
       )}">
       <div class="row">
-        <strong>${escapeHTML(m.user_id)}</strong>
+        <strong>${escapeHTML(idToLabel.get(m.user_id) || "Customer")}</strong>
         ${m.resolved ? `<span class="tag">Resolved</span>` : `<span class="tag">Open</span>`}
       </div>
       <div class="muted small">${escapeHTML((m.body || "").slice(0, 70))}</div>
@@ -789,17 +817,18 @@ async function selectConversationByCustomer(userId) {
   // Load minimal profile for header
   const prof = await supabase
     .from("profiles")
-    .select("id,email,full_name")
+    .select("id,email,full_name,customer_no")
     .eq("id", userId)
     .maybeSingle();
 
   currentCustomer = prof.data
-    ? { id: prof.data.id, email: prof.data.email, full_name: prof.data.full_name }
-    : { id: userId, email: "", full_name: "" };
+    ? { id: prof.data.id, email: prof.data.email, full_name: prof.data.full_name, customer_no: prof.data.customer_no }
+    : { id: userId, email: "", full_name: "", customer_no: "" };
 
   if ($("convoTitle")) {
-    $("convoTitle").textContent =
-      currentCustomer.full_name || currentCustomer.email || `Customer ${currentCustomer.id}`;
+    const name = currentCustomer.full_name || currentCustomer.email || "Customer";
+    const no = (currentCustomer.customer_no || "").trim();
+    $("convoTitle").textContent = no ? `${name} — ${no}` : name;
   }
 
   await renderChat();
@@ -950,6 +979,170 @@ function setupRolesUI() {
 
 // ========================
 // EXPORT PACKAGES CSV
+// ========================
+// ========================
+// REPORTS (simple, no external chart libs)
+// ========================
+let __lastReportRows = null;
+
+function setupReportsUI() {
+  $("runReports")?.addEventListener("click", () => renderReports(true));
+  $("exportReports")?.addEventListener("click", exportReportsCSV);
+}
+
+function fmtNum(n) {
+  const x = Number(n || 0) || 0;
+  return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+async function renderReports(force = false) {
+  setupReportsUI();
+
+  const shipEl = $("shipmentsChart");
+  const storeEl = $("storesChart");
+  if (!shipEl || !storeEl) return;
+
+  // Avoid re-running on every tab click unless requested
+  if (__lastReportRows && !force) {
+    shipEl.innerHTML = __lastReportRows.shipHtml;
+    storeEl.innerHTML = __lastReportRows.storeHtml;
+    return;
+  }
+
+  shipEl.textContent = "Loading…";
+  storeEl.textContent = "Loading…";
+
+  const days = Number($("reportRange")?.value || 30) || 30;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  // Try to use extended finance fields if present; fall back gracefully
+  let pkgSel = "id,created_at,store,status,weight,cost,amount_due_jmd,amount_paid_jmd,is_paid";
+  let res = await supabase
+    .from("packages")
+    .select(pkgSel)
+    .gte("created_at", since)
+    .order("created_at", { ascending: true })
+    .limit(5000);
+
+  if (res.error && String(res.error.message || "").includes("amount_due_jmd")) {
+    pkgSel = "id,created_at,store,status,weight,cost";
+    res = await supabase
+      .from("packages")
+      .select(pkgSel)
+      .gte("created_at", since)
+      .order("created_at", { ascending: true })
+      .limit(5000);
+  }
+
+  if (res.error) {
+    shipEl.innerHTML = `<div class="muted small">${escapeHTML(res.error.message)}</div>`;
+    storeEl.innerHTML = `<div class="muted small">${escapeHTML(res.error.message)}</div>`;
+    __lastReportRows = null;
+    return;
+  }
+
+  const rows = res.data || [];
+
+  // Shipments over time (by day)
+  const byDay = new Map();
+  for (const r of rows) {
+    const d = (r.created_at || "").slice(0, 10) || "unknown";
+    if (!byDay.has(d)) byDay.set(d, { day: d, count: 0, weight: 0, due: 0, paid: 0 });
+    const o = byDay.get(d);
+    o.count += 1;
+    o.weight += Number(r.weight || 0) || 0;
+    const due = Number(r.amount_due_jmd ?? r.cost ?? 0) || 0;
+    const paid = Number(r.amount_paid_jmd ?? 0) || 0;
+    o.due += due;
+    o.paid += paid;
+  }
+  const dayRows = Array.from(byDay.values());
+
+  const shipHtml = `
+    <div class="tableWrap">
+      <table class="table" style="min-width: 720px;">
+        <thead><tr><th>Day</th><th>Packages</th><th>Total weight</th><th>Total due (JMD)</th><th>Total paid (JMD)</th></tr></thead>
+        <tbody>
+          ${dayRows
+            .map(
+              (r) =>
+                `<tr><td>${escapeHTML(r.day)}</td><td>${r.count}</td><td>${fmtNum(r.weight)}</td><td>${formatJMD(r.due)}</td><td>${formatJMD(r.paid)}</td></tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Popular stores
+  const byStore = new Map();
+  for (const r of rows) {
+    const s = (r.store || "Unknown").trim() || "Unknown";
+    if (!byStore.has(s)) byStore.set(s, { store: s, count: 0, weight: 0, due: 0, paid: 0 });
+    const o = byStore.get(s);
+    o.count += 1;
+    o.weight += Number(r.weight || 0) || 0;
+    const due = Number(r.amount_due_jmd ?? r.cost ?? 0) || 0;
+    const paid = Number(r.amount_paid_jmd ?? 0) || 0;
+    o.due += due;
+    o.paid += paid;
+  }
+  const storeRows = Array.from(byStore.values()).sort((a, b) => b.count - a.count).slice(0, 25);
+
+  const storeHtml = `
+    <div class="tableWrap">
+      <table class="table" style="min-width: 720px;">
+        <thead><tr><th>Store</th><th>Packages</th><th>Total weight</th><th>Total due (JMD)</th><th>Total paid (JMD)</th></tr></thead>
+        <tbody>
+          ${storeRows
+            .map(
+              (r) =>
+                `<tr><td>${escapeHTML(r.store)}</td><td>${r.count}</td><td>${fmtNum(r.weight)}</td><td>${formatJMD(r.due)}</td><td>${formatJMD(r.paid)}</td></tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  shipEl.innerHTML = shipHtml;
+  storeEl.innerHTML = storeHtml;
+
+  __lastReportRows = { shipHtml, storeHtml, rows };
+}
+
+function exportReportsCSV() {
+  if (!__lastReportRows?.rows) {
+    alert("Run reports first.");
+    return;
+  }
+
+  const rows = __lastReportRows.rows;
+  const header = ["created_at", "tracking", "status", "store", "weight", "cost", "amount_due_jmd", "amount_paid_jmd", "is_paid"];
+  const csv = [
+    header.join(","),
+    ...rows.map((r) =>
+      header
+        .map((k) => {
+          const v = r[k] ?? "";
+          const s = String(v).replaceAll('"', '""');
+          return `"${s}"`;
+        })
+        .join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `reports_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// ========================
+// EXPORT PACKAGES
 // ========================
 async function exportPackagesCSV() {
   const { data, error } = await supabase

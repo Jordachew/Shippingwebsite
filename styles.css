@@ -10,6 +10,8 @@
   --muted:#a6adbb;
   --line:rgba(255,255,255,.10);
   --line2:rgba(255,255,255,.06);
+  /* used by some admin components */
+  --border: rgba(255,255,255,.10);
   --shadow: 0 18px 60px rgba(0,0,0,.45);
   --radius: 18px;
   --radius2: 22px;
@@ -467,9 +469,9 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(255,255,255,.9);
+  background: rgba(10,10,14,.78);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .topbar__inner{
   display:flex;
@@ -546,11 +548,22 @@ input:focus, textarea:focus, select:focus{border-color: rgba(110,231,255,.55)}
   .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .stat{
-  border:1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(247,248,251,.92));
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.55);
   border-radius: 18px;
   padding: 14px 14px 12px;
 }
+
+/* Force readable text on any light/gray surfaces that may sneak in (file inputs, OS UI) */
+input, textarea, select{
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+input::placeholder, textarea::placeholder{ color: rgba(255,255,255,.45); }
+
+/* Some browsers render file inputs with light backgrounds; ensure text stays readable */
+input[type="file"]{ color: var(--text); }
 .stat__label{ color: var(--muted); font-size: 12px; }
 .stat__value{ font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
 .stat__sub{ color: var(--muted); font-size: 12px; margin-top: 2px; }
