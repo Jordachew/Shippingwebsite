@@ -1425,3 +1425,55 @@ async function init() {
 }
 
 window.addEventListener("DOMContentLoaded", init);
+
+// --- Added: admin logout ---
+
+(function bindAdminLogout(){
+  const btn = document.getElementById("logoutBtn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    try {
+      await sb.auth.signOut();
+      window.location.href = "/index.html";
+    } catch (e) {
+      console.error("Logout failed:", e);
+      alert("Logout failed. Please refresh and try again.");
+    }
+  });
+})();
+
+
+// --- Added: package history panel (package_events) ---
+
+async function loadPackageHistory(packageId, tracking) {
+  const el = document.getElementById("pkgHistoryBody");
+  if (!el) return;
+  el.textContent = "Loading history...";
+  const { data, error } = await sb
+    .from("package_events")
+    .select("event_type, old_value, new_value, created_at")
+    .eq("package_id", packageId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    el.textContent = `Could not load history: ${error.message}`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    el.textContent = `No history found for ${tracking}.`;
+    return;
+  }
+  el.innerHTML = `
+    <table class="table table--mini">
+      <thead><tr><th>Time</th><th>Event</th><th>From</th><th>To</th></tr></thead>
+      <tbody>
+        ${data.map(r => `
+          <tr>
+            <td>${new Date(r.created_at).toLocaleString()}</td>
+            <td>${escapeHTML(String(r.event_type||""))}</td>
+            <td>${escapeHTML(String(r.old_value||""))}</td>
+            <td>${escapeHTML(String(r.new_value||""))}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
