@@ -50,6 +50,11 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
+function numOrNull(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function getProjectRef() {
   try {
     return new URL(SUPABASE_URL).hostname.split(".")[0];
@@ -459,57 +464,131 @@ async function renderCustomers() {
 
   let query = supabase
     .from("profiles")
-    .select("id,email,full_name,role,is_active,created_at")
+    .select("id,email,full_name,phone,address,customer_no,role,is_active,created_at")
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+  if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%,customer_no.ilike.%${q}%`);
 
   const { data, error } = await query;
   if (error) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">${escapeHTML(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">No customers found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="muted">No customers found.</td></tr>`;
     return;
   }
 
+  const label = (c) => {
+    const name = (c.full_name || c.email || "Customer").trim();
+    const no = (c.customer_no || "").trim();
+    return no ? `${name} — ${no}` : name;
+  };
+
   body.innerHTML = data
-    .map(
-      (c) => `
-    <tr data-id="${escapeHTML(c.id)}" class="clickrow">
-      <td><strong>${escapeHTML(c.full_name || "—")}</strong></td>
-      <td>${escapeHTML(c.email || "—")}</td>
-      <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
-      <td class="muted small">${c.is_active === false ? "Inactive" : "Active"}</td>
-    </tr>
-  `
-    )
+    .map((c) => {
+      const active = c.is_active === false ? "Inactive" : "Active";
+      return `
+        <tr data-id="${escapeHTML(c.id)}" class="clickrow">
+          <td><strong>${escapeHTML(c.full_name || "—")}</strong><div class="muted small">${escapeHTML(c.customer_no || "")}</div></td>
+          <td>${escapeHTML(c.email || "—")}</td>
+          <td>${escapeHTML(c.phone || "—")}</td>
+          <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
+          <td class="muted small">${active}</td>
+          <td><button class="btn btn--ghost btn--sm" type="button" data-edit="${escapeHTML(c.id)}">Edit</button></td>
+        </tr>`;
+    })
     .join("");
+
+  const selectCustomer = async (id) => {
+    const customer = data.find((x) => x.id === id);
+    if (!customer) return;
+    currentCustomer = {
+      id: customer.id,
+      email: customer.email,
+      full_name: customer.full_name,
+      customer_no: customer.customer_no,
+      phone: customer.phone,
+      address: customer.address,
+      role: customer.role,
+      is_active: customer.is_active,
+    };
+    await renderCustomerDetail();
+  };
+
+  body.querySelectorAll("button[data-edit]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await selectCustomer(btn.getAttribute("data-edit"));
+      document.getElementById("customerEditForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 
   body.querySelectorAll("tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", async () => {
-      const id = tr.getAttribute("data-id");
-      const customer = data.find((x) => x.id === id);
-      currentCustomer = customer
-        ? { id: customer.id, email: customer.email, full_name: customer.full_name }
-        : null;
-
-      await renderCustomerDetail();
-      // jump to messages tab with convo
-      document.querySelector('.tab[data-tab="messages"]')?.click();
-      await selectConversationByCustomer(currentCustomer?.id);
+      await selectCustomer(tr.getAttribute("data-id"));
     });
   });
 }
 
 async function renderCustomerDetail() {
-  const card = $("customerDetail");
-  if (!card || !currentCustomer) return;
+  const detail = $("customerDetail");
+  const form = $("customerEditForm");
+  if (!detail) return;
 
-  // fetch packages for that customer
+  if (!currentCustomer) {
+    if (form) form.classList.add("hidden");
+    detail.classList.remove("hidden");
+    detail.textContent = "No customer selected.";
+    return;
+  }
+
+  // Fill edit form
+  if (form) {
+    form.classList.remove("hidden");
+    $("custEditName").value = currentCustomer.full_name || "";
+    $("custEditEmail").value = currentCustomer.email || "";
+    $("custEditPhone").value = currentCustomer.phone || "";
+    $("custEditNo").value = currentCustomer.customer_no || "";
+    $("custEditAddress").value = currentCustomer.address || "";
+    $("custEditRole").value = (currentCustomer.role || "customer").trim();
+    $("custEditActive").value = currentCustomer.is_active === false ? "false" : "true";
+    const msg = $("custEditMsg");
+    if (msg) msg.textContent = "";
+
+    // bind once
+    if (!form.dataset.bound) {
+      form.dataset.bound = "1";
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = $("custEditMsg");
+        if (msg) msg.textContent = "Saving...";
+        if (!currentCustomer) return;
+        const patch = {
+          full_name: ($("custEditName")?.value || "").trim() || null,
+          phone: ($("custEditPhone")?.value || "").trim() || null,
+          address: ($("custEditAddress")?.value || "").trim() || null,
+          role: ($("custEditRole")?.value || "customer").trim(),
+          is_active: $("custEditActive")?.value === "true",
+        };
+        const { error } = await supabase.from("profiles").update(patch).eq("id", currentCustomer.id);
+        if (error) {
+          if (msg) msg.textContent = error.message;
+          return;
+        }
+        if (msg) msg.textContent = "Saved.";
+        await renderCustomers();
+      });
+    }
+  }
+
+  // Show summary below form
+  const name = (currentCustomer.full_name || currentCustomer.email || "Customer").trim();
+  const no = (currentCustomer.customer_no || "").trim();
+  const title = no ? `${name} — ${no}` : name;
+
   const { data: pkgs } = await supabase
     .from("packages")
     .select("id,tracking,status,updated_at")
@@ -517,23 +596,21 @@ async function renderCustomerDetail() {
     .order("updated_at", { ascending: false })
     .limit(50);
 
-  card.innerHTML = `
-    <div class="card__head">
-      <h3 class="h3">${escapeHTML(currentCustomer.full_name || "Customer")}</h3>
-      <p class="muted small">${escapeHTML(currentCustomer.email || "")}</p>
-    </div>
-    <div class="muted small">Recent packages</div>
+  detail.classList.remove("hidden");
+  detail.innerHTML = `
+    <div class="muted small">Selected</div>
+    <div><strong>${escapeHTML(title)}</strong></div>
+    <div class="muted small" style="margin-top:8px">Recent packages</div>
     <div class="stack">
       ${
         (pkgs || [])
           .map(
             (p) => `
-          <div class="rowline">
-            <strong>${escapeHTML(p.tracking)}</strong>
-            <span class="tag">${escapeHTML(p.status)}</span>
-            <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
-          </div>
-        `
+            <div class="rowline">
+              <strong>${escapeHTML(p.tracking)}</strong>
+              <span class="tag">${escapeHTML(p.status)}</span>
+              <span class="muted small">${new Date(p.updated_at).toLocaleString()}</span>
+            </div>`
           )
           .join("") || `<div class="muted">No packages assigned.</div>`
       }
@@ -566,7 +643,7 @@ async function renderPackages() {
 
   let query = supabase
     .from("packages")
-    .select("id,tracking,status,store,approved,notes,user_id,updated_at")
+    .select("id,tracking,status,store,approved,notes,user_id,updated_at,pickup,weight,cost,amount_due_jmd,amount_paid_jmd,invoice_prepared,is_paid")
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -587,9 +664,11 @@ async function renderPackages() {
     filter.innerHTML = `<option value="">All statuses</option>` + statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
     filter.value = current;
   }
-  const list = $("statusList");
-  if (list) {
-    list.innerHTML = statuses.map(s => `<option value="${escapeHTML(s)}"></option>`).join("");
+  const editSel = $("pkgEditStatus");
+  if (editSel) {
+    const cur = editSel.value || "";
+    editSel.innerHTML = statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("") || `<option value="">—</option>`;
+    if (cur) editSel.value = cur;
   }
 
   // Fetch customer display names (full_name + customer_no)
@@ -617,7 +696,7 @@ async function renderPackages() {
       <td><span class="tag">${escapeHTML(p.status)}</span></td>
       <td>${escapeHTML(p.store || "—")}</td>
       <td class="muted small">${p.approved ? "Yes" : "No"}</td>
-      <td class="muted small">${escapeHTML(idToLabel.get(p.user_id) || p.user_id || "Unassigned")}</td>
+      <td class="muted small">${escapeHTML(idToLabel.get(p.user_id) || "Unknown customer")}</td>
       <td class="muted small">${new Date(p.updated_at).toLocaleString()}</td>
       <td><button class="btn btn--ghost btn--sm" type="button" data-edit="${escapeHTML(p.id)}">Edit</button></td>
     </tr>
@@ -651,12 +730,26 @@ function fillPackageEditor(pkg) {
   if ($("pkgEditStore")) $("pkgEditStore").value = pkg.store || "";
   if ($("pkgEditApproved")) $("pkgEditApproved").value = (pkg.approved ? "true" : "false");
   if ($("pkgEditNotes")) $("pkgEditNotes").value = pkg.notes || "";
+  if ($("pkgEditPickup")) $("pkgEditPickup").value = pkg.pickup || "";
+  if ($("pkgEditWeight")) $("pkgEditWeight").value = pkg.weight ?? "";
+  if ($("pkgEditCost")) $("pkgEditCost").value = pkg.cost ?? "";
+
+  // Billing fields (best-effort; columns may not exist in older DB)
+  if ($("pkgEditDue")) $("pkgEditDue").value = pkg.amount_due_jmd ?? "";
+  if ($("pkgEditPaid")) $("pkgEditPaid").value = pkg.amount_paid_jmd ?? "";
+  if ($("pkgEditInvoicePrepared")) $("pkgEditInvoicePrepared").value = pkg.invoice_prepared ? "true" : "false";
+  if ($("pkgEditIsPaid")) $("pkgEditIsPaid").value = pkg.is_paid ? "true" : "false";
+
   if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
+  if ($("pkgBillMsg")) $("pkgBillMsg").textContent = "";
 }
+
 
 async function savePackageEdits() {
   const msg = $("pkgEditMsg");
+  const billMsg = $("pkgBillMsg");
   if (msg) msg.textContent = "Saving...";
+  if (billMsg) billMsg.textContent = "";
 
   const id = $("pkgEditId")?.value;
   if (!id) {
@@ -664,33 +757,59 @@ async function savePackageEdits() {
     return;
   }
 
+  // Build patch (best-effort for optional columns)
   const patch = {
     tracking: ($("pkgEditTracking")?.value || "").trim(),
     status: ($("pkgEditStatus")?.value || "").trim(),
     store: ($("pkgEditStore")?.value || "").trim() || null,
     approved: ($("pkgEditApproved")?.value === "true"),
     notes: ($("pkgEditNotes")?.value || "").trim() || null,
+    pickup: ($("pkgEditPickup")?.value || "").trim() || null,
+    weight: numOrNull($("pkgEditWeight")?.value),
+    cost: numOrNull($("pkgEditCost")?.value),
+    amount_due_jmd: numOrNull($("pkgEditDue")?.value),
+    amount_paid_jmd: numOrNull($("pkgEditPaid")?.value),
+    invoice_prepared: ($("pkgEditInvoicePrepared")?.value === "true"),
+    is_paid: ($("pkgEditIsPaid")?.value === "true"),
   };
 
-  const { error } = await supabase.from("packages").update(patch).eq("id", id);
-  if (error) {
-    if (msg) msg.textContent = error.message;
+  // Try full patch; if DB doesn't have extra columns, retry with core fields.
+  let res = await supabase.from("packages").update(patch).eq("id", id);
+  if (res.error && String(res.error.message || "").includes("amount_due_jmd")) {
+    const core = {
+      tracking: patch.tracking,
+      status: patch.status,
+      store: patch.store,
+      approved: patch.approved,
+      notes: patch.notes,
+      pickup: patch.pickup,
+      weight: patch.weight,
+      cost: patch.cost,
+    };
+    res = await supabase.from("packages").update(core).eq("id", id);
+  }
+
+  if (res.error) {
+    if (msg) msg.textContent = res.error.message;
     return;
   }
 
-  // Optional uploads (photo/invoice) if bucket exists
-  const photoFile = $("pkgPhotoFile")?.files?.[0] || null;
+  // Optional invoice upload
   const invoiceFile = $("pkgInvoiceFile")?.files?.[0] || null;
-
-  if (photoFile) await uploadPackageFile(id, photoFile, PKG_PHOTO_BUCKET, "photo", msg);
   if (invoiceFile) await uploadPackageFile(id, invoiceFile, INVOICE_BUCKET, "invoice", msg);
-
-  if ($("pkgPhotoFile")) $("pkgPhotoFile").value = "";
   if ($("pkgInvoiceFile")) $("pkgInvoiceFile").value = "";
+
+  // Send queued emails immediately (best effort)
+  try {
+    await callProcessQueue();
+  } catch (e) {
+    // silent; queue still persists
+  }
 
   if (msg) msg.textContent = "Saved.";
   await renderPackages();
 }
+
 
 async function uploadPackageFile(pkgId, file, bucket, kind, msgEl) {
   try {
@@ -1011,6 +1130,8 @@ async function renderReports(force = false) {
 
   shipEl.textContent = "Loading…";
   storeEl.textContent = "Loading…";
+  // clear cached report output
+
 
   const days = Number($("reportRange")?.value || 30) || 30;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();

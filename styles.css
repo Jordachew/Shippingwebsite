@@ -670,7 +670,7 @@ body.admin-page #adminChatBody * {
 
 
 /* --- Logo --- */
-.brand__logo{width:72px;height:72px;object-fit:contain;border-radius:14px;display:block;background:rgba(0,0,0,.35);padding:6px}
+.brand__logo{width:96px;height:96px;object-fit:contain;border-radius:14px;display:block;background:rgba(0,0,0,.35);padding:6px}
 
 /* --- Rates list --- */
 .ratesList{margin-top:14px}
@@ -690,7 +690,7 @@ body.admin-page #adminChatBody * {
   gap:12px; padding:10px 6px 6px;
 }
 .dashBrand{ display:flex; align-items:center; gap:10px; }
-.dashLogo{height:72px;width:auto;object-fit:contain;filter:drop-shadow(0 12px 26px rgba(0,0,0,.55));background:rgba(0,0,0,.35);padding:6px;border-radius:14px}
+.dashLogo{height:110px;width:auto;object-fit:contain;filter:drop-shadow(0 12px 26px rgba(0,0,0,.55));background:rgba(0,0,0,.35);padding:6px;border-radius:14px}
 
 .dashRight{ display:flex; align-items:center; gap:10px; }
 .userPill{
@@ -884,7 +884,7 @@ input[type="file"]::-webkit-file-upload-button{
 
 /* ===== v6 UI fixes ===== */
 .dashBrand{ display:flex; align-items:center; }
-.dashLogo{ height: 86px !important; width: auto !important; display:block; object-fit:contain; }
+.dashLogo{ height: 120px !important; width: auto !important; display:block; object-fit:contain; }
 @media (max-width: 680px){ .dashLogo{ height: 72px !important; } }
 
 /* Fix any light surfaces inheriting white text */
@@ -957,3 +957,18 @@ input[style*="background"], .field input, .field select, .field textarea{
   font-size: 14px;
   line-height: 1.35;
 }
+
+.brand--row{flex-direction:row;align-items:center;gap:14px}
+.brand__text{display:flex;flex-direction:column;gap:2px}
+.brand__title{font-weight:800;letter-spacing:-0.02em}
+
+.admin-page .stat{background:rgba(0,0,0,.55)!important;color:var(--text)!important;border:1px solid var(--border)!important}
+.admin-page .stat__k{color:var(--muted)!important}
+.admin-page .stat__v{color:var(--text)!important}
+
+.admin-page .card{background:rgba(0,0,0,.42)!important}
+.admin-page th{background:rgba(0,0,0,.55)!important;color:var(--text)!important}
+.admin-page td{background:transparent}
+
+input, select, textarea{color:var(--text)}
+input[type=file]{color:var(--text)!important}
