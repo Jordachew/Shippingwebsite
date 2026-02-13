@@ -32,6 +32,17 @@ function formatJMD(n) {
   return "JMD " + x.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+function statusNote(status) {
+  const s = String(status || "").trim().toLowerCase();
+  if (s === "received at warehouse") return "We’ve received your package at our warehouse.";
+  if (s === "processing") return "Your package is being processed.";
+  if (s === "in transit") return "Your package is on the way through shipping stages.";
+  if (s === "read for pickup" || s === "ready for pickup") return "Your package is ready for pickup. Please confirm your pickup location in the portal.";
+  if (s === "pickup/delivered") return "Your package has been picked up/delivered. Thank you!";
+  if (s === "hold") return "Your package is on hold. Please check portal messages for next steps.";
+  return "There is an update to your package.";
+}
+
 function buildEmail({ template, profile, payload, tracking }) {
   const name = firstName(profile);
   const customerNo = profile?.customer_no ? ` (${profile.customer_no})` : "";
@@ -40,17 +51,19 @@ function buildEmail({ template, profile, payload, tracking }) {
   if (template === "package_status") {
     const oldS = payload?.old_status || "";
     const newS = payload?.new_status || "";
+    const note = statusNote(newS);
     return {
-      subject: `${subjectPrefix}: Package status updated` ,
+      subject: `${subjectPrefix}: ${tracking} — Status update`,
       text:
 `Hi ${name}${customerNo},
 
-Your package (${tracking}) status has been updated.
+${note}
 
+Tracking: ${tracking}
 From: ${oldS}
 To:   ${newS}
 
-You can log in to view details and message support if you have questions.
+Log in to view details, confirm pickup location, and message support if needed.
 
 — Sueños Shipping`
     };
@@ -58,11 +71,11 @@ You can log in to view details and message support if you have questions.
 
   if (template === "invoice_approved") {
     return {
-      subject: `${subjectPrefix}: Invoice approved`,
+      subject: `${subjectPrefix}: ${tracking} — Supplier invoice approved`,
       text:
 `Hi ${name}${customerNo},
 
-Good news — your invoice for package (${tracking}) has been approved.
+Your supplier invoice for package ${tracking} has been approved.
 
 If anything else is needed, we will message you in the portal.
 
@@ -70,27 +83,29 @@ If anything else is needed, we will message you in the portal.
     };
   }
 
-  if (template === "invoice_prepared") {
+  if (template === "bill_created") {
     return {
-      subject: `${subjectPrefix}: Invoice prepared`,
+      subject: `${subjectPrefix}: ${tracking} — Shipping bill ready`,
       text:
 `Hi ${name}${customerNo},
 
-Your shipping invoice for package (${tracking}) is ready.
+Your Sueños Shipping bill for package ${tracking} is ready.
 
-Please log in to view the amount due and payment details.
+Please log in to download your bill and view the amount due.
 
 — Sueños Shipping`
     };
   }
 
-  if (template === "payment_received") {
+  if (template === "receipt_created") {
     return {
-      subject: `${subjectPrefix}: Payment received`,
+      subject: `${subjectPrefix}: ${tracking} — Payment receipt`,
       text:
 `Hi ${name}${customerNo},
 
-Payment has been received for package (${tracking}). Thank you!
+We’ve received your payment for package ${tracking}. Your receipt is ready.
+
+Please log in to download your receipt.
 
 — Sueños Shipping`
     };
