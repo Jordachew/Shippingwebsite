@@ -213,27 +213,10 @@
 
           <div class="dashSection active" data-section="overview">
             <div class="dashGrid2">
-              <section class="dashLeft">
-                <h2 class="dashH1">Welcome back, <span id="welcomeName">Customer</span>!</h2>
+	              <section class="dashLeft">
+	                <h2 class="dashH1">Welcome back, <span id="welcomeName">Customer</span>!</h2>
 
-                <div class="shipCard">
-                  <div class="shipRow">
-                    <div class="shipLabel">Customer #:</div>
-                    <div class="shipValue" id="customerNo">SNS-JMXXXX</div>
-                  </div>
-                  <div class="shipRow">
-                    <div class="shipLabel">Shipping Address:</div>
-                    <div class="shipValue" style="flex:1">
-                      <pre class="shipTo" id="shipToBlock"></pre>
-                    </div>
-                  </div>
-                  <div class="row row--wrap">
-                    <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
-                    <span class="muted small" id="shipToMsg"></span>
-                  </div>
-                </div>
-
-                <div class="statRow">
+	                <div class="statRow">
                   <div class="statCard gold">
                     <div class="statTitle">Ready for Pickup</div>
                     <div class="statNum" id="statReady">0</div>
@@ -247,6 +230,23 @@
                     <div class="statNum" id="statOutstanding">0</div>
                   </div>
                 </div>
+
+	                <div class="shipCard">
+	                  <div class="shipRow">
+	                    <div class="shipLabel">Customer #:</div>
+	                    <div class="shipValue" id="customerNo">SNS-JMXXXX</div>
+	                  </div>
+	                  <div class="shipRow">
+	                    <div class="shipLabel">Shipping Address:</div>
+	                    <div class="shipValue" style="flex:1">
+	                      <pre class="shipTo" id="shipToBlock"></pre>
+	                    </div>
+	                  </div>
+	                  <div class="row row--wrap">
+	                    <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
+	                    <span class="muted small" id="shipToMsg"></span>
+	                  </div>
+	                </div>
               </section>
 
               <aside class="dashRightCol">
@@ -275,11 +275,11 @@
                   </div>
                 </div>
 
-                <div class="panel panel--soft" style="margin-top:14px">
-                  <div class="panel__head">
-                    <div class="panel__title">Invoices & Bills</div>
-                    <div class="panel__sub muted small">Supplier invoices you uploaded + shipping bills from Sueños.</div>
-                  </div>
+	                <div class="panel panel--soft" style="margin-top:14px">
+	                  <div class="panel__head">
+	                    <div class="panel__title">Supplier Invoices</div>
+	                    <div class="panel__sub muted small">Invoices you received from Amazon/Shein/eBay etc.</div>
+	                  </div>
                   <ul class="list" id="overviewInvList"></ul>
                   <div class="row row--wrap" style="justify-content:flex-end;margin-top:10px">
                     <button class="btn btn--primary" id="jumpUpload" type="button">Upload supplier invoice</button>
@@ -315,17 +315,17 @@
       </div>
 
       <div class="tableWrap" style="margin-top:14px;">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Tracking</th>
-              <th>Status</th>
-              <th>Weight (lb)</th>
-              <th>Cost (JMD)</th>
-              <th>Notes</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
+	        <table class="table table--fixed">
+	          <thead>
+	            <tr>
+	              <th>Tracking</th>
+	              <th>Status</th>
+	              <th class="col--xs">Weight</th>
+	              <th class="col--xs">Cost</th>
+	              <th>Pickup location</th>
+	              <th>Updated</th>
+	            </tr>
+	          </thead>
           <tbody id="pkgBody">
             <tr><td colspan="6" class="muted">Loading...</td></tr>
           </tbody>

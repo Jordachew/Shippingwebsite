@@ -462,9 +462,9 @@ async function renderCustomers() {
 
   const q = ($("custSearch")?.value || "").trim().toLowerCase();
 
-  let query = supabase
-    .from("profiles")
-    .select("id,email,full_name,phone,address,customer_no,role,is_active,created_at")
+	  let query = supabase
+	    .from("profiles")
+	    .select("id,email,full_name,phone,address,customer_no,is_active,created_at")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -472,12 +472,12 @@ async function renderCustomers() {
 
   const { data, error } = await query;
   if (error) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHTML(error.message)}</td></tr>`;
+	    body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHTML(error.message)}</td></tr>`;
     return;
   }
 
   if (!data?.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">No customers found.</td></tr>`;
+	    body.innerHTML = `<tr><td colspan="5" class="muted">No customers found.</td></tr>`;
     return;
   }
 
@@ -495,7 +495,6 @@ async function renderCustomers() {
           <td><strong>${escapeHTML(c.full_name || "—")}</strong><div class="muted small">${escapeHTML(c.customer_no || "")}</div></td>
           <td>${escapeHTML(c.email || "—")}</td>
           <td>${escapeHTML(c.phone || "—")}</td>
-          <td><span class="tag">${escapeHTML(c.role || "customer")}</span></td>
           <td class="muted small">${active}</td>
           <td><button class="btn btn--ghost btn--sm" type="button" data-edit="${escapeHTML(c.id)}">Edit</button></td>
         </tr>`;
@@ -512,7 +511,6 @@ async function renderCustomers() {
       customer_no: customer.customer_no,
       phone: customer.phone,
       address: customer.address,
-      role: customer.role,
       is_active: customer.is_active,
     };
     await renderCustomerDetail();
@@ -553,7 +551,6 @@ async function renderCustomerDetail() {
     $("custEditPhone").value = currentCustomer.phone || "";
     $("custEditNo").value = currentCustomer.customer_no || "";
     $("custEditAddress").value = currentCustomer.address || "";
-    $("custEditRole").value = (currentCustomer.role || "customer").trim();
     $("custEditActive").value = currentCustomer.is_active === false ? "false" : "true";
     const msg = $("custEditMsg");
     if (msg) msg.textContent = "";
@@ -566,13 +563,12 @@ async function renderCustomerDetail() {
         const msg = $("custEditMsg");
         if (msg) msg.textContent = "Saving...";
         if (!currentCustomer) return;
-        const patch = {
-          full_name: ($("custEditName")?.value || "").trim() || null,
-          phone: ($("custEditPhone")?.value || "").trim() || null,
-          address: ($("custEditAddress")?.value || "").trim() || null,
-          role: ($("custEditRole")?.value || "customer").trim(),
-          is_active: $("custEditActive")?.value === "true",
-        };
+	        const patch = {
+	          full_name: ($("custEditName")?.value || "").trim() || null,
+	          phone: ($("custEditPhone")?.value || "").trim() || null,
+	          address: ($("custEditAddress")?.value || "").trim() || null,
+	          is_active: $("custEditActive")?.value === "true",
+	        };
         const { error } = await supabase.from("profiles").update(patch).eq("id", currentCustomer.id);
         if (error) {
           if (msg) msg.textContent = error.message;
@@ -1070,33 +1066,6 @@ async function setupMessageRealtime(userId) {
 }
 
 // ========================
-// ROLES TAB (admin-only action)
-// ========================
-function setupRolesUI() {
-  $("roleForm")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = $("roleMsg");
-    if (msg) msg.textContent = "Saving...";
-
-    if (!currentAdmin || currentAdmin.role !== "admin") {
-      if (msg) msg.textContent = "Only admins can change roles.";
-      return;
-    }
-
-    const email = ($("roleEmail")?.value || "").trim().toLowerCase();
-    const role = ($("roleValue")?.value || "").trim();
-
-    const { error } = await supabase.from("profiles").update({ role }).eq("email", email);
-    if (error) {
-      if (msg) msg.textContent = error.message;
-      return;
-    }
-
-    if (msg) msg.textContent = "Role updated.";
-  });
-}
-
-// ========================
 // EXPORT PACKAGES CSV
 // ========================
 // ========================
@@ -1179,7 +1148,22 @@ async function renderReports(force = false) {
   }
   const dayRows = Array.from(byDay.values());
 
-  const shipHtml = `
+	  // Status breakdown
+	  const byStatus = new Map();
+	  for (const r of rows) {
+	    const s = (r.status || "Unknown").trim() || "Unknown";
+	    if (!byStatus.has(s)) byStatus.set(s, { status: s, count: 0, weight: 0, due: 0, paid: 0 });
+	    const o = byStatus.get(s);
+	    o.count += 1;
+	    o.weight += Number(r.weight || 0) || 0;
+	    const due = Number(r.amount_due_jmd ?? r.cost ?? 0) || 0;
+	    const paid = Number(r.amount_paid_jmd ?? 0) || 0;
+	    o.due += due;
+	    o.paid += paid;
+	  }
+	  const statusRows = Array.from(byStatus.values()).sort((a, b) => b.count - a.count);
+
+	  const shipHtml = `
     <div class="tableWrap">
       <table class="table" style="min-width: 720px;">
         <thead><tr><th>Day</th><th>Packages</th><th>Total weight</th><th>Total due (JMD)</th><th>Total paid (JMD)</th></tr></thead>
@@ -1192,7 +1176,20 @@ async function renderReports(force = false) {
             .join("")}
         </tbody>
       </table>
-    </div>
+	    </div>
+	    <div style="height:12px"></div>
+	    <div class="tableWrap">
+	      <table class="table" style="min-width: 720px;">
+	        <thead><tr><th>Status</th><th>Packages</th><th>Total weight</th><th>Total due (JMD)</th><th>Total paid (JMD)</th></tr></thead>
+	        <tbody>
+	          ${statusRows
+	            .map((r) =>
+	              `<tr><td>${escapeHTML(r.status)}</td><td>${r.count}</td><td>${fmtNum(r.weight)}</td><td>${formatJMD(r.due)}</td><td>${formatJMD(r.paid)}</td></tr>`
+	            )
+	            .join("")}
+	        </tbody>
+	      </table>
+	    </div>
   `;
 
   // Popular stores
@@ -1406,7 +1403,7 @@ async function init() {
   await sanitizeStaleTokenOnce();
   setupAuthUI();
   setupAuthSubOnce();
-  setupRolesUI();
+	  setupReportsUI();
   setupBulkUploadIfPresent();
   await renderApp();
 }

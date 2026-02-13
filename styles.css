@@ -980,3 +980,23 @@ input[type=file]{color:var(--text)!important}
 .tag { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); }
 .tag--warn { border-color: rgba(255,180,0,.35); background: rgba(255,180,0,.10); }
 .link { color: inherit; text-decoration: underline; }
+
+/* =========================
+   v11 Customer UX fixes
+   ========================= */
+
+.table--fixed{ table-layout: fixed; width: 100%; }
+.col--xs{ width: 84px; max-width: 84px; }
+.table--mini th.col--xs, .table--mini td.col--xs{ width: 72px; max-width: 72px; }
+
+/* Keep package summary from overflowing on smaller screens */
+.tableWrap{ overflow-x: auto; }
+
+.shipRow{ flex-wrap: wrap; gap: 10px; }
+.shipLabel{ width: 120px; min-width: 120px; }
+.shipValue{ flex: 1 1 320px; min-width: 320px; }
+.shipTo{ white-space: pre-wrap; word-break: break-word; }
+
+/* Compact inputs inside tables */
+.input--compact{ padding: 10px 12px; font-size: 0.95rem; }
+.btn--sm{ padding: 10px 12px; font-size: 0.95rem; }

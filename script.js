@@ -360,40 +360,92 @@
     var u = await sb.auth.getUser();
     var user = u?.data?.user;
     if (!user) {
-      body.innerHTML = '<tr><td colspan="4" class="muted">Please log in.</td></tr>';
+	      body.innerHTML = '<tr><td colspan="6" class="muted">Please log in.</td></tr>';
       return;
     }
 
     var q = sb.from("packages")
-      .select("tracking,status,pickup,pickup_confirmed,updated_at")
+      .select("id,tracking,status,weight,cost,pickup,pickup_confirmed,updated_at")
       .order("updated_at", { ascending: false });
 
     if (filter.trim()) q = q.ilike("tracking", "%" + filter.trim() + "%");
 
     var res = await q;
-    if (res.error) {
-      body.innerHTML = '<tr><td colspan="4" class="muted">' + escapeHTML(res.error.message) + "</td></tr>";
+	    if (res.error) {
+	      body.innerHTML = '<tr><td colspan="6" class="muted">' + escapeHTML(res.error.message) + "</td></tr>";
       return;
     }
 
     var data = res.data || [];
-    if (!data.length) {
-      body.innerHTML = '<tr><td colspan="4" class="muted">No packages yet.</td></tr>';
+	    if (!data.length) {
+	      body.innerHTML = '<tr><td colspan="6" class="muted">No packages yet.</td></tr>';
       return;
     }
 
+    var norm = function (s) { return String(s || "").toLowerCase(); };
+    var isReady = function (status) {
+      var s = norm(status);
+      return s.includes("pickup") && (s.includes("ready") || s.includes("read"));
+    };
+
     body.innerHTML = data.map(function (p) {
+      var pickupCell = "";
+      if (isReady(p.status) && !p.pickup_confirmed) {
+        pickupCell = (
+          '<div class="row row--wrap" style="gap:8px">'
+          + '<select class="input input--compact" data-pickup-select="' + p.id + '">'
+            + '<option value="UWI_KINGSTON" ' + (p.pickup === 'UWI_KINGSTON' ? 'selected' : '') + '>UWI, Kingston</option>'
+            + '<option value="RHODEN_HALL_CLARENDON" ' + (p.pickup === 'RHODEN_HALL_CLARENDON' ? 'selected' : '') + '>Rhoden Hall, Clarendon</option>'
+          + '</select>'
+          + '<button class="btn btn--ghost btn--sm" data-action="setPickup" data-pkg-id="' + p.id + '">Save</button>'
+          + '</div>'
+        );
+      } else {
+        pickupCell = escapeHTML(pickupLabel(p.pickup)) + (p.pickup_confirmed ? ' <span class="tag">Confirmed</span>' : '');
+      }
+
       return (
         "<tr>" +
           "<td><strong>" + escapeHTML(p.tracking) + "</strong></td>" +
           '<td><span class="tag">' + escapeHTML(p.status) + "</span></td>" +
-          "<td>" + escapeHTML(pickupLabel(p.pickup)) +
-            (p.pickup_confirmed ? ' <span class="tag">Confirmed</span>' : ' <span class="tag">Pending</span>') +
-          "</td>" +
+          "<td class=\"col--xs\">" + (p.weight != null ? escapeHTML(String(p.weight)) : "—") + "</td>" +
+          "<td class=\"col--xs\">" + (p.cost != null ? formatJMD(Number(p.cost)) : "—") + "</td>" +
+          "<td>" + pickupCell + "</td>" +
           '<td class="muted">' + new Date(p.updated_at).toLocaleString() + "</td>" +
         "</tr>"
       );
     }).join("");
+  }
+
+  // Update pickup location for a ready-for-pickup package
+  async function setupPickupUpdates() {
+    var table = document.querySelector('[data-section="packages"]');
+    if (!table) return;
+    table.addEventListener('click', async function (e) {
+      var btn = e.target.closest('[data-action="setPickup"]');
+      if (!btn) return;
+      e.preventDefault();
+
+      var pkgId = btn.getAttribute('data-pkg-id');
+      var sel = document.querySelector('[data-pickup-select="' + pkgId + '"]');
+      var pickup = sel ? sel.value : null;
+      if (!pickup) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        var { error } = await sb.from('packages').update({ pickup: pickup }).eq('id', pkgId);
+        if (error) {
+          alert('Could not save pickup location: ' + error.message);
+        } else {
+          // refresh table
+          await renderPackages(($('pkgSearch')?.value || '').trim());
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    });
   }
 
   async function renderUploads() {
@@ -945,6 +997,7 @@
     renderRatesTable();
     setupLoginRegister();
     setupPackageSearch();
+	    setupPickupUpdates();
     setupInvoiceUpload();
     setupChatUI();
     setupDashboardTabs();
