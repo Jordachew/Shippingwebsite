@@ -972,3 +972,11 @@ input[style*="background"], .field input, .field select, .field textarea{
 
 input, select, textarea{color:var(--text)}
 input[type=file]{color:var(--text)!important}
+
+
+/* === Dashboard overview right column === */
+.dashRightCol { display:flex; flex-direction:column; }
+.table--mini th, .table--mini td { padding:10px 10px; font-size: 13px; }
+.tag { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); }
+.tag--warn { border-color: rgba(255,180,0,.35); background: rgba(255,180,0,.10); }
+.link { color: inherit; text-decoration: underline; }

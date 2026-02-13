@@ -682,7 +682,7 @@
       if ($("adminLink")) $("adminLink").style.display = isStaff ? "inline-flex" : "none";
 
       setupDashboardTabs();
-      setupMiniCalcs();
+      // customer portal mini calculators removed
       await renderPackages("");
       await renderUploads();
       await renderDashboardStatsAndAwaiting();
@@ -745,6 +745,14 @@
       $("invTracking")?.focus();
     });
 
+
+    $("goPackages")?.addEventListener("click", function () {
+      showDashTab("packages");
+    });
+
+    $("openChatDash")?.addEventListener("click", function () {
+      showDashTab("chat");
+    });
     $("closeChatTab")?.addEventListener("click", function () {
       showDashTab("overview");
       closeChat();
@@ -805,113 +813,100 @@
   }
 
   async function renderDashboardStatsAndAwaiting() {
-    var awaiting = $("statAwaiting");
-    var picked = $("statPicked");
-    var transit = $("statTransit");
-    var tBody = $("awaitingTableBody");
-    var sumBody = $("dashSummaryBody");
+    // Overview stats + latest packages + overview invoices
+    var statReady = $("statReady");
+    var statTransit = $("statTransit");
+    var statOutstanding = $("statOutstanding");
+    var overviewPkgBody = $("overviewPkgBody");
+    var overviewInvList = $("overviewInvList");
 
-    // It's OK if some elements don't exist (older layouts)
+    // Packages
     var res = await sb.from("packages")
       .select("id,tracking,status,weight,cost,amount_due_jmd,amount_paid_jmd,is_paid,updated_at,created_at")
       .order("updated_at", { ascending: false });
 
     if (res.error) {
-      if (tBody) tBody.innerHTML = '<tr><td colspan="4" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
-      if (sumBody) sumBody.innerHTML = '<tr><td colspan="5" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
-      return;
-    }
+      if (overviewPkgBody) overviewPkgBody.innerHTML = '<tr><td colspan="4" class="muted">' + escapeHTML(res.error.message) + '</td></tr>';
+      if (statReady) statReady.textContent = "0";
+      if (statTransit) statTransit.textContent = "0";
+      if (statOutstanding) statOutstanding.textContent = "0";
+    } else {
+      var rows = res.data || [];
+      var norm = function (s) { return String(s || "").toLowerCase(); };
 
-    var rows = res.data || [];
-    var norm = function (s) { return String(s || "").toLowerCase(); };
-
-    // Heuristics for the three hero stats using existing status text (no forced enum)
-    var awaitingRows = rows.filter(function (r) {
-      var s = norm(r.status);
-      return s.includes("ready") || s.includes("await") || s.includes("pickup");
-    });
-    var pickedRows = rows.filter(function (r) {
-      var s = norm(r.status);
-      return s.includes("picked") || s.includes("delivered");
-    });
-    var transitRows = rows.filter(function (r) {
-      var s = norm(r.status);
-      return s.includes("transit") || s.includes("shipped") || s.includes("air") || s.includes("jamaica");
-    });
-
-    if (awaiting) awaiting.textContent = String(awaitingRows.length);
-    if (picked) picked.textContent = String(pickedRows.length);
-    if (transit) transit.textContent = String(transitRows.length);
-
-    // Awaiting pickup table (recent)
-    if (tBody) {
-      var show = awaitingRows.slice(0, 8);
-      if (!show.length) {
-        tBody.innerHTML = '<tr><td colspan="4" class="muted">No packages currently awaiting pickup.</td></tr>';
-      } else {
-        tBody.innerHTML = show.map(function (p) {
-          var due = (p.amount_due_jmd != null) ? Number(p.amount_due_jmd) : (p.cost != null ? Number(p.cost) : null);
-          return (
-            '<tr>' +
-              '<td><strong>' + escapeHTML(p.tracking || "") + '</strong></td>' +
-              '<td><span class="tag">' + escapeHTML(p.status || "") + '</span></td>' +
-              '<td>' + (p.weight != null ? (Number(p.weight).toFixed(2) + ' lb') : '—') + '</td>' +
-              '<td>' + (due != null ? formatJMD(due) : '—') + '</td>' +
-            '</tr>'
-          );
-        }).join("");
-      }
-    }
-
-    // Dashboard summary (group by status)
-    if (sumBody) {
-      var map = {};
-      var totalCount = 0, totalWeight = 0, totalDue = 0, totalPaid = 0;
-
-      rows.forEach(function (p) {
-        var st = p.status || "Unknown";
-        map[st] = map[st] || { count: 0, weight: 0, due: 0, paid: 0 };
-        map[st].count += 1;
-        totalCount += 1;
-
-        if (p.weight != null) {
-          var w = Number(p.weight) || 0;
-          map[st].weight += w;
-          totalWeight += w;
-        }
-
-        var due = (p.amount_due_jmd != null) ? Number(p.amount_due_jmd) : (p.cost != null ? Number(p.cost) : 0);
-        map[st].due += (Number.isFinite(due) ? due : 0);
-        totalDue += (Number.isFinite(due) ? due : 0);
-
-        var paid = (p.amount_paid_jmd != null) ? Number(p.amount_paid_jmd) : (p.is_paid ? due : 0);
-        map[st].paid += (Number.isFinite(paid) ? paid : 0);
-        totalPaid += (Number.isFinite(paid) ? paid : 0);
+      var readyRows = rows.filter(function (r) {
+        var s = norm(r.status);
+        // supports "Ready for Pickup" and the user's existing typo "Read for Pickup"
+        return s.includes("pickup") && (s.includes("ready") || s.includes("read"));
       });
+      var transitRows = rows.filter(function (r) { return norm(r.status).includes("transit"); });
 
-      var statuses = Object.keys(map).sort(function (a, b) { return map[b].count - map[a].count; });
+      if (statReady) statReady.textContent = String(readyRows.length);
+      if (statTransit) statTransit.textContent = String(transitRows.length);
 
-      if (!statuses.length) {
-        sumBody.innerHTML = '<tr><td colspan="5" class="muted">No packages yet.</td></tr>';
-      } else {
-        sumBody.innerHTML = statuses.map(function (st) {
-          var o = map[st];
-          return (
-            '<tr>' +
-              '<td>' + escapeHTML(st) + '</td>' +
-              '<td>' + o.count + '</td>' +
-              '<td>' + (o.weight ? (o.weight.toFixed(2) + ' lb') : '—') + '</td>' +
-              '<td>' + formatJMD(o.due) + '</td>' +
-              '<td>' + formatJMD(o.paid) + '</td>' +
-            '</tr>'
-          );
-        }).join("");
+      var outstanding = 0;
+      rows.forEach(function (r) {
+        var due = (r.amount_due_jmd != null) ? Number(r.amount_due_jmd) : (r.cost != null ? Number(r.cost) : 0);
+        var paid = (r.amount_paid_jmd != null) ? Number(r.amount_paid_jmd) : 0;
+        if (!Number.isFinite(due)) due = 0;
+        if (!Number.isFinite(paid)) paid = 0;
+        var diff = due - paid;
+        if (diff > 0) outstanding += diff;
+      });
+      if (statOutstanding) statOutstanding.textContent = formatJMD(outstanding);
+
+      if (overviewPkgBody) {
+        var show = rows.slice(0, 6);
+        if (!show.length) {
+          overviewPkgBody.innerHTML = '<tr><td colspan="4" class="muted">No packages yet.</td></tr>';
+        } else {
+          overviewPkgBody.innerHTML = show.map(function (p) {
+            return '<tr>'
+              + '<td><strong>' + escapeHTML(p.tracking || "") + '</strong></td>'
+              + '<td>' + escapeHTML(p.status || "") + '</td>'
+              + '<td>' + (p.weight != null ? escapeHTML(String(p.weight)) : "—") + '</td>'
+              + '<td>' + (p.cost != null ? formatJMD(Number(p.cost)) : (p.amount_due_jmd != null ? formatJMD(Number(p.amount_due_jmd)) : "—")) + '</td>'
+              + '</tr>';
+          }).join("");
+        }
       }
+    }
 
-      if ($("dashTotalCount")) $("dashTotalCount").textContent = String(totalCount);
-      if ($("dashTotalWeight")) $("dashTotalWeight").textContent = totalWeight ? (totalWeight.toFixed(2) + " lb") : "0";
-      if ($("dashTotalDue")) $("dashTotalDue").textContent = formatJMD(totalDue);
-      if ($("dashTotalPaid")) $("dashTotalPaid").textContent = formatJMD(totalPaid);
+    // Invoices (supplier uploads + bills if you store them in the same bucket)
+    if (overviewInvList) overviewInvList.innerHTML = '<li class="muted small">Loading…</li>';
+
+    var invRes = await sb.from("invoices")
+      .select("id,tracking,file_path,file_name,approved,created_at")
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    if (overviewInvList) {
+      if (invRes.error) {
+        overviewInvList.innerHTML = '<li class="muted small">' + escapeHTML(invRes.error.message) + '</li>';
+      } else {
+        var invs = invRes.data || [];
+        if (!invs.length) {
+          overviewInvList.innerHTML = '<li class="muted small">No invoices uploaded yet.</li>';
+        } else {
+          overviewInvList.innerHTML = invs.map(function (inv) {
+            var badge = inv.approved ? '<span class="tag">Approved</span>' : '<span class="tag tag--warn">Pending</span>';
+            var a = '';
+            // try public URL if the bucket is public; otherwise just show filename
+            try {
+              var url = sb.storage.from("invoices").getPublicUrl(inv.file_path).data.publicUrl;
+              a = '<a class="link" href="' + url + '" target="_blank" rel="noopener">Download</a>';
+            } catch (e) {
+              a = '';
+            }
+            return '<li class="list__item">'
+              + '<div><strong>' + escapeHTML(inv.tracking || "") + '</strong> • ' + escapeHTML(inv.file_name || "invoice") + '</div>'
+              + '<div class="row row--wrap" style="gap:8px;margin-top:6px;align-items:center">'
+              + badge + (a ? a : '')
+              + '</div>'
+              + '</li>';
+          }).join("");
+        }
+      }
     }
   }
 

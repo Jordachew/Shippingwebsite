@@ -62,6 +62,7 @@
       </div>
     </div>
 
+    
     <div class="hero__visual">
       <div class="glassCard" id="varietyHero">
         <div class="glassCard__head">
@@ -78,15 +79,6 @@
             <div class="storeHero__item">⌚ <span>Accessories</span></div>
             <div class="storeHero__item">💄 <span>Beauty</span></div>
           </div>
-
-          <div class="storeHero__note">Browse our variety store while you wait on your shipments.</div>
-
-          <a class="btn btn--primary" href="#varietyHero" style="width:100%;margin-top:12px">Browse Variety Store</a>
-        </div>
-      </div>
-<div class="glassCard__foot">
-          <div class="mini"><div class="mini__k">Secure</div><div class="mini__v">Account based</div></div>
-          <div class="mini"><div class="mini__k">Fast</div><div class="mini__v">Clear updates</div></div>
         </div>
       </div>
     </div>
@@ -243,20 +235,71 @@
 
                 <div class="statRow">
                   <div class="statCard gold">
-                    <div class="statTitle">Awaiting Pickup</div>
-                    <div class="statNum" id="statAwaiting">0</div>
+                    <div class="statTitle">Ready for Pickup</div>
+                    <div class="statNum" id="statReady">0</div>
                   </div>
                   <div class="statCard blue">
-                    <div class="statTitle">Picked Up</div>
-                    <div class="statNum" id="statPicked">0</div>
-                  </div>
-                  <div class="statCard green">
                     <div class="statTitle">In Transit</div>
                     <div class="statNum" id="statTransit">0</div>
                   </div>
+                  <div class="statCard green">
+                    <div class="statTitle">Outstanding (JMD)</div>
+                    <div class="statNum" id="statOutstanding">0</div>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="dashRightCol">
+                <div class="panel panel--soft">
+                  <div class="panel__head">
+                    <div class="panel__title">Packages</div>
+                    <div class="panel__sub muted small">Latest updates. View all in the Packages tab.</div>
+                  </div>
+                  <div class="tableWrap tableWrap--soft">
+                    <table class="table table--mini">
+                      <thead>
+                        <tr>
+                          <th>Tracking</th>
+                          <th>Status</th>
+                          <th>Weight</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody id="overviewPkgBody">
+                        <tr><td colspan="4" class="muted">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="row" style="justify-content:flex-end;margin-top:10px">
+                    <button class="btn btn--ghost" id="goPackages" type="button">View all packages</button>
+                  </div>
                 </div>
 
-<div class="dashSection" data-section="packages">
+                <div class="panel panel--soft" style="margin-top:14px">
+                  <div class="panel__head">
+                    <div class="panel__title">Invoices & Bills</div>
+                    <div class="panel__sub muted small">Supplier invoices you uploaded + shipping bills from Sueños.</div>
+                  </div>
+                  <ul class="list" id="overviewInvList"></ul>
+                  <div class="row row--wrap" style="justify-content:flex-end;margin-top:10px">
+                    <button class="btn btn--primary" id="jumpUpload" type="button">Upload supplier invoice</button>
+                  </div>
+                </div>
+
+                <div class="panel panel--soft" style="margin-top:14px">
+                  <div class="panel__head">
+                    <div class="panel__title">Support</div>
+                    <div class="panel__sub muted small">Message staff and get updates.</div>
+                  </div>
+                  <div class="row" style="justify-content:flex-end;">
+                    <button class="btn btn--primary" id="openChatDash" type="button">Open chat</button>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <div class="dashSection" data-section="packages">
   <div class="dashGridSingle">
     <div class="panel panel--soft">
       <div class="panel__head">
