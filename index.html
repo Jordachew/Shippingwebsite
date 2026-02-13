@@ -256,13 +256,13 @@
                     <div class="panel__sub muted small">Latest updates. View all in the Packages tab.</div>
                   </div>
                   <div class="tableWrap tableWrap--soft">
-                    <table class="table table--mini">
+                    <table class="table table--mini overviewTable">
                       <thead>
                         <tr>
                           <th>Tracking</th>
                           <th>Status</th>
-                          <th>Weight</th>
-                          <th>Cost</th>
+                          <th class="col--xs">Weight</th>
+                          <th class="col--xs">Cost</th>
                         </tr>
                       </thead>
                       <tbody id="overviewPkgBody">
@@ -341,14 +341,15 @@
   <div class="dashGridSingle">
     <div class="panel panel--soft">
       <div class="panel__head">
-        <div class="panel__title">Upload Invoice</div>
-        <div class="panel__sub muted small">Upload supplier invoice (Amazon/Shein/eBay etc.). Staff will approve it.</div>
+        <div class="panel__title">Supplier Invoice</div>
+        <div class="panel__sub muted small">Upload the invoice you received from the supplier. Staff will approve it.</div>
       </div>
 
       <form class="form" id="invoiceForm">
         <div class="grid2">
           <label>Tracking #
-            <input id="invTracking" type="text" required placeholder="e.g. 1Z..." />
+            <select id="invTracking" required></select>
+            <div class="muted small">Only packages that are not ready for pickup are shown.</div>
           </label>
           <label>Pickup Location
             <select id="invPickup" required>

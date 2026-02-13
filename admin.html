@@ -76,6 +76,15 @@
 
       <!-- OVERVIEW -->
       <section class="panel" id="tab-overview">
+        <div class="stats" style="margin-bottom:12px">
+          <div class="stat"><div class="muted small">Total packages</div><div class="h2" id="sumTotal">—</div></div>
+          <div class="stat"><div class="muted small">Received</div><div class="h2" id="sumReceived">—</div></div>
+          <div class="stat"><div class="muted small">In transit</div><div class="h2" id="sumTransit">—</div></div>
+          <div class="stat"><div class="muted small">Ready for pickup</div><div class="h2" id="sumReady">—</div></div>
+          <div class="stat"><div class="muted small">Hold</div><div class="h2" id="sumHold">—</div></div>
+          <div class="stat"><div class="muted small">Outstanding (JMD)</div><div class="h2" id="sumOutstanding">—</div></div>
+        </div>
+
         <div class="grid2">
           <div class="card">
             <div class="card__head">
@@ -262,26 +271,12 @@
               </label>
 
               <div class="card card--pad" style="margin-top:12px">
-                <div><strong>Billing / Invoice</strong><div class="muted small">Set amount due, mark invoice prepared, and mark paid.</div></div>
-                <div class="grid3" style="margin-top:10px">
+                <div><strong>Billing</strong><div class="muted small">Set amount due and record payments. (Invoice prepared/paid flags removed.)</div></div>
+                <div class="grid2" style="margin-top:10px">
                   <label class="field"><span>Amount Due (JMD)</span><input id="pkgEditDue" type="number" step="0.01" placeholder="0.00" /></label>
                   <label class="field"><span>Amount Paid (JMD)</span><input id="pkgEditPaid" type="number" step="0.01" placeholder="0.00" /></label>
-                  <label class="field"><span>Invoice Prepared?</span>
-                    <select id="pkgEditInvoicePrepared" class="input">
-                      <option value="false">No</option>
-                      <option value="true">Yes</option>
-                    </select>
-                  </label>
                 </div>
-                <div class="grid2" style="margin-top:10px">
-                  <label class="field"><span>Paid?</span>
-                    <select id="pkgEditIsPaid" class="input">
-                      <option value="false">No</option>
-                      <option value="true">Yes</option>
-                    </select>
-                  </label>
-                  <div class="muted small" id="pkgBillMsg" style="align-self:end"></div>
-                </div>
+                <div class="muted small" id="pkgBillMsg" style="margin-top:10px"></div>
               </div>
 
               <div class="grid2" style="margin-top:12px">

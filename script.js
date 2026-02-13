@@ -504,6 +504,9 @@
     var form = $("invoiceForm");
     if (!form) return;
 
+    // Populate tracking picklist with packages that are NOT ready for pickup
+    populateInvoiceTrackingSelect();
+
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
       var msg = $("invMsg");
@@ -545,6 +548,43 @@
       if (msg) msg.textContent = "Uploaded. Pickup location will be confirmed by staff.";
       await renderUploads();
     });
+  }
+
+  async function populateInvoiceTrackingSelect() {
+    var sel = $("invTracking");
+    if (!sel || sel.tagName !== "SELECT") return;
+
+    var u = await sb.auth.getUser();
+    var user = u?.data?.user;
+    if (!user) return;
+
+    // Exclude packages already ready for pickup (or already picked up)
+    var exclude = new Set(["Read for Pickup", "Pickup/Delivered"]);
+
+    var res = await sb
+      .from("packages")
+      .select("tracking,status,updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(500);
+
+    if (res.error) {
+      sel.innerHTML = '<option value="">(unable to load packages)</option>';
+      return;
+    }
+
+    var pkgs = (res.data || []).filter(function (p) {
+      var s = String(p.status || "").trim();
+      return p.tracking && !exclude.has(s);
+    });
+
+    var current = sel.value;
+    var opts = ['<option value="">Select tracking #</option>'];
+    pkgs.forEach(function (p) {
+      opts.push('<option value="' + escapeHTML(p.tracking) + '">' + escapeHTML(p.tracking) + ' • ' + escapeHTML(p.status || "") + '</option>');
+    });
+    sel.innerHTML = opts.join("");
+    if (current) sel.value = current;
   }
 
   // ------------------------
@@ -777,6 +817,9 @@
 
     if (name === "chat") {
       embedChatWidget();
+    } else if (name === "invoices") {
+      // Refresh tracking options when visiting the Supplier Invoice tab
+      populateInvoiceTrackingSelect();
     } else {
       unembedChatWidget();
     }

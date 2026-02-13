@@ -739,10 +739,21 @@ body.admin-page #adminChatBody * {
 
 .dashGrid2{
   display:grid;
-  grid-template-columns: 1.55fr .95fr;
-  gap: 18px;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 14px;
   padding: 18px 6px 6px;
 }
+.dashLeft, .dashRightCol{ min-width: 0; }
+
+.overviewTable{ table-layout: fixed; width: 100%; }
+.overviewTable th:nth-child(3), .overviewTable td:nth-child(3),
+.overviewTable th:nth-child(4), .overviewTable td:nth-child(4){
+  width: 72px;
+}
+
+.list li{ overflow-wrap: anywhere; word-break: break-word; }
+
+.panel, .card{ max-width: 100%; }
 @media (max-width: 980px){
   .dashGrid2{ grid-template-columns: 1fr; }
 }

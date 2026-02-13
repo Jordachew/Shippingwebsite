@@ -366,7 +366,6 @@ function setupOverviewButtons() {
 async function renderOverview() {
   // Stats: packages by status + customers + messages
   const statsRow = $("statsRow");
-  if (!statsRow) return;
 
   // Pull recent + compute meaningful totals for the dashboard row
   const [pkgRecent, msgRecent, pkgAgg, openMsgs] = await Promise.all([
@@ -400,7 +399,7 @@ async function renderOverview() {
     { label: "Open messages", value: openMsgs.count || 0 },
   ];
 
-  statsRow.innerHTML = stats
+  if (statsRow) statsRow.innerHTML = stats
     .map(
       (s) => `
       <div class="stat">
@@ -410,6 +409,20 @@ async function renderOverview() {
     `
     )
     .join("");
+
+  // New overview summary tiles
+  const byStatus = new Map();
+  for (const p of pkgAgg.data || []) {
+    const s = String(p.status || "Unknown").trim() || "Unknown";
+    byStatus.set(s, (byStatus.get(s) || 0) + 1);
+  }
+  const outstanding = Math.max(0, totalDue - totalPaid);
+  if ($("sumTotal")) $("sumTotal").textContent = String(totalPkgs);
+  if ($("sumReceived")) $("sumReceived").textContent = String(byStatus.get("Received at warehouse") || 0);
+  if ($("sumTransit")) $("sumTransit").textContent = String(byStatus.get("In transit") || 0);
+  if ($("sumReady")) $("sumReady").textContent = String(byStatus.get("Read for Pickup") || 0);
+  if ($("sumHold")) $("sumHold").textContent = String(byStatus.get("Hold") || 0);
+  if ($("sumOutstanding")) $("sumOutstanding").textContent = formatJMD(outstanding);
 
   const pkgRes = pkgRecent;
   const msgRes = msgRecent;
@@ -733,8 +746,7 @@ function fillPackageEditor(pkg) {
   // Billing fields (best-effort; columns may not exist in older DB)
   if ($("pkgEditDue")) $("pkgEditDue").value = pkg.amount_due_jmd ?? "";
   if ($("pkgEditPaid")) $("pkgEditPaid").value = pkg.amount_paid_jmd ?? "";
-  if ($("pkgEditInvoicePrepared")) $("pkgEditInvoicePrepared").value = pkg.invoice_prepared ? "true" : "false";
-  if ($("pkgEditIsPaid")) $("pkgEditIsPaid").value = pkg.is_paid ? "true" : "false";
+  // invoice_prepared / is_paid UI fields removed; we calculate paid state from amounts
 
   if ($("pkgEditMsg")) $("pkgEditMsg").textContent = "";
   if ($("pkgBillMsg")) $("pkgBillMsg").textContent = "";
@@ -765,8 +777,7 @@ async function savePackageEdits() {
     cost: numOrNull($("pkgEditCost")?.value),
     amount_due_jmd: numOrNull($("pkgEditDue")?.value),
     amount_paid_jmd: numOrNull($("pkgEditPaid")?.value),
-    invoice_prepared: ($("pkgEditInvoicePrepared")?.value === "true"),
-    is_paid: ($("pkgEditIsPaid")?.value === "true"),
+    // invoice_prepared / is_paid are maintained by database logic if present
   };
 
   // Try full patch; if DB doesn't have extra columns, retry with core fields.
@@ -1081,6 +1092,11 @@ function setupReportsUI() {
 function fmtNum(n) {
   const x = Number(n || 0) || 0;
   return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function formatJMD(n) {
+  const x = Number(n || 0) || 0;
+  return x.toLocaleString(undefined, { style: "currency", currency: "JMD", maximumFractionDigits: 2 });
 }
 
 async function renderReports(force = false) {
