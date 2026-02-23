@@ -63,6 +63,7 @@
     // Backward compatible labels for legacy codes
     if (!v) return "";
     if (v === "RHODEN_HALL_CLARENDON") return "Rhoden Hall, Clarendon";
+	if (v === "Mandiville_plaza_Manchester") return "Mandiville Plaza, Manchester";
     if (v === "UWI_KINGSTON") return "UWI, Kingston";
     return String(v);
   }
@@ -75,6 +76,7 @@
 
     const fallback = [
       { value: "UWI_KINGSTON", label: "UWI, Kingston" },
+	  { value: "Mandiville_plaza_Manchester", label: "Mandiville Plaza, Manchester" },
       { value: "RHODEN_HALL_CLARENDON", label: "Rhoden Hall, Clarendon" },
     ];
 
