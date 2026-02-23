@@ -50,6 +50,71 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
+// ========================
+// PICKUP LOCATIONS (optional; pulls from `locations` table if present)
+// ========================
+let __adminPickupLocationsCache = null;
+
+async function getPickupLocationsAdmin() {
+  if (__adminPickupLocationsCache) return __adminPickupLocationsCache;
+
+  const fallback = [
+    { value: "UWI_KINGSTON", label: "UWI, Kingston" },
+    { value: "RHODEN_HALL_CLARENDON", label: "Rhoden Hall, Clarendon" },
+  ];
+
+  try {
+    const res = await supabase
+      .from("locations")
+      .select("name,is_active")
+      .eq("is_active", true)
+      .order("name");
+
+    if (res.error) {
+      __adminPickupLocationsCache = fallback;
+      return __adminPickupLocationsCache;
+    }
+    const rows = (res.data || []).filter(r => r && r.name);
+    __adminPickupLocationsCache = rows.length
+      ? rows.map(r => ({ value: r.name, label: r.name }))
+      : fallback;
+
+    return __adminPickupLocationsCache;
+  } catch (e) {
+    __adminPickupLocationsCache = fallback;
+    return __adminPickupLocationsCache;
+  }
+}
+
+async function wirePickupDatalistIfPresent() {
+  const el = $("pkgEditPickup");
+  if (!el) return;
+
+  // If it's a SELECT, populate options. If it's an INPUT, attach a datalist.
+  const locs = await getPickupLocationsAdmin();
+
+  if (el.tagName === "SELECT") {
+    el.innerHTML = locs
+      .map(l => `<option value="${escapeHTML(l.value)}">${escapeHTML(l.label)}</option>`)
+      .join("");
+    return;
+  }
+
+  // INPUT
+  let dl = document.getElementById("pickupDatalist");
+  if (!dl) {
+    dl = document.createElement("datalist");
+    dl.id = "pickupDatalist";
+    document.body.appendChild(dl);
+  }
+  el.setAttribute("list", "pickupDatalist");
+  dl.innerHTML = locs
+    .map(l => `<option value="${escapeHTML(l.value)}"></option>`)
+    .join("");
+}
+
+
+
 function numOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -1422,6 +1487,7 @@ async function init() {
 	  setupReportsUI();
   setupBulkUploadIfPresent();
   await renderApp();
+  await wirePickupDatalistIfPresent();
 }
 
 window.addEventListener("DOMContentLoaded", init);

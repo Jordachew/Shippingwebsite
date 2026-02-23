@@ -60,8 +60,61 @@
     }).format(Number(n || 0));
   }
   function pickupLabel(v) {
-    return v === "RHODEN_HALL_CLARENDON" ? "Rhoden Hall District, Clarendon" : "UWI, Kingston";
+    // Backward compatible labels for legacy codes
+    if (!v) return "";
+    if (v === "RHODEN_HALL_CLARENDON") return "Rhoden Hall, Clarendon";
+    if (v === "UWI_KINGSTON") return "UWI, Kingston";
+    return String(v);
   }
+
+  let __pickupLocationsCache = null;
+
+  async function getPickupLocations() {
+    // Try pulling from `locations` table (recommended). If missing or empty, fall back.
+    if (__pickupLocationsCache) return __pickupLocationsCache;
+
+    const fallback = [
+      { value: "UWI_KINGSTON", label: "UWI, Kingston" },
+      { value: "RHODEN_HALL_CLARENDON", label: "Rhoden Hall, Clarendon" },
+    ];
+
+    try {
+      const res = await sb.from("locations").select("id,name,is_active").eq("is_active", true).order("name");
+      if (res.error) {
+        __pickupLocationsCache = fallback;
+        return __pickupLocationsCache;
+      }
+      const rows = (res.data || []).filter(r => r && r.name);
+      if (!rows.length) {
+        __pickupLocationsCache = fallback;
+        return __pickupLocationsCache;
+      }
+      // Store name as the value (since packages.pickup is text)
+      __pickupLocationsCache = rows.map(r => ({ value: r.name, label: r.name }));
+      return __pickupLocationsCache;
+    } catch (e) {
+      __pickupLocationsCache = fallback;
+      return __pickupLocationsCache;
+    }
+  }
+
+  function pickupOptionsHtml(currentValue, locations) {
+    const cur = String(currentValue || "");
+    const opts = (locations && locations.length ? locations : []);
+    // include legacy options if the current value is a legacy code so it can remain selected
+    const legacy = [
+      { value: "UWI_KINGSTON", label: "UWI, Kingston" },
+      { value: "RHODEN_HALL_CLARENDON", label: "Rhoden Hall, Clarendon" },
+    ];
+    const needsLegacy = legacy.some(o => o.value === cur) && !opts.some(o => o.value === cur);
+    const finalOpts = needsLegacy ? legacy.concat(opts) : opts;
+
+    return finalOpts.map(o => {
+      const sel = (o.value === cur) ? "selected" : "";
+      return `<option value="${escapeHTML(o.value)}" ${sel}>${escapeHTML(o.label)}</option>`;
+    }).join("");
+  }
+
   function firstName(fullName, email) {
     var fn = String(fullName || "").trim().split(/\s+/)[0];
     if (fn) return fn;
@@ -388,14 +441,15 @@
       return s.includes("pickup") && (s.includes("ready") || s.includes("read"));
     };
 
+        var pickupLocations = await getPickupLocations();
+
     body.innerHTML = data.map(function (p) {
       var pickupCell = "";
       if (isReady(p.status) && !p.pickup_confirmed) {
         pickupCell = (
           '<div class="row row--wrap" style="gap:8px">'
           + '<select class="input input--compact" data-pickup-select="' + p.id + '">'
-            + '<option value="UWI_KINGSTON" ' + (p.pickup === 'UWI_KINGSTON' ? 'selected' : '') + '>UWI, Kingston</option>'
-            + '<option value="RHODEN_HALL_CLARENDON" ' + (p.pickup === 'RHODEN_HALL_CLARENDON' ? 'selected' : '') + '>Rhoden Hall, Clarendon</option>'
+            + pickupOptionsHtml(p.pickup, pickupLocations)
           + '</select>'
           + '<button class="btn btn--ghost btn--sm" data-action="setPickup" data-pkg-id="' + p.id + '">Save</button>'
           + '</div>'
