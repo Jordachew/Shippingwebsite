@@ -319,12 +319,12 @@
   if (!el) return;
 
   var fn = String(profile?.full_name || "").trim() || firstName(profile?.full_name, email);
-  var acct = profile?.customer_no || "SNS-JMXXXX";
+  var acct = profile?.customer_no || "SNS-XXXX";
 
   el.textContent = [
     fn,
     WAREHOUSE_LINES[0],
-    WAREHOUSE_LINES[1] acct,
+    WAREHOUSE_LINES[1], acct,
     WAREHOUSE_LINES[2]
   ].join("\n");
   }
