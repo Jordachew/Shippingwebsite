@@ -315,11 +315,19 @@
   }
 
   function renderShipTo(profile, email) {
-    var el = $("shipToBlock");
-    if (!el) return;
-    var fn = String(profile?.full_name || '').trim() || firstName(profile?.full_name, email);
-    var acct = profile?.customer_no || "SNS-JMXXXX";
-    el.textContent = [fn + " — " + acct].concat(WAREHOUSE_LINES).join("\n");
+  var el = $("shipToBlock");
+  if (!el) return;
+
+  var fn = String(profile?.full_name || "").trim() || firstName(profile?.full_name, email);
+  var acct = profile?.customer_no || "SNS-JMXXXX";
+
+  el.textContent = [
+    fn,
+    WAREHOUSE_LINES[0],
+    acct,
+    WAREHOUSE_LINES[1],
+    WAREHOUSE_LINES[2]
+  ].join("\n");
   }
 
   // ------------------------
