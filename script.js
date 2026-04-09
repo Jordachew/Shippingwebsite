@@ -23,7 +23,7 @@
   var HOURS_TEXT = "Mon–Fri 10:00 AM–5:00 PM. After hours, we reply next business day.";
 
   // Warehouse address (display only)
-  var WAREHOUSE_LINES = ["4350 NE 5TH TERRACE", "Bay #3", "Oakland Park, Florida 33334"];
+  var WAREHOUSE_LINES = ["4350 NE 5TH TERRACE", "Bay #3", customer_no, "Oakland Park, Florida 33334"];
 
   // ------------------------
   // CALCULATOR RATES
