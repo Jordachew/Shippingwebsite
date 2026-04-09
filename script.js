@@ -324,8 +324,7 @@
   el.textContent = [
     fn,
     WAREHOUSE_LINES[0],
-    acct,
-    WAREHOUSE_LINES[1],
+    WAREHOUSE_LINES[1] acct,
     WAREHOUSE_LINES[2]
   ].join("\n");
   }
