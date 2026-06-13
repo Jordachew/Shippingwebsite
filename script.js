@@ -54,6 +54,16 @@
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
   }
+  function statusTagClass(status) {
+    var s = String(status || "").toLowerCase();
+    if (s.includes("ready"))    return "tag--ready";
+    if (s.includes("transit"))  return "tag--transit";
+    if (s.includes("received")) return "tag--received";
+    if (s.includes("delivered"))return "tag--delivered";
+    if (s.includes("hold"))     return "tag--hold";
+    return "";
+  }
+
   function formatJMD(n) {
     return new Intl.NumberFormat("en-JM", {
       style: "currency", currency: "JMD", maximumFractionDigits: 0
@@ -126,8 +136,7 @@
     var nav = $("nav");
     if (!toggle || !nav) return;
     toggle.addEventListener("click", function () {
-      var open = nav.style.display === "flex";
-      nav.style.display = open ? "none" : "flex";
+      nav.classList.toggle("open");
     });
   }
 
@@ -408,7 +417,7 @@
       return (
         "<tr>" +
           "<td><strong>" + escapeHTML(p.tracking) + "</strong></td>" +
-          '<td><span class="tag">' + escapeHTML(p.status) + "</span></td>" +
+          '<td><span class="tag ' + statusTagClass(p.status) + '">' + escapeHTML(p.status) + "</span></td>" +
           "<td class=\"col--xs\">" + (p.weight != null ? escapeHTML(String(p.weight)) : "—") + "</td>" +
           "<td class=\"col--xs\">" + (p.cost != null ? formatJMD(Number(p.cost)) : "—") + "</td>" +
           "<td>" + pickupCell + "</td>" +
@@ -972,7 +981,7 @@
           overviewPkgBody.innerHTML = show.map(function (p) {
             return '<tr>'
               + '<td><strong>' + escapeHTML(p.tracking || "") + '</strong></td>'
-              + '<td>' + escapeHTML(p.status || "") + '</td>'
+              + '<td><span class="tag ' + statusTagClass(p.status) + '">' + escapeHTML(p.status || "") + '</span></td>'
               + '<td>' + (p.weight != null ? escapeHTML(String(p.weight)) : "—") + '</td>'
               + '<td>' + (p.cost != null ? formatJMD(Number(p.cost)) : (p.amount_due_jmd != null ? formatJMD(Number(p.amount_due_jmd)) : "—")) + '</td>'
               + '</tr>';

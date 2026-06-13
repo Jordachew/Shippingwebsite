@@ -44,7 +44,7 @@
   <div class="container hero__grid">
     <div class="hero__copy">
       <div class="pill"><span class="dot"></span> Mon–Fri 10AM–5PM • UWI Kingston or Clarendon Pickup</div>
-      <h1>World-class shipping, simple tracking, and a modern customer portal.</h1>
+      <h1>World-class shipping, <span>simple tracking</span>, and a modern customer portal.</h1>
       <p>
         Upload invoices, track packages, estimate costs, and message our team in one place.
         Pick up at <strong>UWI (Kingston)</strong> or <strong>Rhoden Hall District (Clarendon)</strong>.
@@ -56,28 +56,63 @@
       </div>
 
       <div class="hero__stats">
-        <div class="stat"><div class="stat__k">Support</div><div class="stat__v">Chat enabled</div></div>
-        <div class="stat"><div class="stat__k">Invoices</div><div class="stat__v">Upload anytime</div></div>
-        <div class="stat"><div class="stat__k">Pickup</div><div class="stat__v">2 locations</div></div>
+        <div class="hero__stat"><div class="hero__stat-k">Support</div><div class="hero__stat-v">Chat enabled</div></div>
+        <div class="hero__stat"><div class="hero__stat-k">Invoices</div><div class="hero__stat-v">Upload anytime</div></div>
+        <div class="hero__stat"><div class="hero__stat-k">Pickup</div><div class="hero__stat-v">2 locations</div></div>
       </div>
     </div>
 
     
     <div class="hero__visual">
-      <div class="glassCard" id="varietyHero">
-        <div class="glassCard__head">
-          <div class="glassCard__title">Variety Store</div>
-          <div class="badge">Shop</div>
+      <div class="trackCard">
+        <div class="trackCard__head">
+          <div class="trackCard__title">Package Tracker</div>
+          <span class="badge">Live</span>
         </div>
-
-        <div class="storeHero">
-          <div class="storeHero__grid">
-            <div class="storeHero__item">👗 <span>Clothing</span></div>
-            <div class="storeHero__item">👟 <span>Shoes</span></div>
-            <div class="storeHero__item">👜 <span>Bags</span></div>
-            <div class="storeHero__item">🌸 <span>Perfume</span></div>
-            <div class="storeHero__item">⌚ <span>Accessories</span></div>
-            <div class="storeHero__item">💄 <span>Beauty</span></div>
+        <div class="trackCard__sub">Track your shipment every step of the way</div>
+        <div class="timeline">
+          <div class="tl">
+            <div class="tl__dot done">
+              <svg viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="tl__content">
+              <div class="tl__top">
+                <div class="tl__title">Received at warehouse</div>
+                <span class="tag tag--ok">Done</span>
+              </div>
+              <div class="tl__sub">Lauderhill, FL 33311</div>
+            </div>
+          </div>
+          <div class="tl">
+            <div class="tl__dot done">
+              <svg viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="tl__content">
+              <div class="tl__top">
+                <div class="tl__title">In Transit</div>
+                <span class="tag tag--ok">Done</span>
+              </div>
+              <div class="tl__sub">Cleared customs · en route to Jamaica</div>
+            </div>
+          </div>
+          <div class="tl">
+            <div class="tl__dot active"></div>
+            <div class="tl__content">
+              <div class="tl__top">
+                <div class="tl__title">Ready for Pickup</div>
+                <span class="tag tag--ready">Action needed</span>
+              </div>
+              <div class="tl__sub">UWI, Kingston — confirm pickup location</div>
+            </div>
+          </div>
+          <div class="tl">
+            <div class="tl__dot"></div>
+            <div class="tl__content">
+              <div class="tl__top">
+                <div class="tl__title">Picked Up / Delivered</div>
+              </div>
+              <div class="tl__sub">Awaiting collection</div>
+            </div>
           </div>
         </div>
       </div>
@@ -93,12 +128,29 @@
     </div>
     <div class="cards cards--3">
       <article class="card feature"><div class="icon">📦</div><h3>Package Handling</h3><p>Assigned tracking IDs and clear status updates.</p></article>
-      <article class="card feature"><div class="icon">🧾</div><h3>Invoice Uploads</h3><p>Upload multiple invoices per package (PDF, JPEG, DOCX, Excel).</p></article>
+      <article class="card feature"><div class="icon">🧾</div><h3>Invoice Uploads</h3><p>Upload supplier invoices per package — PDF, JPG, PNG or WEBP accepted.</p></article>
       <article class="card feature"><div class="icon">📍</div><h3>Pickup Options</h3><p>Choose UWI Kingston or Clarendon pickup during uploads.</p></article>
     </div>
   </div>
 </section>
 
+
+<section id="varietyHero" class="section section--alt">
+  <div class="container">
+    <div class="section__head">
+      <h2>Variety Store</h2>
+      <p>Shop popular categories shipped direct to your door in Jamaica.</p>
+    </div>
+    <div class="storeGrid">
+      <div class="storeItem"><div class="storeItem__icon">👗</div>Clothing</div>
+      <div class="storeItem"><div class="storeItem__icon">👟</div>Shoes</div>
+      <div class="storeItem"><div class="storeItem__icon">👜</div>Bags</div>
+      <div class="storeItem"><div class="storeItem__icon">🌸</div>Perfume</div>
+      <div class="storeItem"><div class="storeItem__icon">⌚</div>Accessories</div>
+      <div class="storeItem"><div class="storeItem__icon">💄</div>Beauty</div>
+    </div>
+  </div>
+</section>
 
 <section id="calculator" class="section">
   <div class="container">
@@ -360,7 +412,7 @@
         </div>
 
         <label>Invoice File
-          <input id="invFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
+          <input id="invFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic" />
         </label>
 
         <label>Note (optional)
@@ -457,7 +509,7 @@
   <div class="divider"></div>
   <div style="padding:10px;">
     <label class="muted small">Attachment (optional)</label>
-    <input id="chatFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"/>
+    <input id="chatFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"/>
     <div class="muted small" id="chatMsg"></div>
   </div>
 </div>
