@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sueños Shipping & Variety Store</title>
+  <meta name="description" content="Track packages, upload invoices, estimate shipping cost, and chat with support."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="customer-page">
+
+<header class="header">
+  <div class="container header__inner">
+    <a class="brand" href="#home">
+      <div class="brand__mark"><img src="assets/logo.jpeg" alt="Sueños Shipping logo" class="brand__logo"/></div>
+      <div class="brand__text">
+        <div class="brand__name">Sueños Shipping</div>
+        <div class="brand__tag">Shipping & Variety Store</div>
+      </div>
+    </a>
+
+    <button class="nav__toggle" id="navToggle" type="button">☰</button>
+
+    <nav class="nav" id="nav">
+      <a href="#services">Services</a>
+      <a href="#varietyHero">Variety Store</a>
+      <a href="#calculator">Calculator</a>
+      <a href="#portal" class="nav__pill">Customer Portal</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <div class="header__actions">
+      <a class="btn btn--ghost" href="/track.html">Track</a>
+      <a class="btn btn--ghost" href="#portal">Portal</a>
+      <button class="btn btn--primary" id="openChatTop" type="button">Chat</button>
+    </div>
+  </div>
+</header>
+
+<main id="home" class="hero">
+  <div class="container hero__grid">
+    <div class="hero__copy">
+      <div class="pill"><span class="dot"></span> Mon–Fri 10AM–5PM • UWI Kingston or Clarendon Pickup</div>
+      <h1>World-class shipping, simple tracking, and a modern customer portal.</h1>
+      <p>
+        Upload invoices, track packages, estimate costs, and message our team in one place.
+        Pick up at <strong>UWI (Kingston)</strong> or <strong>Rhoden Hall District (Clarendon)</strong>.
+      </p>
+
+      <div class="hero__cta">
+        <a class="btn btn--primary" href="#portal">Open Portal</a>
+        <a class="btn btn--ghost" href="/track.html">Public Tracking</a>
+      </div>
+
+      <div class="hero__stats">
+        <div class="stat"><div class="stat__k">Support</div><div class="stat__v">Chat enabled</div></div>
+        <div class="stat"><div class="stat__k">Invoices</div><div class="stat__v">Upload anytime</div></div>
+        <div class="stat"><div class="stat__k">Pickup</div><div class="stat__v">2 locations</div></div>
+      </div>
+    </div>
+
+    
+    <div class="hero__visual">
+      <div class="glassCard" id="varietyHero">
+        <div class="glassCard__head">
+          <div class="glassCard__title">Variety Store</div>
+          <div class="badge">Shop</div>
+        </div>
+
+        <div class="storeHero">
+          <div class="storeHero__grid">
+            <div class="storeHero__item">👗 <span>Clothing</span></div>
+            <div class="storeHero__item">👟 <span>Shoes</span></div>
+            <div class="storeHero__item">👜 <span>Bags</span></div>
+            <div class="storeHero__item">🌸 <span>Perfume</span></div>
+            <div class="storeHero__item">⌚ <span>Accessories</span></div>
+            <div class="storeHero__item">💄 <span>Beauty</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<section id="services" class="section">
+  <div class="container">
+    <div class="section__head">
+      <h2>Shipping Services</h2>
+      <p>Reliable handling, transparent steps, and status updates you can trust.</p>
+    </div>
+    <div class="cards cards--3">
+      <article class="card feature"><div class="icon">📦</div><h3>Package Handling</h3><p>Assigned tracking IDs and clear status updates.</p></article>
+      <article class="card feature"><div class="icon">🧾</div><h3>Invoice Uploads</h3><p>Upload multiple invoices per package (PDF, JPEG, DOCX, Excel).</p></article>
+      <article class="card feature"><div class="icon">📍</div><h3>Pickup Options</h3><p>Choose UWI Kingston or Clarendon pickup during uploads.</p></article>
+    </div>
+  </div>
+</section>
+
+
+<section id="calculator" class="section">
+  <div class="container">
+    <div class="section__head">
+      <h2>Shipping Cost Calculator</h2>
+      <p>Estimate shipping cost by weight and optional fees.</p>
+    </div>
+
+    <div class="grid2 grid2--calc">
+      <div class="calcLeft">
+        <form class="form card card--pad" id="calcForm">
+          <label>Weight (lbs) <span class="req">*</span>
+            <input id="weight" type="number" step="0.1" min="0.1" required/>
+          </label>
+          <label>Declared Value (USD) <span class="req">*</span>
+            <input id="value" type="number" step="0.01" min="0" required/>
+          </label>
+          <button class="btn btn--primary" type="submit">Calculate</button>
+          <p class="muted small">Estimate only. Final cost may change based on duties/handling.</p>
+        </form>
+
+        <div class="card card--pad calcEstimate">
+          <h3>Estimate</h3>
+          <div id="result">
+            <div class="result__big">—</div>
+            <div class="result__sub">Enter weight and value to calculate.</div>
+          </div>
+          <div class="divider"></div>
+          <button class="btn btn--ghost" id="openChatCalc" type="button">Ask a question</button>
+        </div>
+      </div>
+
+      <div class="card card--pad calcRates">
+        <h3>Rate Chart</h3>
+        <div id="ratesList" class="ratesList"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="portal" class="section section--alt">
+  <div class="container">
+    <div class="section__head">
+      <h2>Customer Portal</h2>
+      <p>Register/login to view packages, upload invoices, and chat with support.</p>
+    </div>
+
+    <div class="portal">
+      <!-- Login/Register -->
+      <div class="card card--pad" id="loginCard">
+        <h3>Account</h3>
+
+        <div class="tabs">
+          <button class="tab active" id="tabLogin" type="button">Login</button>
+          <button class="tab" id="tabRegister" type="button">Register</button>
+        </div>
+
+        <div id="loginPane">
+          <form class="form" id="loginForm">
+            <label>Email <input id="loginEmail" type="email" required/></label>
+            <label>Password <input id="loginPassword" type="password" required/></label>
+            <button class="btn btn--primary" type="submit">Sign In</button>
+            <div class="muted small" id="loginMsg"></div>
+          </form>
+        </div>
+
+        <div id="registerPane" class="hidden">
+          <form class="form" id="registerForm">
+            <label>Full Name <input id="regName" type="text" required/></label>
+            <label>Phone <input id="regPhone" type="tel" placeholder="1876..." required/></label>
+            <label>Email <input id="regEmail" type="email" required/></label>
+            <label>Password <input id="regPassword" type="password" minlength="8" required/></label>
+            <button class="btn btn--primary" type="submit">Create Account</button>
+            <div class="muted small" id="regMsg"></div>
+          </form>
+        </div>
+
+        <div class="divider"></div>
+        <a class="btn btn--ghost" href="/track.html">Public Tracking</a>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="card card--pad hidden" id="dashCard">
+        <div class="dashShell">
+          <div class="dashTop">
+            <div class="dashBrand">
+              <img src="assets/logo.jpeg" class="dashLogo" alt="Sueños logo">
+            </div>
+
+            <div class="dashRight">
+              <button class="iconBtn" id="notifBtn" type="button" aria-label="Notifications">
+                🔔 <span class="notifDot" id="notifDot" style="display:none;">2</span>
+              </button>
+
+              <div class="userPill">
+                <span class="avatar">👤</span>
+                <span id="userName">Customer</span>
+                <span class="caret">▾</span>
+              </div>
+
+              <a class="btn btn--ghost" href="/admin.html" id="adminLink" style="display:none;">Admin</a>
+              <button class="btn btn--ghost" id="logoutBtn" type="button">Logout</button>
+            </div>
+          </div>
+
+          <nav class="dashNav" aria-label="Dashboard tabs">
+            <button class="dashTab active" data-tab="overview" type="button">Dashboard</button>
+            <button class="dashTab" data-tab="packages" type="button">Packages</button>
+            <button class="dashTab" data-tab="invoices" type="button">Invoices</button>
+            <button class="dashTab" data-tab="chat" type="button">Chat Support</button>
+          </nav>
+
+          <div class="dashSection active" data-section="overview">
+            <div class="dashGrid2">
+	              <section class="dashLeft">
+	                <h2 class="dashH1">Welcome back, <span id="welcomeName">Customer</span>!</h2>
+
+	                <div class="statRow">
+                  <div class="statCard gold">
+                    <div class="statTitle">Ready for Pickup</div>
+                    <div class="statNum" id="statReady">0</div>
+                  </div>
+                  <div class="statCard blue">
+                    <div class="statTitle">In Transit</div>
+                    <div class="statNum" id="statTransit">0</div>
+                  </div>
+                  <div class="statCard green">
+                    <div class="statTitle">Outstanding (JMD)</div>
+                    <div class="statNum" id="statOutstanding">0</div>
+                  </div>
+                </div>
+
+	                <div class="shipCard">
+	                  <div class="shipRow">
+	                    <div class="shipLabel">Customer #:</div>
+	                    <div class="shipValue" id="customerNo">SNS-JMXXXX</div>
+	                  </div>
+	                  <div class="shipRow">
+	                    <div class="shipLabel">Shipping Address:</div>
+	                    <div class="shipValue" style="flex:1">
+	                      <pre class="shipTo" id="shipToBlock"></pre>
+	                    </div>
+	                  </div>
+	                  <div class="row row--wrap">
+	                    <button class="btn btn--ghost" id="shipToCopy" type="button">Copy address</button>
+	                    <span class="muted small" id="shipToMsg"></span>
+	                  </div>
+	                </div>
+              </section>
+
+              <aside class="dashRightCol">
+                <div class="panel panel--soft">
+                  <div class="panel__head">
+                    <div class="panel__title">Packages</div>
+                    <div class="panel__sub muted small">Latest updates. View all in the Packages tab.</div>
+                  </div>
+                  <div class="tableWrap tableWrap--soft">
+                    <table class="table table--mini overviewTable">
+                      <thead>
+                        <tr>
+                          <th>Tracking</th>
+                          <th>Status</th>
+                          <th class="col--xs">Weight</th>
+                          <th class="col--xs">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody id="overviewPkgBody">
+                        <tr><td colspan="4" class="muted">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="row" style="justify-content:flex-end;margin-top:10px">
+                    <button class="btn btn--ghost" id="goPackages" type="button">View all packages</button>
+                  </div>
+                </div>
+
+	                <div class="panel panel--soft" style="margin-top:14px">
+	                  <div class="panel__head">
+	                    <div class="panel__title">Supplier Invoices</div>
+	                    <div class="panel__sub muted small">Invoices you received from Amazon/Shein/eBay etc.</div>
+	                  </div>
+                  <ul class="list" id="overviewInvList"></ul>
+                  <div class="row row--wrap" style="justify-content:flex-end;margin-top:10px">
+                    <button class="btn btn--primary" id="jumpUpload" type="button">Upload supplier invoice</button>
+                  </div>
+                </div>
+
+                <div class="panel panel--soft" style="margin-top:14px">
+                  <div class="panel__head">
+                    <div class="panel__title">Support</div>
+                    <div class="panel__sub muted small">Message staff and get updates.</div>
+                  </div>
+                  <div class="row" style="justify-content:flex-end;">
+                    <button class="btn btn--primary" id="openChatDash" type="button">Open chat</button>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <div class="dashSection" data-section="packages">
+  <div class="dashGridSingle">
+    <div class="panel panel--soft">
+      <div class="panel__head">
+        <div class="panel__title">Your Packages</div>
+        <div class="panel__sub muted small">Search by tracking number.</div>
+      </div>
+
+      <div class="row row--wrap" style="gap:10px; align-items:flex-end;">
+        <label style="flex:1; min-width:220px;">Search
+          <input id="pkgSearch" type="text" placeholder="Enter tracking number..." />
+        </label>
+        <button class="btn btn--ghost" id="resetSearch" type="button">Reset</button>
+      </div>
+
+      <div class="tableWrap" style="margin-top:14px;">
+	        <table class="table table--fixed">
+	          <thead>
+	            <tr>
+	              <th>Tracking</th>
+	              <th>Status</th>
+	              <th class="col--xs">Weight</th>
+	              <th class="col--xs">Cost</th>
+	              <th>Pickup location</th>
+	              <th>Updated</th>
+	            </tr>
+	          </thead>
+          <tbody id="pkgBody">
+            <tr><td colspan="6" class="muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="muted small" id="pkgMsg" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="dashSection" data-section="invoices">
+  <div class="dashGridSingle">
+    <div class="panel panel--soft">
+      <div class="panel__head">
+        <div class="panel__title">Supplier Invoice</div>
+        <div class="panel__sub muted small">Upload the invoice you received from the supplier. Staff will approve it.</div>
+      </div>
+
+      <form class="form" id="invoiceForm">
+        <div class="grid2">
+          <label>Tracking #
+            <select id="invTracking" required></select>
+            <div class="muted small">Only packages that are not ready for pickup are shown.</div>
+          </label>
+          <label>Pickup Location
+            <select id="invPickup" required>
+              <option value="UWI_KINGSTON">UWI, Kingston</option>
+              <option value="RHODEN_HALL_CLARENDON">Rhoden Hall District, Clarendon</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Invoice File
+          <input id="invFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
+        </label>
+
+        <label>Note (optional)
+          <input id="invNote" type="text" placeholder="Amazon/Shein/etc. Any notes..." />
+        </label>
+
+        <div class="row row--wrap" style="gap:10px; align-items:center;">
+          <button class="btn btn--primary" type="submit">Upload Invoice</button>
+          <span class="muted small" id="invMsg"></span>
+        </div>
+      </form>
+
+      <div class="divider" style="margin:18px 0;"></div>
+
+      <div class="panel__head" style="padding:0;">
+        <div class="panel__title">Recent Uploads</div>
+        <div class="panel__sub muted small">If empty, you haven't uploaded any invoices yet.</div>
+      </div>
+      <ul class="list" id="uploadsList" style="margin-top:10px;"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="dashSection" data-section="chat">
+            <div class="dashGridSingle">
+              <div class="panel panel--soft">
+                <div class="panel__head">
+                  <div class="panel__title">Chat with Support</div>
+                  <div class="panel__sub muted small">Attachments supported (PDF/JPG/DOCX/XLSX).</div>
+                </div>
+                <div id="chatTabHost"></div>
+                <div class="muted small" id="chatTabHint" style="margin-top:10px;">Click “Open Chat” if the widget is hidden.</div>
+                <div class="row" style="justify-content:flex-end;margin-top:10px">
+                  <button class="btn btn--ghost" id="closeChatTab" type="button">Back to Dashboard</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact" class="section">
+  <div class="container">
+    <div class="section__head">
+      <h2>Contact</h2>
+      <p>Mon–Fri 10:00 AM–5:00 PM</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card card--pad">
+        <h3>Sueños Shipping & Variety Store</h3>
+        <p class="muted">
+          Email: <strong>suenoshipping@gmail.com</strong><br/>
+          Phone: <strong>1-876-364-1205</strong><br/>
+          Location: <strong>Rhoden Hall District, Clarendon</strong><br/>
+          Pickup: <strong>UWI, Kingston</strong> or <strong>Clarendon</strong>
+        </p>
+        <button class="btn btn--primary" id="openChatContact" type="button">Message us</button>
+      </div>
+
+      <div class="card card--pad">
+        <h3>Quick Links</h3>
+        <a class="btn btn--ghost" href="/track.html">Public Tracking</a>
+        <div class="divider"></div>
+        <p class="muted small">For after-hours messages, we respond next business day.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Chat Widget -->
+<div class="chat hidden" id="chatWidget" aria-hidden="true">
+  <div class="chat__head">
+    <div>
+      <div class="chat__title">Sueños Support</div>
+      <div class="chat__sub" id="chatHoursText">Mon–Fri 10AM–5PM</div>
+    </div>
+    <button class="chat__close" id="closeChat" type="button">✕</button>
+  </div>
+  <div class="chat__body" id="chatBody"></div>
+
+  <form class="chat__form" id="chatForm">
+    <input id="chatInput" type="text" placeholder="Type your message..." autocomplete="off"/>
+    <button class="btn btn--primary" type="submit">Send</button>
+  </form>
+
+  <div class="divider"></div>
+  <div style="padding:10px;">
+    <label class="muted small">Attachment (optional)</label>
+    <input id="chatFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"/>
+    <div class="muted small" id="chatMsg"></div>
+  </div>
+</div>
+
+<button class="chatFab" id="chatFab" type="button">💬</button>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="./config.js"></script>
+<script src="./jps-monitor.js"></script>
+<script>
+  JpsMonitor.init({ getClient: () => window.__SB__, appName: 'shipping' });
+</script>
+<script src="script.js"></script>
+</body>
+</html>

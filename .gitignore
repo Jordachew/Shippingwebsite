@@ -1,0 +1,8 @@
+
+# Secrets — never commit
+config.js
+.env
+.env.local
+.env*.local
+
+.vercel

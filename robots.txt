@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin.html
+Disallow: /admin/
+Disallow: /api/
+Disallow: /supabase/
+Disallow: /private/
+
+Sitemap: https://www.suenosshipping.com/sitemap.xml
