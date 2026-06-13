@@ -64,6 +64,34 @@
     return "";
   }
 
+  // ── Toast ──────────────────────────────────────────────
+  function showToast(msg, type) {
+    type = type || "info";
+    var container = $("toastContainer");
+    if (!container) return;
+    var t = document.createElement("div");
+    t.className = "toast toast--" + type;
+    t.innerHTML = '<span class="toast__dot"></span>' + escapeHTML(msg);
+    container.appendChild(t);
+    setTimeout(function () { t.style.opacity = "0"; t.style.transform = "translateY(8px)"; t.style.transition = "opacity .2s,transform .2s"; }, 3200);
+    setTimeout(function () { t.remove(); }, 3450);
+  }
+
+  // ── Button loading ──────────────────────────────────────
+  function btnLoading(btn, loading, label) {
+    if (!btn) return;
+    if (loading) {
+      btn.dataset._origText = btn.textContent;
+      btn.textContent = label || "Please wait…";
+      btn.classList.add("btn--loading");
+      btn.disabled = true;
+    } else {
+      btn.textContent = btn.dataset._origText || btn.textContent;
+      btn.classList.remove("btn--loading");
+      btn.disabled = false;
+    }
+  }
+
   function formatJMD(n) {
     return new Intl.NumberFormat("en-JM", {
       style: "currency", currency: "JMD", maximumFractionDigits: 0
@@ -286,7 +314,9 @@
     loginForm?.addEventListener("submit", async function (e) {
       e.preventDefault();
       var msg = $("loginMsg");
-      if (msg) msg.textContent = "Signing in...";
+      var btn = loginForm.querySelector('button[type="submit"]');
+      if (msg) msg.textContent = "";
+      btnLoading(btn, true, "Signing in…");
 
       try {
         var email = ($("loginEmail")?.value || "").trim().toLowerCase();
@@ -294,29 +324,39 @@
 
         var res = await sb.auth.signInWithPassword({ email: email, password: password });
         if (res.error) {
-          if (msg) msg.textContent = "Login error: " + res.error.message;
+          if (msg) msg.textContent = res.error.message;
+          showToast(res.error.message, "error");
           return;
         }
 
         var sess = await safeGetSession();
         if (!sess.session) {
-          if (msg) msg.textContent = "Logged in but no session returned. If email confirmation is ON, confirm email then log in.";
+          var m = "Logged in but no session. Confirm your email then try again.";
+          if (msg) msg.textContent = m;
+          showToast(m, "error");
           return;
         }
 
         await ensureProfileSafe("", "");
         if (msg) msg.textContent = "";
+        showToast("Welcome back!", "success");
         await renderAuth();
       } catch (err) {
         console.error(err);
-        if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+        var m2 = err?.message || String(err);
+        if (msg) msg.textContent = m2;
+        showToast(m2, "error");
+      } finally {
+        btnLoading(btn, false);
       }
     });
 
     regForm?.addEventListener("submit", async function (e) {
       e.preventDefault();
       var msg = $("regMsg");
-      if (msg) msg.textContent = "Creating account...";
+      var btn = regForm.querySelector('button[type="submit"]');
+      if (msg) msg.textContent = "";
+      btnLoading(btn, true, "Creating account…");
 
       try {
         var full_name = ($("regName")?.value || "").trim();
@@ -331,23 +371,32 @@
         });
 
         if (res.error) {
-          if (msg) msg.textContent = "Signup error: " + res.error.message;
+          if (msg) msg.textContent = res.error.message;
+          showToast(res.error.message, "error");
           return;
         }
 
-        // If email confirmation OFF, we may already have a session
         var sess = await safeGetSession();
         if (sess.session) {
           await ensureProfileSafe(full_name, phone);
-          if (msg) msg.textContent = "Account created. You can now log in.";
+          var m = "Account created. Welcome!";
+          if (msg) msg.textContent = m;
+          showToast(m, "success");
+          await renderAuth();
         } else {
-          if (msg) msg.textContent = "Account created. Please check your email to confirm, then log in.";
+          var m2 = "Account created. Check your email to confirm, then log in.";
+          if (msg) msg.textContent = m2;
+          showToast(m2, "info");
         }
 
         regForm.reset();
       } catch (err) {
         console.error(err);
-        if (msg) msg.textContent = "Unexpected error: " + (err?.message || String(err));
+        var m3 = err?.message || String(err);
+        if (msg) msg.textContent = m3;
+        showToast(m3, "error");
+      } finally {
+        btnLoading(btn, false);
       }
     });
 
@@ -387,6 +436,7 @@
     }
 
     var data = res.data || [];
+    _pkgStore = data;
 	    if (!data.length) {
 	      body.innerHTML = '<tr><td colspan="6" class="muted">No packages yet.</td></tr>';
       return;
@@ -521,7 +571,8 @@
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
       var msg = $("invMsg");
-      if (msg) msg.textContent = "Uploading...";
+      var btn = form.querySelector('button[type="submit"]');
+      if (msg) msg.textContent = "";
 
       var u = await sb.auth.getUser();
       var user = u?.data?.user;
@@ -539,30 +590,41 @@
       var ALLOWED_TYPES = ["application/pdf","image/jpeg","image/png","image/webp","image/heic"];
       if (!ALLOWED_TYPES.includes(file.type)) {
         if (msg) msg.textContent = "Only PDF, JPG, PNG or WEBP files allowed.";
+        showToast("File type not allowed. Use PDF, JPG, PNG or WEBP.", "error");
         return;
       }
-      var safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      var path = user.id + "/" + tracking + "/" + Date.now() + "_" + safeName;
 
-      var up = await sb.storage.from(INVOICE_BUCKET).upload(path, file, { upsert: false });
-      if (up.error) { if (msg) msg.textContent = up.error.message; return; }
+      btnLoading(btn, true, "Uploading…");
+      try {
+        var safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        var path = user.id + "/" + tracking + "/" + Date.now() + "_" + safeName;
 
-      var ins = await sb.from("invoices").insert({
-        user_id: user.id,
-        tracking: tracking,
-        pickup: pickup,
-        pickup_confirmed: false,
-        file_path: path,
-        file_name: safeName,
-        file_type: (file.type || "unknown"),
-        note: note || null
-      });
+        var up = await sb.storage.from(INVOICE_BUCKET).upload(path, file, { upsert: false });
+        if (up.error) {
+          if (msg) msg.textContent = up.error.message;
+          showToast(up.error.message, "error");
+          return;
+        }
 
-      if (ins.error) { if (msg) msg.textContent = ins.error.message; return; }
+        var ins = await sb.from("invoices").insert({
+          user_id: user.id, tracking: tracking, pickup: pickup,
+          pickup_confirmed: false, file_path: path,
+          file_name: safeName, file_type: (file.type || "unknown"), note: note || null
+        });
 
-      form.reset();
-      if (msg) msg.textContent = "Uploaded. Pickup location will be confirmed by staff.";
-      await renderUploads();
+        if (ins.error) {
+          if (msg) msg.textContent = ins.error.message;
+          showToast(ins.error.message, "error");
+          return;
+        }
+
+        form.reset();
+        if (msg) msg.textContent = "";
+        showToast("Invoice uploaded. Staff will confirm pickup.", "success");
+        await renderUploads();
+      } finally {
+        btnLoading(btn, false);
+      }
     });
   }
 
@@ -764,6 +826,11 @@
         if ($("adminLink")) $("adminLink").style.display = "none";
         if (chatChannel) { sb.removeChannel(chatChannel); chatChannel = null; }
         if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+        // Header auth chip — logged out
+        var ha = $("headerAuth");
+        if (ha) ha.innerHTML = '<a class="btn btn--primary btn--sm" href="#portal">Sign In</a>';
+        // Hide bottom nav
+        $("bottomNav")?.classList.add("hidden");
         return;
       }
 
@@ -778,11 +845,23 @@
 
       var profile = pr.data || null;
 
-      // Show "FirstName — Email"
       var fn = firstName(profile?.full_name, user.email);
       if (window.SuenosMonitor) SuenosMonitor.setUser(user.id, profile?.full_name || user.email);
       if ($("userName")) $("userName").textContent = fn + " — " + user.email;
       if ($("welcomeName")) $("welcomeName").textContent = fn;
+
+      // Header auth chip — logged in
+      var ha = $("headerAuth");
+      if (ha) {
+        ha.innerHTML =
+          '<div class="header-auth-chip">' +
+            '<div class="avatar-dot">' + escapeHTML(fn.charAt(0)) + '</div>' +
+            '<span>' + escapeHTML(fn) + '</span>' +
+          '</div>';
+      }
+
+      // Show bottom nav
+      $("bottomNav")?.classList.remove("hidden");
       if ($("customerNo")) $("customerNo").textContent = (profile?.customer_no || "");
 
       // Shipping address block
@@ -838,11 +917,11 @@
     if (name === "chat") {
       embedChatWidget();
     } else if (name === "invoices") {
-      // Refresh tracking options when visiting the Supplier Invoice tab
       populateInvoiceTrackingSelect();
     } else {
       unembedChatWidget();
     }
+    syncBottomNav(name);
   }
 
   function setupDashboardTabs() {
@@ -1054,6 +1133,125 @@
       }
 
 // ------------------------
+  // COPY ADDRESS
+  // ------------------------
+  function setupCopyAddress() {
+    $("shipToCopy")?.addEventListener("click", async function () {
+      var btn = $("shipToCopy");
+      var text = $("shipToBlock")?.textContent || "";
+      if (!text.trim()) { showToast("No address to copy yet.", "info"); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        var orig = btn.textContent;
+        btn.textContent = "Copied!";
+        btn.classList.add("btn--primary");
+        showToast("Warehouse address copied.", "success");
+        setTimeout(function () { btn.textContent = orig; btn.classList.remove("btn--primary"); }, 2000);
+      } catch (_) {
+        showToast("Could not copy — try manually selecting the text.", "error");
+      }
+    });
+  }
+
+  // ------------------------
+  // PACKAGE DRAWER
+  // ------------------------
+  var _pkgStore = [];
+
+  function openDrawer(pkg) {
+    var drawer = $("pkgDrawer");
+    if (!drawer) return;
+    $("drawerTitle").textContent = pkg.tracking || "Package";
+    $("drawerSub").textContent = "Last updated " + new Date(pkg.updated_at).toLocaleString();
+
+    var steps = [
+      { label: "Received at warehouse", done: true },
+      { label: "In Transit",            done: ["in transit","transit"].some(function(k){return String(pkg.status||"").toLowerCase().includes(k);}) || String(pkg.status||"").toLowerCase().includes("ready") || String(pkg.status||"").toLowerCase().includes("deliver") },
+      { label: "Ready for Pickup",      done: String(pkg.status||"").toLowerCase().includes("ready") || String(pkg.status||"").toLowerCase().includes("deliver") },
+      { label: "Delivered / Picked Up", done: String(pkg.status||"").toLowerCase().includes("deliver") }
+    ];
+
+    var activeIdx = steps.reduce(function(acc,s,i){return s.done?i:acc;}, 0);
+
+    var timelineHtml = steps.map(function(s, i) {
+      var cls = s.done ? (i < activeIdx ? "done" : "active") : "";
+      var check = s.done && i < activeIdx
+        ? '<svg viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : "";
+      return '<div class="tl"><div class="tl__dot ' + cls + '">' + check + '</div>'
+        + '<div class="tl__content"><div class="tl__title">' + escapeHTML(s.label) + '</div></div></div>';
+    }).join("");
+
+    $("drawerBody").innerHTML =
+      '<div>'
+        + '<div class="drawer__section-title">Status Timeline</div>'
+        + '<div class="timeline" style="margin-bottom:4px">' + timelineHtml + '</div>'
+        + '<div style="margin-top:10px"><span class="tag ' + statusTagClass(pkg.status) + '">' + escapeHTML(pkg.status || "Unknown") + '</span></div>'
+      + '</div>'
+      + '<div>'
+        + '<div class="drawer__section-title">Details</div>'
+        + '<div class="drawer__field"><div class="drawer__field-k">Tracking</div><div class="drawer__field-v">' + escapeHTML(pkg.tracking||"—") + '</div></div>'
+        + '<div class="drawer__field"><div class="drawer__field-k">Weight</div><div class="drawer__field-v">' + (pkg.weight != null ? pkg.weight + " lbs" : "—") + '</div></div>'
+        + '<div class="drawer__field"><div class="drawer__field-k">Cost</div><div class="drawer__field-v">' + (pkg.cost != null ? formatJMD(Number(pkg.cost)) : "—") + '</div></div>'
+        + '<div class="drawer__field"><div class="drawer__field-k">Pickup</div><div class="drawer__field-v">' + escapeHTML(pickupLabel(pkg.pickup)) + '</div></div>'
+        + '<div class="drawer__field"><div class="drawer__field-k">Updated</div><div class="drawer__field-v muted">' + new Date(pkg.updated_at).toLocaleString() + '</div></div>'
+      + '</div>';
+
+    drawer.classList.remove("hidden");
+    drawer.setAttribute("aria-hidden", "false");
+  }
+
+  function closeDrawer() {
+    var drawer = $("pkgDrawer");
+    if (!drawer) return;
+    drawer.classList.add("hidden");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+
+  function setupDrawer() {
+    $("drawerClose")?.addEventListener("click", closeDrawer);
+    $("drawerBackdrop")?.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeDrawer(); });
+
+    // Package table row click → drawer
+    document.addEventListener("click", function(e) {
+      var row = e.target.closest("#pkgBody tr");
+      if (!row) return;
+      // don't open if clicking a button/select inside the row
+      if (e.target.closest("button,select")) return;
+      var trackingEl = row.querySelector("td strong");
+      if (!trackingEl) return;
+      var tracking = trackingEl.textContent.trim();
+      var pkg = _pkgStore.find(function(p){ return p.tracking === tracking; });
+      if (pkg) openDrawer(pkg);
+    });
+  }
+
+  // ------------------------
+  // BOTTOM NAV
+  // ------------------------
+  function setupBottomNav() {
+    var nav = $("bottomNav");
+    if (!nav) return;
+    nav.querySelectorAll(".bnav__btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        nav.querySelectorAll(".bnav__btn").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        showDashTab(btn.getAttribute("data-tab"));
+      });
+    });
+  }
+
+  // Sync bottom nav active state when dashboard tab changes
+  function syncBottomNav(tabName) {
+    var nav = $("bottomNav");
+    if (!nav) return;
+    nav.querySelectorAll(".bnav__btn").forEach(function(btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === tabName);
+    });
+  }
+
+// ------------------------
   // INIT
   // ------------------------
   function init() {
@@ -1069,6 +1267,9 @@
     setupChatUI();
     setupDashboardTabs();
     setupMiniCalcs();
+    setupCopyAddress();
+    setupDrawer();
+    setupBottomNav();
     renderAuth();
   }
 

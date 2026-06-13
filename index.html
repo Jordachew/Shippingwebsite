@@ -33,9 +33,10 @@
     </nav>
 
     <div class="header__actions">
-      <a class="btn btn--ghost" href="/track.html">Track</a>
-      <a class="btn btn--ghost" href="#portal">Portal</a>
-      <button class="btn btn--primary" id="openChatTop" type="button">Chat</button>
+      <a class="btn btn--ghost btn--sm" href="/track.html">Track</a>
+      <div id="headerAuth">
+        <a class="btn btn--primary btn--sm" href="#portal">Sign In</a>
+      </div>
     </div>
   </div>
 </header>
@@ -513,6 +514,40 @@
     <div class="muted small" id="chatMsg"></div>
   </div>
 </div>
+
+<!-- Package detail drawer -->
+<div class="drawer hidden" id="pkgDrawer" aria-hidden="true">
+  <div class="drawer__backdrop" id="drawerBackdrop"></div>
+  <div class="drawer__panel">
+    <div class="drawer__head">
+      <div>
+        <div class="drawer__title" id="drawerTitle">Package Details</div>
+        <div class="drawer__sub" id="drawerSub"></div>
+      </div>
+      <button class="chat__close" id="drawerClose" type="button">✕</button>
+    </div>
+    <div class="drawer__body" id="drawerBody"></div>
+  </div>
+</div>
+
+<!-- Bottom nav (mobile, logged in only) -->
+<nav class="bottom-nav hidden" id="bottomNav" aria-label="Dashboard navigation">
+  <button class="bnav__btn active" data-tab="overview" type="button">
+    <span class="bnav__icon">🏠</span><span class="bnav__label">Home</span>
+  </button>
+  <button class="bnav__btn" data-tab="packages" type="button">
+    <span class="bnav__icon">📦</span><span class="bnav__label">Packages</span>
+  </button>
+  <button class="bnav__btn" data-tab="invoices" type="button">
+    <span class="bnav__icon">🧾</span><span class="bnav__label">Invoices</span>
+  </button>
+  <button class="bnav__btn" data-tab="chat" type="button">
+    <span class="bnav__icon">💬</span><span class="bnav__label">Support</span>
+  </button>
+</nav>
+
+<!-- Toast container -->
+<div id="toastContainer" class="toast-container"></div>
 
 <button class="chatFab" id="chatFab" type="button">💬</button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
