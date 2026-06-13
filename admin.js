@@ -314,15 +314,15 @@ async function renderApp() {
   }
 
   if (!isStaffRole(role)) {
-    // IMPORTANT: Don't auto-signout here. Auto-signout can create the “login once then stuck” loop.
-    // Instead, show a clear message and allow manual logout.
     currentAdmin = null;
-    if (who) who.textContent = "";
-    if (loginCard) loginCard.classList.remove("hidden");
-    if (app) app.classList.add("hidden");
-    if (logoutBtn) logoutBtn.classList.remove("hidden");
-    if ($("adminLoginMsg")) $("adminLoginMsg").textContent =
-      "Signed in, but not authorized. Your profile role must be 'staff' or 'admin'. Click Log out, then have an admin update your role in Supabase.";
+    if (who) who.textContent = “”;
+    if (loginCard) loginCard.classList.remove(“hidden”);
+    if (app) app.classList.add(“hidden”);
+    if (logoutBtn) logoutBtn.classList.remove(“hidden”);
+    if ($(“adminLoginMsg”)) $(“adminLoginMsg”).textContent =
+      “Not authorized (role: “ + role + “). Redirecting…”;
+    // Redirect non-staff away — don't sign out (avoids login loop)
+    setTimeout(function () { window.location.replace(“/”); }, 2500);
     return;
   }
 

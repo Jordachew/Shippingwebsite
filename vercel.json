@@ -2,7 +2,27 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "routes": [
-    { "src": "/admin", "dest": "/admin.html" },
-    { "src": "/track", "dest": "/track.html" }
+    {
+      "src": "/admin\\.html",
+      "status": 404,
+      "dest": "/404"
+    },
+    {
+      "src": "/notify-ready\\.js|/track\\.js|/welcome-email\\.js",
+      "status": 404,
+      "dest": "/404"
+    },
+    {
+      "src": "/admin",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store"
+      },
+      "dest": "/admin.html"
+    },
+    {
+      "src": "/track",
+      "dest": "/track.html"
+    }
   ]
 }
