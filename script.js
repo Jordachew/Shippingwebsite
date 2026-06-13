@@ -366,6 +366,7 @@
 
     var q = sb.from("packages")
       .select("id,tracking,status,weight,cost,pickup,pickup_confirmed,updated_at")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
 
     if (filter.trim()) q = q.ilike("tracking", "%" + filter.trim() + "%");
@@ -461,6 +462,7 @@
 
     var res = await sb.from("invoices")
       .select("tracking,file_name,file_type,pickup,pickup_confirmed,created_at,note")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -525,6 +527,11 @@
       if (!fileInput?.files?.length) { if (msg) msg.textContent = "Choose a file."; return; }
 
       var file = fileInput.files[0];
+      var ALLOWED_TYPES = ["application/pdf","image/jpeg","image/png","image/webp","image/heic"];
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        if (msg) msg.textContent = "Only PDF, JPG, PNG or WEBP files allowed.";
+        return;
+      }
       var safeName = file.name.replace(/[^\w.\-]+/g, "_");
       var path = user.id + "/" + tracking + "/" + Date.now() + "_" + safeName;
 
@@ -559,7 +566,7 @@
     if (!user) return;
 
     // Exclude packages already ready for pickup (or already picked up)
-    var exclude = new Set(["Read for Pickup", "Pickup/Delivered"]);
+    var exclude = new Set(["Ready for Pickup", "Pickup/Delivered"]);
 
     var res = await sb
       .from("packages")
@@ -606,6 +613,7 @@
 
     var res = await sb.from("messages")
       .select("id,sender,body,created_at")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: true })
       .limit(200);
 
@@ -662,6 +670,8 @@
     if (ins.error) { alert(ins.error.message); return; }
 
     if (file) {
+      var ALLOWED_CHAT_TYPES = ["application/pdf","image/jpeg","image/png","image/webp","image/heic"];
+      if (!ALLOWED_CHAT_TYPES.includes(file.type)) { alert("Only PDF, JPG, PNG or WEBP files allowed."); return; }
       var safeName = file.name.replace(/[^\w.\-]+/g, "_");
       var path = user.id + "/messages/" + Date.now() + "_" + safeName;
 
@@ -778,7 +788,7 @@
       // customer portal mini calculators removed
       await renderPackages("");
       await renderUploads();
-      await renderDashboardStatsAndAwaiting();
+      await renderDashboardStatsAndAwaiting(user);
     } finally {
       __renderAuthBusy = false;
     }
@@ -908,7 +918,7 @@
     if ($("chatTabHint")) $("chatTabHint").style.display = "";
   }
 
-  async function renderDashboardStatsAndAwaiting() {
+  async function renderDashboardStatsAndAwaiting(user) {
     // Overview stats + latest packages + overview invoices
     var statReady = $("statReady");
     var statTransit = $("statTransit");
@@ -916,9 +926,12 @@
     var overviewPkgBody = $("overviewPkgBody");
     var overviewInvList = $("overviewInvList");
 
+    if (!user) return;
+
     // Packages
     var res = await sb.from("packages")
       .select("id,tracking,status,weight,cost,amount_due_jmd,amount_paid_jmd,is_paid,updated_at,created_at")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
 
     if (res.error) {
@@ -932,7 +945,7 @@
 
       var readyRows = rows.filter(function (r) {
         var s = norm(r.status);
-        // supports "Ready for Pickup" and the user's existing typo "Read for Pickup"
+        // supports "Ready for Pickup" and the user's existing typo "Ready for Pickup"
         return s.includes("pickup") && (s.includes("ready") || s.includes("read"));
       });
       var transitRows = rows.filter(function (r) { return norm(r.status).includes("transit"); });
@@ -973,6 +986,7 @@
 
     var invRes = await sb.from("invoices")
       .select("id,tracking,file_path,file_name,approved,created_at")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(6);
 

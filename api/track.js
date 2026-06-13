@@ -6,15 +6,15 @@ module.exports = async function handler(req, res) {
     if (!tracking) return res.status(400).json({ error: "tracking required" });
 
     const url = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
 
-    if (!url || !serviceKey) {
+    if (!url || !anonKey) {
       return res.status(500).json({
-        error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel env vars."
+        error: "Missing SUPABASE_URL or SUPABASE_ANON_KEY in Vercel env vars."
       });
     }
 
-    const supabase = createClient(url, serviceKey);
+    const supabase = createClient(url, anonKey);
 
     const { data, error } = await supabase
       .from("packages")

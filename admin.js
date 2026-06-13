@@ -420,7 +420,7 @@ async function renderOverview() {
   if ($("sumTotal")) $("sumTotal").textContent = String(totalPkgs);
   if ($("sumReceived")) $("sumReceived").textContent = String(byStatus.get("Received at warehouse") || 0);
   if ($("sumTransit")) $("sumTransit").textContent = String(byStatus.get("In transit") || 0);
-  if ($("sumReady")) $("sumReady").textContent = String(byStatus.get("Read for Pickup") || 0);
+  if ($("sumReady")) $("sumReady").textContent = String(byStatus.get("Ready for Pickup") || 0);
   if ($("sumHold")) $("sumHold").textContent = String(byStatus.get("Hold") || 0);
   if ($("sumOutstanding")) $("sumOutstanding").textContent = formatJMD(outstanding);
 
@@ -1413,6 +1413,45 @@ SNS-JM0001,1Z999AA10123456785,In Transit,RHODEN_HALL_CLARENDON,1.2,2250,,Shein
 }
 
 // ========================
+// PROCESS QUEUE
+// ========================
+async function callProcessQueue() {
+  const { session } = await safeGetSession();
+  if (!session?.access_token) return;
+  await fetch("/api/process-queue", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ limit: 20 }),
+  });
+}
+
+// ========================
+// PARSE CSV
+// ========================
+function parseCsv(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === "," && !inQ) { vals.push(cur); cur = ""; }
+      else { cur += ch; }
+    }
+    vals.push(cur);
+    const row = {};
+    headers.forEach((h, i) => { row[h] = (vals[i] ?? "").trim(); });
+    return row;
+  }).filter(r => Object.values(r).some(v => v));
+}
+
+// ========================
 // INIT
 // ========================
 async function init() {
@@ -1425,22 +1464,6 @@ async function init() {
 }
 
 window.addEventListener("DOMContentLoaded", init);
-
-// --- Added: admin logout ---
-
-(function bindAdminLogout(){
-  const btn = document.getElementById("logoutBtn");
-  if (!btn) return;
-  btn.addEventListener("click", async () => {
-    try {
-      await sb.auth.signOut();
-      window.location.href = "/index.html";
-    } catch (e) {
-      console.error("Logout failed:", e);
-      alert("Logout failed. Please refresh and try again.");
-    }
-  });
-})();
 
 
 // --- Added: package history panel (package_events) ---
