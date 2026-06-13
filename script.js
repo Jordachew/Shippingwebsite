@@ -761,7 +761,7 @@
 
       // Show "FirstName — Email"
       var fn = firstName(profile?.full_name, user.email);
-      if (window.JpsMonitor) JpsMonitor.setUser(user.id, profile?.full_name || user.email);
+      if (window.SuenosMonitor) SuenosMonitor.setUser(user.id, profile?.full_name || user.email);
       if ($("userName")) $("userName").textContent = fn + " — " + user.email;
       if ($("welcomeName")) $("welcomeName").textContent = fn;
       if ($("customerNo")) $("customerNo").textContent = (profile?.customer_no || "");

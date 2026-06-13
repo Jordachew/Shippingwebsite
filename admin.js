@@ -333,7 +333,7 @@ async function renderApp() {
     role,
   };
 
-  if (window.JpsMonitor) JpsMonitor.setUser(currentAdmin.id, currentAdmin.full_name || currentAdmin.email);
+  if (window.SuenosMonitor) SuenosMonitor.setUser(currentAdmin.id, currentAdmin.full_name || currentAdmin.email);
   if (who) who.textContent = `${currentAdmin.full_name} • ${currentAdmin.role}`;
 
   setupTabs();
